@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>XPIN eSIM 数据平台 · 接口设计方案</title>
+<style>
+  :root{
+    --bg:#0B0E11; --bg2:#10141A; --surface:#12171E; --surface2:#161C25;
+    --text:#EAECEF; --muted:#8b93a1; --faint:#5b6572;
+    --gold:#F0B90B; --teal:#00D4AA; --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --grad:linear-gradient(90deg,var(--gold),var(--teal));
+    --grad135:linear-gradient(135deg,var(--gold),var(--teal));
+    --font:"PingFang SC","Microsoft YaHei","Noto Sans SC","Segoe UI",system-ui,sans-serif;
+    --mono:"SF Mono","JetBrains Mono","Roboto Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:rgba(0,212,170,.25)}
+
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .mono{font-family:var(--mono)}
+
+  /* ---- top nav ---- */
+  nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);background:rgba(11,14,17,.72);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .brand{font-weight:800;letter-spacing:.5px;font-size:15px}
+  .brand .x{color:var(--faint);margin:0 8px;font-weight:400}
+  .navlinks{display:flex;gap:26px;font-size:13px;color:var(--muted)}
+  .navlinks a{transition:color .2s} .navlinks a:hover{color:var(--text)}
+  @media(max-width:720px){.navlinks{display:none}}
+
+  /* ---- hero ---- */
+  header{position:relative;padding:120px 0 90px;text-align:center;overflow:hidden}
+  header::before{content:"";position:absolute;inset:0;background:
+    radial-gradient(55% 55% at 22% 0%,rgba(240,185,11,.16),transparent),
+    radial-gradient(55% 55% at 78% 0%,rgba(0,212,170,.13),transparent);pointer-events:none}
+  .eyebrow-brand{position:relative;font-size:14px;font-weight:700;letter-spacing:3px;color:var(--muted)}
+  .eyebrow-brand b{color:var(--gold)} .eyebrow-brand i{color:var(--teal);font-style:normal}
+  h1{position:relative;font-size:clamp(38px,6vw,72px);font-weight:800;line-height:1.08;margin:22px 0 18px;letter-spacing:-1px}
+  .sub{position:relative;font-size:clamp(14px,2vw,18px);color:var(--muted);font-weight:500}
+  .sub b{color:var(--teal);font-weight:600}
+  .hero-tags{position:relative;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:38px}
+  .tag{border:1px solid var(--line2);border-radius:999px;padding:8px 18px;font-size:13px;color:var(--muted);background:rgba(255,255,255,.02)}
+  .tag b{color:var(--text);font-weight:600}
+
+  /* ---- section scaffolding ---- */
+  section{padding:80px 0;border-top:1px solid var(--line)}
+  .sec-head{display:flex;align-items:flex-end;gap:20px;margin-bottom:44px}
+  .sec-num{font-size:64px;font-weight:800;line-height:.8;color:transparent;-webkit-text-stroke:1.5px rgba(240,185,11,.55);font-family:var(--mono)}
+  .sec-meta .kicker{font-size:12px;letter-spacing:3px;font-weight:700;color:var(--teal);text-transform:uppercase}
+  .sec-meta h2{font-size:clamp(24px,3.4vw,36px);font-weight:800;margin-top:6px;letter-spacing:-.5px}
+  .sec-meta h2 small{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:10px}
+
+  /* ---- generic cards ---- */
+  .grid{display:grid;gap:18px}
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:860px){.g3,.g4{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.g2,.g3,.g4{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px;transition:border-color .25s,transform .25s}
+  .card:hover{border-color:var(--line2);transform:translateY(-3px)}
+  .card .ic{font-size:22px;margin-bottom:12px;display:block}
+  .card h3{font-size:16px;font-weight:700;margin-bottom:8px}
+  .card p{font-size:13.5px;color:var(--muted)}
+  .card .accent{color:var(--teal)}
+
+  /* ---- positioning diagram ---- */
+  .flowline{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .node{flex:1;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:26px 22px;text-align:center}
+  .node.mid{border-color:rgba(0,212,170,.35);background:linear-gradient(180deg,rgba(0,212,170,.06),rgba(240,185,11,.04))}
+  .node .role{font-size:11px;letter-spacing:2px;color:var(--faint);text-transform:uppercase}
+  .node .name{font-size:20px;font-weight:800;margin:8px 0 6px}
+  .node .desc{font-size:12.5px;color:var(--muted)}
+  .node ul{list-style:none;margin-top:14px;text-align:left;font-size:12px;color:var(--muted);display:grid;gap:6px}
+  .node ul li::before{content:"▹ ";color:var(--teal)}
+  .arrow{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 8px;color:var(--faint);min-width:110px}
+  .arrow .a1{color:var(--gold)} .arrow .a2{color:var(--teal)}
+  .arrow small{font-size:10px;letter-spacing:1px}
+  @media(max-width:860px){.arrow{transform:rotate(90deg);min-width:auto;padding:14px 0}}
+
+  /* ---- layer stack ---- */
+  .layer{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-bottom:14px;position:relative;overflow:hidden}
+  .layer::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--grad135)}
+  .layer .lh{display:flex;align-items:baseline;gap:12px;margin-bottom:12px}
+  .layer .lh .no{font-family:var(--mono);font-size:13px;color:var(--gold);font-weight:700}
+  .layer .lh h3{font-size:17px;font-weight:700}
+  .layer .lh span{font-size:12px;color:var(--faint);letter-spacing:1px;text-transform:uppercase}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:12px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:5px 11px}
+  .chip b{color:var(--text);font-weight:600}
+  .adapters{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
+  .adapter{flex:1;min-width:150px;border:1px dashed var(--line2);border-radius:10px;padding:12px 14px;font-size:13px}
+  .adapter b{color:var(--teal)} .adapter.live b{color:var(--gold)}
+  .adapter small{display:block;color:var(--faint);font-size:11px;margin-top:3px}
+
+  /* ---- endpoint groups ---- */
+  .epgroup{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px;height:100%}
+  .epgroup .gh{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+  .epgroup .gh .ic{font-size:20px} .epgroup .gh h3{font-size:15px;font-weight:700}
+  .epgroup .gh .cnt{margin-left:auto;font-size:11px;color:var(--faint);font-family:var(--mono)}
+  .ep{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:12.5px}
+  .ep .m{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--teal);border:1px solid rgba(0,212,170,.35);border-radius:5px;padding:2px 6px;flex-shrink:0}
+  .ep .m.cb{color:var(--gold);border-color:rgba(240,185,11,.35)}
+  .ep .path{font-family:var(--mono);color:var(--text);font-size:12px}
+  .ep .d{margin-left:auto;color:var(--faint);font-size:11.5px;white-space:nowrap}
+  @media(max-width:560px){.ep .d{display:none}}
+
+  /* ---- feature / security cards ---- */
+  .kv{display:grid;gap:10px}
+  .kv .row{display:flex;gap:12px;font-size:13px;align-items:baseline}
+  .kv .row .k{color:var(--gold);font-family:var(--mono);font-size:12px;min-width:130px;flex-shrink:0}
+  .kv .row .v{color:var(--muted)}
+
+  /* ---- routing ---- */
+  .route{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-family:var(--mono);font-size:12px;color:var(--muted);overflow-x:auto}
+  .route .lbl{color:var(--teal)} .route .cost{color:var(--gold)}
+
+  /* ---- timeline ---- */
+  .tl{position:relative;padding-left:34px}
+  .tl::before{content:"";position:absolute;left:11px;top:6px;bottom:6px;width:2px;background:linear-gradient(180deg,var(--gold),var(--teal))}
+  .tl .step{position:relative;padding:0 0 26px}
+  .tl .step:last-child{padding-bottom:0}
+  .tl .step::before{content:"";position:absolute;left:-28px;top:4px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--teal)}
+  .tl .step .st{font-size:11px;letter-spacing:2px;color:var(--gold);font-weight:700;font-family:var(--mono)}
+  .tl .step h4{font-size:15px;font-weight:700;margin:3px 0 4px}
+  .tl .step p{font-size:13px;color:var(--muted)}
+  .tl .step code{font-family:var(--mono);font-size:11.5px;color:var(--teal);background:var(--bg2);padding:1px 6px;border-radius:5px}
+
+  /* ---- stats strip ---- */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{text-align:center;padding:20px 10px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .stat .n{font-size:34px;font-weight:800;font-family:var(--mono)}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:4px}
+
+  /* ---- footer ---- */
+  footer{border-top:1px solid var(--line);padding:60px 0 46px;text-align:center;position:relative;overflow:hidden}
+  footer::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 100% at 50% 100%,rgba(0,212,170,.10),transparent);pointer-events:none}
+  footer h3{position:relative;font-size:clamp(20px,3vw,30px);font-weight:800;margin-bottom:12px}
+  footer p{position:relative;color:var(--muted);font-size:14px;max-width:620px;margin:0 auto}
+  footer .slogan{position:relative;margin-top:22px;font-family:var(--mono);color:var(--teal);font-size:13px;letter-spacing:1px}
+  footer .copy{position:relative;margin-top:26px;color:var(--faint);font-size:12px}
+
+  /* markers & priority badges */
+  .badge{font-size:10px;font-weight:700;border-radius:6px;padding:2px 7px;letter-spacing:.3px;white-space:nowrap;font-family:var(--mono)}
+  .b-adopt{color:var(--teal);background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3)}
+  .b-rec{color:var(--gold);background:rgba(240,185,11,.1);border:1px solid rgba(240,185,11,.3)}
+  .b-future{color:var(--muted);background:rgba(255,255,255,.04);border:1px solid var(--line2)}
+  .pri{font-family:var(--mono);font-size:10px;font-weight:700;border-radius:5px;padding:1px 5px;flex-shrink:0}
+  .p0{color:#0B0E11;background:var(--teal)} .p1{color:var(--teal);border:1px solid rgba(0,212,170,.4)} .p2{color:var(--faint);border:1px solid var(--line2)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:26px;font-size:12px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .internal-note{position:relative;display:inline-block;margin-top:18px;font-size:11px;letter-spacing:2px;color:var(--gold);border:1px solid rgba(240,185,11,.35);border-radius:999px;padding:5px 16px;font-weight:700}
+
+  /* auth block */
+  .auth-wrap{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:720px){.auth-wrap{grid-template-columns:1fr}}
+  .htable{width:100%;border-collapse:collapse;font-size:12.5px}
+  .htable th{text-align:left;color:var(--faint);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:1px;padding:6px 10px;border-bottom:1px solid var(--line)}
+  .htable td{padding:7px 10px;border-bottom:1px solid var(--line);color:var(--muted);vertical-align:top}
+  .htable td.h{font-family:var(--mono);color:var(--gold);font-size:11.5px;white-space:nowrap}
+  .htable tr:last-child td{border-bottom:none}
+  .signbox{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:16px 18px;font-family:var(--mono);font-size:12px;color:var(--muted);line-height:1.9}
+  .signbox b{color:var(--teal);font-weight:600} .signbox .step{color:var(--gold)}
+
+  /* spec example */
+  .spec{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .spec .sh{display:flex;align-items:center;gap:10px;padding:16px 20px;background:var(--bg2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .spec .sh .m{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--teal);border:1px solid rgba(0,212,170,.35);border-radius:5px;padding:2px 7px}
+  .spec .sh .path{font-family:var(--mono);font-size:13px;color:var(--text)}
+  .spec .sh .name{font-size:13px;color:var(--muted)}
+  .spec .body{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  @media(max-width:720px){.spec .body{grid-template-columns:1fr}}
+  .spec .col{padding:18px 20px} .spec .col+.col{border-left:1px solid var(--line)}
+  @media(max-width:720px){.spec .col+.col{border-left:none;border-top:1px solid var(--line)}}
+  .spec .col h5{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+
+  /* full endpoint spec card */
+  .grouplbl{display:flex;align-items:center;gap:10px;margin:30px 0 14px;font-size:13px;font-weight:700;color:var(--text)}
+  .grouplbl .ic{font-size:17px}
+  .grouplbl .cnt{margin-left:auto;font-size:11px;color:var(--faint);font-family:var(--mono)}
+  .grouplbl::after{content:"";flex:0 0 0}
+  .epc{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:14px}
+  .epc>.h{display:flex;align-items:center;gap:9px;padding:12px 16px;background:var(--bg2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .epc .h .m{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--teal);border:1px solid rgba(0,212,170,.35);border-radius:5px;padding:2px 6px}
+  .epc .h .path{font-family:var(--mono);font-size:12.5px;color:var(--text)}
+  .epc .h .nm{font-size:12px;color:var(--muted)}
+  .epc .h .meta{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .epc .cols{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  @media(max-width:720px){.epc .cols{grid-template-columns:1fr}}
+  .epc .c{padding:14px 16px} .epc .c+.c{border-left:1px solid var(--line)}
+  @media(max-width:720px){.epc .c+.c{border-left:none;border-top:1px solid var(--line)}}
+  .epc .c h6{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--teal);margin-bottom:9px}
+  .epc .note{font-size:11.5px;color:var(--muted);margin-top:9px;line-height:1.7}
+  .epc .note b{color:var(--gold);font-weight:600;font-family:var(--mono)}
+  .epc .req{color:var(--gold)} /* 必填 */
+  .model{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .model h6{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;font-family:var(--mono)}
+  .model p{font-size:12px;color:var(--muted);line-height:1.9}
+  .model .f{font-family:var(--mono);color:var(--text);font-size:11.5px}
+
+  /* reveal (progressive enhancement — visible without JS) */
+  html.js .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+  html.js .reveal.in{opacity:1;transform:none}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="brand">XPIN<span class="x">×</span><span class="grad-text">eSIM API</span></div>
+    <div class="navlinks">
+      <a href="#pos">定位</a>
+      <a href="#arch">架构</a>
+      <a href="#auth">鉴权</a>
+      <a href="#api">接口全景</a>
+      <a href="#multi">多供应商</a>
+      <a href="#conv">约定与安全</a>
+      <a href="#flow">集成流程</a>
+    </div>
+  </div>
+</nav>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow-brand"><b>XPIN NETWORK</b> &nbsp;×&nbsp; <i>eSIM AGGREGATION PLATFORM</i></div>
+    <h1>eSIM 数据平台<br/><span class="grad-text">接口设计方案</span></h1>
+    <p class="sub">承接下游分销商用量需求 · 对齐上游供应商能力 · <b>可插拔多供应商适配</b></p>
+    <div class="hero-tags">
+      <span class="tag"><b>15</b> 个开放接口</span>
+      <span class="tag"><b>3</b> 类回调事件</span>
+      <span class="tag"><b>API Key</b> 静态鉴权</span>
+      <span class="tag"><b>SPI</b> 供应商适配层</span>
+      <span class="tag">兼容 <b>途鸽 V2.0</b> 语义</span>
+    </div>
+    <div class="internal-note">内部技术评审 · INTERNAL</div>
+    <div class="legend">
+      <span><b class="badge b-adopt">✅ 承接</b> 对齐上游已验证能力</span>
+      <span><b class="badge b-rec">💡 建议</b> 平台层增强，纳入 V1</span>
+      <span><b class="badge b-future">🔮 未来</b> 构思，V1 暂不实现</span>
+    </div>
+  </div>
+</header>
+
+<!-- 00 POSITIONING -->
+<section id="pos">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">00</div>
+      <div class="sec-meta">
+        <div class="kicker">Positioning</div>
+        <h2>平台定位 <small>下游分销商 ← XPIN 中台 → 多上游供应商</small></h2>
+      </div>
+    </div>
+
+    <div class="flowline reveal">
+      <div class="node">
+        <div class="role">Downstream</div>
+        <div class="name">下游分销商</div>
+        <div class="desc">Reseller / 渠道</div>
+        <ul><li>目录同步与售卖</li><li>下单 / 续订 / 加油包</li><li>订单与流量查询</li></ul>
+      </div>
+      <div class="arrow">
+        <div class="a1">──▶</div><small>XPIN OpenAPI</small>
+        <div class="a2">◀──</div><small>Webhook 回调</small>
+      </div>
+      <div class="node mid">
+        <div class="role">Aggregation</div>
+        <div class="name grad-text">XPIN eSIM 平台</div>
+        <div class="desc">能力对齐 · 收单归一 · 幂等安全</div>
+        <ul><li>产品目录聚合</li><li>订单中心 + 状态机</li><li>回调归一与重投</li><li>供应商路由 / 容灾</li></ul>
+      </div>
+      <div class="arrow">
+        <div class="a1">──▶</div><small>Supplier SPI</small>
+        <div class="a2">◀──</div><small>Callback 归一</small>
+      </div>
+      <div class="node">
+        <div class="role">Upstream</div>
+        <div class="name">上游供应商</div>
+        <div class="desc">Multi-Supplier</div>
+        <ul><li>途鸽 TuGe（已接）</li><li>供应商 B（规划）</li><li>供应商 C（规划）</li></ul>
+      </div>
+    </div>
+
+    <div class="grid g4 reveal" style="margin-top:28px">
+      <div class="card"><span class="ic">🔗</span><h3>能力对齐</h3><p>对下游提供与上游<span class="accent">同等</span>的产品/下单/续订/加油包/查询/回调能力。</p></div>
+      <div class="card"><span class="ic">🪶</span><h3>接口平滑</h3><p>语义、字段、状态机对齐途鸽 V2.0，已对接方可<span class="accent">低成本迁移</span>。</p></div>
+      <div class="card"><span class="ic">🧩</span><h3>多源扩展</h3><p>新增供应商只需一套<span class="accent">适配器 + 映射表</span>，下游接口零改动。</p></div>
+      <div class="card"><span class="ic">🛡</span><h3>幂等安全</h3><p>写操作强制 <span class="accent">idempotencyKey</span>，重试不产生重复订单。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 01 ARCHITECTURE -->
+<section id="arch">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">01</div>
+      <div class="sec-meta">
+        <div class="kicker">Architecture</div>
+        <h2>三层架构 <small>下游只感知接入层，供应商差异隔离在适配层</small></h2>
+      </div>
+    </div>
+
+    <div class="reveal">
+      <div class="layer">
+        <div class="lh"><span class="no">①</span><h3>接入层 · Access</h3><span>下游面向的 XPIN OpenAPI</span></div>
+        <div class="chips">
+          <span class="chip"><b>鉴权</b> Bearer Token</span><span class="chip"><b>限流</b> QPS/账户</span>
+          <span class="chip">参数校验</span><span class="chip"><b>幂等</b>控制</span><span class="chip">统一响应/错误码</span>
+          <span class="chip"><b>Webhook</b> 签名下发</span><span class="chip">多语言 lang</span><span class="chip">审计日志</span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="lh"><span class="no">②</span><h3>核心层 · Core</h3><span>平台业务与数据</span></div>
+        <div class="chips">
+          <span class="chip"><b>产品目录</b>聚合</span><span class="chip"><b>订单中心</b> + 状态机</span>
+          <span class="chip">账户与额度</span><span class="chip">价格 / 结算</span>
+          <span class="chip"><b>回调归一</b>与重投</span><span class="chip"><b>供应商路由</b></span><span class="chip">SKU 映射</span>
+        </div>
+      </div>
+      <div class="layer">
+        <div class="lh"><span class="no">③</span><h3>适配层 · Adapter</h3><span>上游面向的 Supplier SPI</span></div>
+        <div class="adapters">
+          <div class="adapter live"><b>TuGeAdapter</b><small>途鸽 V2.0 · 已接入</small></div>
+          <div class="adapter"><b>SupplierBAdapter</b><small>规划中</small></div>
+          <div class="adapter"><b>SupplierCAdapter</b><small>规划中</small></div>
+        </div>
+        <div class="chips" style="margin-top:12px">
+          <span class="chip">统一 SPI 接口</span><span class="chip">能力描述 Capability</span><span class="chip">字段 / 错误码映射</span><span class="chip">回调归一化</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid g3 reveal" style="margin-top:22px">
+      <div class="card"><span class="ic">🏷</span><h3>产品编码隔离</h3><p>下游只见 XPIN 规范 <span class="accent">productCode</span>，内部映射 <span class="mono">→ (supplierCode, supplierProductCode)</span>。</p></div>
+      <div class="card"><span class="ic">🧾</span><h3>订单号统一</h3><p>XPIN 统一生成 <span class="accent">orderNo</span>，前缀编码供应商与类型；原始供应商单号仅存内部。</p></div>
+      <div class="card"><span class="ic">📡</span><h3>回调归一</h3><p>各供应商 webhook → <span class="mono">parseCallback()</span> → XPIN 事件 → 改签 HMAC 转发下游。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 01.5 AUTH -->
+<section id="auth">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">02</div>
+      <div class="sec-meta">
+        <div class="kicker">Authentication</div>
+        <h2>鉴权：API Key + 签名 <small>标准静态密钥 · 无 Token 生命周期</small> <b class="badge b-rec">💡 相对上游变更</b></h2>
+      </div>
+    </div>
+
+    <p style="color:var(--muted);font-size:13.5px;margin-bottom:22px;max-width:840px">
+      途鸽 V2.0 用「换取 24h Token + 过期刷新」的动态令牌；XPIN 改为 <b style="color:var(--text)">静态 <span class="mono" style="color:var(--teal)">appKey</span> + <span class="mono" style="color:var(--teal)">appSecret</span> 请求签名</b>，
+      <b style="color:var(--text)">取消 /oauth/token、/oauth/refreshToken 两个接口</b>，下游无需管理 token 生命周期，接入更简单稳定。
+    </p>
+
+    <div class="auth-wrap reveal">
+      <div class="card">
+        <h3 style="margin-bottom:14px">🔑 请求鉴权头（每个请求携带）</h3>
+        <table class="htable">
+          <tr><th>Header</th><th>说明</th></tr>
+          <tr><td class="h">X-Api-Key</td><td>appKey，标识调用方</td></tr>
+          <tr><td class="h">X-Timestamp</td><td>UTC+0，服务端校验 ±5 分钟窗口</td></tr>
+          <tr><td class="h">X-Nonce</td><td>一次性随机串，窗口内去重防重放</td></tr>
+          <tr><td class="h">X-Sign</td><td>请求签名（见右）</td></tr>
+          <tr><td class="h">Content-Type</td><td>application/json;charset=UTF-8</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:14px">🔏 签名算法 · HMAC-SHA256</h3>
+        <div class="signbox">
+<span class="step">1.</span> 取 body 参数 + <b>X-Timestamp</b> + <b>X-Nonce</b>（排除 X-Sign / 空值）<br/>
+<span class="step">2.</span> 参数名 <b>ASCII 升序</b>，嵌套展开 父.子<br/>
+<span class="step">3.</span> 拼 <b>key1value1key2value2…</b> 无分隔符<br/>
+<span class="step">4.</span> <b>X-Sign = HMAC-SHA256(appSecret, 拼接串)</b> → 64 位 hex 小写
+        </div>
+        <div class="chips" style="margin-top:14px">
+          <span class="chip"><b>兼容</b> signMode=MD5_LEGACY 对齐途鸽历史对接</span>
+          <span class="chip">错误：2002 Key 无效 · 2003 签名失败 · 2004 过期/重放</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 API SURFACE -->
+<section id="api">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">03</div>
+      <div class="sec-meta">
+        <div class="kicker">API Surface · Full Spec</div>
+        <h2>接口全景 <small>15 个开放接口 + 3 类回调 · 全部 ✅ 承接上游</small></h2>
+      </div>
+    </div>
+
+    <p style="color:var(--muted);font-size:13px;margin-bottom:8px">
+      内部评审版：<b style="color:var(--text)">下游可用的全部数据接口均在此完整列出，含请求/响应参数、QPS 与错误码</b>，不省略核心信息。
+      优先级：<b class="pri p0">P0</b> 售卖闭环必备 &nbsp; <b class="pri p1">P1</b> 重要 &nbsp; <b class="pri p2">P2</b> 按需。
+      所有路径前缀 <span class="mono" style="color:var(--teal)">/openapi/v1</span>，方法均为 <span class="mono" style="color:var(--teal)">POST</span>。
+    </p>
+
+    <!-- ===== 产品目录 ===== -->
+    <div class="grouplbl reveal"><span class="ic">📦</span>产品目录 Products<span class="cnt">3 个接口</span></div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p0">P0</span><span class="path">/products/list</span><span class="nm">分页查询所有 eSIM 产品套餐</span><span class="meta">QPS 30 · 800ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">pageNum</td><td class="req">是</td><td>页码，int</td></tr>
+          <tr><td class="h">pageSize</td><td class="req">是</td><td>每页条数 ≤100，int</td></tr>
+          <tr><td class="h">productType</td><td>否</td><td>DAILY_PACK / DATA_PACK</td></tr>
+          <tr><td class="h">cardType</td><td>否</td><td>卡类型</td></tr>
+          <tr><td class="h">usagePeriod</td><td>否</td><td>激活使用期，Integer</td></tr>
+          <tr><td class="h">periodType</td><td>否</td><td>0=24H / 1=自然日</td></tr>
+          <tr><td class="h">lang</td><td>否</td><td>en / ja-JP / zh-CN，默认 en</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (EsimProductRes)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">total</td><td>Integer</td><td>数据总数</td></tr>
+          <tr><td class="h">list</td><td>ProductInfo[]</td><td>产品数组（字段见下方核心数据模型）</td></tr>
+        </table><div class="note">💡 建议按 <b>lastModifiedTime</b> 增量同步；下架仅置状态不删 productCode。</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p1">P1</span><span class="path">/products/detail</span><span class="nm">单产品套餐查询</span><span class="meta">QPS 50 · 500ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">productCode</td><td class="req">是</td><td>产品编码</td></tr>
+          <tr><td class="h">lang</td><td>否</td><td>语言，默认 en</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">data</td><td>ProductInfo</td><td>单个产品对象（见核心数据模型）</td></tr>
+        </table><div class="note">错误：<b>4001</b> 不存在 · <b>4002</b> 已下架 · <b>4000</b> 其他异常</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p1">P1</span><span class="path">/card</span><span class="nm">卡特性查询</span><span class="meta">QPS 50 · 200ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">cardType</td><td class="req">是</td><td>卡类型</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (CardTypeInfo)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">cardType</td><td>String</td><td>卡类型</td></tr>
+          <tr><td class="h">timeZone</td><td>String</td><td>自然日时区，如 UTC+8</td></tr>
+          <tr><td class="h">renewFlag</td><td>Boolean</td><td>是否支持续订</td></tr>
+          <tr><td class="h">supportGetUsage</td><td>Boolean</td><td>是否支持实时流量</td></tr>
+          <tr><td class="h">renewCount</td><td>Integer</td><td>同时最大有效订单数</td></tr>
+        </table><div class="note">错误：<b>6003</b> 卡类型不存在</div></div>
+      </div>
+    </div>
+
+    <!-- ===== 订单 ===== -->
+    <div class="grouplbl reveal"><span class="ic">🧾</span>订单 Orders（下单类为异步，回调返完整卡信息）<span class="cnt">8 个接口</span></div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p0">P0</span><span class="path">/order/create</span><span class="nm">创建订单（常规 eSIM）· 异步 eventType=1</span><span class="meta">500ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">productCode</td><td class="req">是</td><td>产品编码</td></tr>
+          <tr><td class="h">channelOrderNo</td><td class="req">是</td><td>下游订单号 ≤100</td></tr>
+          <tr><td class="h">idempotencyKey</td><td class="req">是</td><td>幂等键 UUID v4 ≤64</td></tr>
+          <tr><td class="h">startDate</td><td>否</td><td>指定激活开始时间(UTC)，不早于当前</td></tr>
+          <tr><td class="h">email</td><td>否</td><td>收二维码邮箱 ≤200，逗号分隔</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (OrderInfo)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">orderNo</td><td>String</td><td>XPIN 订单号，回调/查询以此为准</td></tr>
+        </table><div class="note"><b>回调</b> eventType=1 推送 qrCode/iccid/imsi 等；<b>错误</b> 5013 币种 · 4001 产品不存在 · 5000 处理中 · 5044 无卡可分</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p1">P1</span><span class="path">/order/renew</span><span class="nm">eSIM 续订（同卡购新套餐）· 异步 eventType=2</span><span class="meta">500ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">productCode</td><td class="req">是</td><td>产品编码（须与原卡匹配）</td></tr>
+          <tr><td class="h">iccid</td><td class="req">是</td><td>目标卡 ICCID</td></tr>
+          <tr><td class="h">channelOrderNo</td><td class="req">是</td><td>下游订单号 ≤100</td></tr>
+          <tr><td class="h">idempotencyKey</td><td class="req">是</td><td>幂等键</td></tr>
+          <tr><td class="h">startDate / email</td><td>否</td><td>同 create</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (OrderInfo)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">orderNo</td><td>String</td><td>订单号</td></tr>
+        </table><div class="note">先查 §卡特性 <b>renewFlag</b>；错误 <b>5040~5049</b> 续订限制 · <b>4010</b> 余额不足。同卡强绑定原供应商。</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p0">P0</span><span class="path">/order/list</span><span class="nm">分页查询订单信息</span><span class="meta">QPS 80 · 200ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">pageNum / pageSize</td><td class="req">是</td><td>分页，pageSize ≤100</td></tr>
+          <tr><td class="h">orderStatus</td><td>否</td><td>订单状态枚举</td></tr>
+          <tr><td class="h">orderTypeList</td><td>否</td><td>订单类型集合 Array</td></tr>
+          <tr><td class="h">createdStartTime</td><td>否</td><td>创建起始，传一必传另一</td></tr>
+          <tr><td class="h">createdEndTime</td><td>否</td><td>创建截止</td></tr>
+          <tr><td class="h">lang</td><td>否</td><td>语言</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (OrderRes)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">total</td><td>Integer</td><td>总数</td></tr>
+          <tr><td class="h">list</td><td>OrderInfo[]</td><td>订单数组（见核心数据模型）</td></tr>
+        </table><div class="note">错误：<b>5037</b> 起止时间须同时空/同时非空</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p0">P0</span><span class="path">/order/query</span><span class="nm">条件筛选查询订单（上游 /order/orders）</span><span class="meta">QPS 50 · 200ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request（三者至少一个）</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">orderNo</td><td>否*</td><td>订单号</td></tr>
+          <tr><td class="h">iccid</td><td>否*</td><td>ICCID</td></tr>
+          <tr><td class="h">channelOrderNo</td><td>否*</td><td>下游订单号</td></tr>
+          <tr><td class="h">lang</td><td>否</td><td>语言</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (OrderList)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">list</td><td>OrderInfo[]</td><td>订单数组（见核心数据模型）</td></tr>
+        </table><div class="note">*三者至少填一个；错误 <b>5032</b>。</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p0">P0</span><span class="path">/iccid/profile</span><span class="nm">eSIM Profile 查询 · 安装状态</span><span class="meta">QPS 50 · 200ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">iccid</td><td class="req">是</td><td>ICCID（已作废订单不支持）</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (ProfileInfo)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">iccid / eid / imsi</td><td>String</td><td>卡标识</td></tr>
+          <tr><td class="h">state</td><td>String</td><td>Released/Downloaded/Installed/Enabled/Disabled/Deleted/Unavailable/Error</td></tr>
+          <tr><td class="h">installDevice</td><td>String</td><td>安装设备</td></tr>
+          <tr><td class="h">installCount</td><td>String</td><td>安装次数</td></tr>
+          <tr><td class="h">installTime / updateTime</td><td>String</td><td>安装/更新时间</td></tr>
+        </table><div class="note">错误：<b>5004</b> 订单不存在/已作废 · <b>6002</b> profile 不存在</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p1">P1</span><span class="path">/order/usage</span><span class="nm">实时流量查询</span><span class="meta">QPS 50 · 800ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">orderNo</td><td class="req">是</td><td>订单号（卡须支持流量查询）</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (UsageInfo)，单位 MB</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">dataTotal</td><td>String</td><td>周期总流量（日用包无）</td></tr>
+          <tr><td class="h">dataUsage</td><td>String</td><td>当前周期已用</td></tr>
+          <tr><td class="h">dataResidual</td><td>String</td><td>当前周期剩余（日用包无）</td></tr>
+          <tr><td class="h">refuelingTotal</td><td>String</td><td>当日加油包总量</td></tr>
+          <tr><td class="h">qtaconsumption</td><td>String</td><td>当日高速已用量</td></tr>
+        </table><div class="note">错误：<b>5002</b> 订单不存在 · <b>5005</b> 不支持流量 · <b>4068</b> 计算中稍后重试</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p2">P2</span><span class="path">/order/create/push</span><span class="nm">创建订单（推送模式 US-TMOBILE）· 异步 eventType=3</span><span class="meta">500ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">productCode</td><td class="req">是</td><td>推送模式专属编码</td></tr>
+          <tr><td class="h">startDate</td><td class="req">是</td><td>= 当前 UTC + 6 天</td></tr>
+          <tr><td class="h">channelOrderNo</td><td class="req">是</td><td>下游订单号 ≤100</td></tr>
+          <tr><td class="h">eid</td><td class="req">是</td><td>eSIM 唯一标识，32 位数字</td></tr>
+          <tr><td class="h">imei2</td><td class="req">是</td><td>IMEI2，15–17 位</td></tr>
+          <tr><td class="h">idempotencyKey</td><td class="req">是</td><td>幂等键</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (OrderInfo)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">orderNo</td><td>String</td><td>推送模式订单号（前缀 PU）</td></tr>
+        </table><div class="note">错误：<b>5006</b> IMEI2 长度 · <b>5007</b> 日期规则 · <b>5012</b> EID 非 32 位 · <b>5013</b> 币种 · <b>4001</b> 产品</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p2">P2</span><span class="path">/order/terminate</span><span class="nm">终止套餐（仅支持的卡类型，如 C4）</span><span class="meta">QPS 50 · 500ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">orderNo</td><td class="req">是</td><td>订单号</td></tr>
+          <tr><td class="h">iccid</td><td class="req">是</td><td>ICCID</td></tr>
+        </table></div>
+        <div class="c"><h6>Response</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">code / msg</td><td>String</td><td>无 data，仅返回结果码</td></tr>
+        </table><div class="note">仅可终止「使用中/已用完」；错误 <b>6001</b> 不支持终止 · <b>5003</b> 状态不满足 · <b>5001</b> 卡单不匹配</div></div>
+      </div>
+    </div>
+
+    <!-- ===== 加油包 ===== -->
+    <div class="grouplbl reveal"><span class="ic">⛽</span>加油包 Top-up（限速后追加流量，不延长时间 · 当前仅 C4 日用包）<span class="cnt">3 个接口</span></div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p2">P2</span><span class="path">/order/topup/create</span><span class="nm">订购加油包</span><span class="meta">QPS 50 · 500ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">orderNo</td><td class="req">是</td><td>主订单号</td></tr>
+          <tr><td class="h">purchaseType</td><td class="req">是</td><td>1=当日 / 2=每日，int</td></tr>
+          <tr><td class="h">idempotencyKey</td><td class="req">是</td><td>幂等键</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (TopupOrderInfo)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">topupNumber</td><td>String</td><td>加油包订单号（前缀 TU）</td></tr>
+        </table><div class="note">错误：<b>5015/5018/5019/5020/5023/5028/5031</b> 各类不可订购原因</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p2">P2</span><span class="path">/order/topup/list</span><span class="nm">分页查询加油包订单</span><span class="meta">QPS 50 · 500ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">pageNum / pageSize</td><td class="req">是</td><td>分页，pageSize ≤100</td></tr>
+          <tr><td class="h">createdStartTime</td><td>否</td><td>创建起始时间</td></tr>
+          <tr><td class="h">createdEndTime</td><td>否</td><td>创建截止时间</td></tr>
+          <tr><td class="h">lang</td><td>否</td><td>语言</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (TopupOrderRes)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">total</td><td>Integer</td><td>总数</td></tr>
+          <tr><td class="h">list</td><td>TopupOrderInfo[]</td><td>加油包订单（见核心数据模型）</td></tr>
+        </table><div class="note">按创建时间倒序返回全部。</div></div>
+      </div>
+    </div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p2">P2</span><span class="path">/order/topups</span><span class="nm">查询订单关联的加油包订单</span><span class="meta">QPS 50 · 500ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request（三者至少一个）</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">pageNum / pageSize</td><td class="req">是</td><td>分页</td></tr>
+          <tr><td class="h">orderNo</td><td>否*</td><td>主订单号</td></tr>
+          <tr><td class="h">iccid</td><td>否*</td><td>ICCID</td></tr>
+          <tr><td class="h">topupNumber</td><td>否*</td><td>加油包订单号</td></tr>
+          <tr><td class="h">lang</td><td>否</td><td>语言</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (TopupOrderRes)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">total</td><td>Integer</td><td>总数</td></tr>
+          <tr><td class="h">list</td><td>TopupOrderInfo[]</td><td>加油包订单</td></tr>
+        </table><div class="note">*三者至少填一个；错误 <b>5030</b>。</div></div>
+      </div>
+    </div>
+
+    <!-- ===== 账户 ===== -->
+    <div class="grouplbl reveal"><span class="ic">💰</span>账户 Account<span class="cnt">1 个接口</span></div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m">POST</span><span class="pri p0">P0</span><span class="path">/account/balance</span><span class="nm">账户余额查询</span><span class="meta">QPS 50 · 50ms</span></div>
+      <div class="cols">
+        <div class="c"><h6>Request</h6><table class="htable">
+          <tr><th>字段</th><th>必填</th><th>说明</th></tr>
+          <tr><td class="h">type</td><td>否</td><td>BASIC 基础 / DEPOSIT 保证金</td></tr>
+        </table></div>
+        <div class="c"><h6>Response · data (AccountInfo)</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">currency</td><td>String</td><td>结算币种</td></tr>
+          <tr><td class="h">accountId / name</td><td>String</td><td>渠道编码 / 名称</td></tr>
+          <tr><td class="h">settlementType</td><td>String</td><td>CASH 现付 / MONTHSETTLE 月结</td></tr>
+          <tr><td class="h">accountList</td><td>BalanceInfo[]</td><td>id · type · status · balance(2 位小数)</td></tr>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ===== 回调 ===== -->
+    <div class="grouplbl reveal"><span class="ic">🔔</span>回调 Webhook（平台 → 下游 · 异步）<span class="cnt">eventType 1–3</span></div>
+
+    <div class="epc reveal">
+      <div class="h"><span class="m cb">CALLBACK</span><span class="path">下游回调地址</span><span class="nm">CB1 常规开卡 · CB2 续订 · CB3 推送开卡</span><span class="meta">超时 10s · 重试 2h/5s</span></div>
+      <div class="cols">
+        <div class="c"><h6>外层 + CallbackInfo</h6><table class="htable">
+          <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+          <tr><td class="h">code / msg</td><td>String</td><td>0000=成功，失败见错误码</td></tr>
+          <tr><td class="h">timestamp / sign</td><td>String</td><td>签名时间 + 签名（同 §鉴权算法）</td></tr>
+          <tr><td class="h">eventType</td><td>int</td><td>1 开卡 / 2 续订 / 3 推送</td></tr>
+          <tr><td class="h">businessType</td><td>String</td><td>固定 ESIM</td></tr>
+          <tr><td class="h">idempotencyKey</td><td>String</td><td>回填原请求幂等键</td></tr>
+          <tr><td class="h">orderInfo</td><td>Object</td><td>见右</td></tr>
+        </table></div>
+        <div class="c"><h6>orderInfo（开卡结果）</h6><table class="htable">
+          <tr><th>字段</th><th>说明</th></tr>
+          <tr><td class="h">orderNo / iccid</td><td>订单号 / ICCID</td></tr>
+          <tr><td class="h">qrCode</td><td>LPA:1$RSP$激活码，用于生成二维码</td></tr>
+          <tr><td class="h">channelOrderNo</td><td>下游订单号</td></tr>
+          <tr><td class="h">imsi / msisdn</td><td>IMSI / 手机号</td></tr>
+          <tr><td class="h">activatedStart/EndTime</td><td>激活起止（指定激活）</td></tr>
+          <tr><td class="h">latestActivationTime</td><td>最晚激活（自动激活）</td></tr>
+          <tr><td class="h">renewExpirationTime</td><td>最晚续订时间</td></tr>
+          <tr><td class="h">createdTime / orderType</td><td>下单时间 / 订单类型</td></tr>
+        </table></div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--line)">
+        <p style="font-size:12px;color:var(--muted)">下游须 10 秒内固定返回 <span class="mono" style="color:var(--gold)">{"code":"0000","msg":"success"}</span>，2 小时内每 5 秒重试，按 orderNo 幂等；IP 白名单加白 XPIN 出口。开卡失败码：5044 无卡可分 · 4010 余额不足 · 4011 结算价 · 4013 未上架 等。 &nbsp;<b class="badge b-future">🔮 未来</b> eventType 4/5（终止/加油包）V1 不做。</p>
+      </div>
+    </div>
+
+    <!-- ===== 核心数据模型 ===== -->
+    <div class="grouplbl reveal"><span class="ic">🧬</span>核心数据模型 Data Models（响应共享对象的完整字段）<span class="cnt">避免正文省略</span></div>
+    <div class="grid g2 reveal">
+      <div class="model">
+        <h6>ProductInfo</h6>
+        <p><span class="f">productCode · productName · productType · countryCodeList[] · mccList[] · netPrice(Decimal) · periodType(0/1) · usagePeriod · validityPeriod · dataLimited(Y/N) · dataTotal · dataUnit · activeType · ruleDesc · operatorDesc · apnDesc · highSpeed · limitSpeed · showGradeContent · cardType · lastModifiedTime · topupInfoList[]</span></p>
+      </div>
+      <div class="model">
+        <h6>OrderInfo + CardInfo</h6>
+        <p><span class="f">orderNo · productCode · productName · activatedStartTime · activatedEndTime · latestActivationTime · renewExpirationTime · createdTime · orderStatus · profileStatus · qrCode · channelOrderNo · orderType · cardInfo{ iccid · imsi · msisdn · rentalContractNumber }</span></p>
+      </div>
+      <div class="model">
+        <h6>TopupOrderInfo</h6>
+        <p><span class="f">iccid · orderNo · topupNumber · productName · productType · topupName · quantity · channelStartTime · channelEndTime · settlementCurrency · settlementAmount(Decimal) · channelCreatedTime</span></p>
+      </div>
+      <div class="model">
+        <h6>TopupInfo（产品内加油包档位）</h6>
+        <p><span class="f">topupId · topupName · topupSize · topupUnit(MB/GB) · topupPrice(Decimal)</span></p>
+      </div>
+      <div class="model">
+        <h6>枚举 · orderStatus</h6>
+        <p><span class="f">NOTACTIVE 未激活 · ACTIVATED 已激活 · INUSE 使用中 · USED 已用完 · EXPIRED 已过期 · ABANDON 已作废 · TERMINATION 已终止</span></p>
+      </div>
+      <div class="model">
+        <h6>枚举 · orderType / profileStatus</h6>
+        <p><span class="f">orderType: DAYPASS · DAILY · MULTIPLEMONTHS · MULTIPLEMONTHS_AUTO<br/>profileStatus: activated · downloaded · disabled · nodownload · downloadfail · deleted · failed · ungenerated · unvaliable</span></p>
+      </div>
+    </div>
+
+    <p style="font-size:12px;color:var(--faint);margin-top:18px">完整字段类型/示例/子错误码见配套《eSIM 平台接口设计文档.md》第 5–11 章。</p>
+  </div>
+</section>
+
+<!-- 03 MULTI-SUPPLIER -->
+<section id="multi">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">04</div>
+      <div class="sec-meta">
+        <div class="kicker">Multi-Supplier</div>
+        <h2>供应商适配层 <small>新增一家 = 一套 SPI + 能力描述 + 映射表</small> <b class="badge b-rec">💡 V1 抽象先行</b> <b class="badge b-future">🔮 多源实接待第二家</b></h2>
+      </div>
+    </div>
+
+    <div class="grid g3 reveal">
+      <div class="card"><span class="ic">⚙️</span><h3>统一 SPI 接口</h3><p>目录 / 订单 / 查询 / 加油包 / 账户 / 回调解析全部抽象为标准方法，核心层只依赖接口。</p></div>
+      <div class="card"><span class="ic">📋</span><h3>能力描述</h3><p>声明 <span class="accent">续订 · 流量查询 · 加油包 · 推送 · 终止</span> 及卡类型/币种/签名算法，驱动校验与路由。</p></div>
+      <div class="card"><span class="ic">🔀</span><h3>字段与错误码映射</h3><p>供应商字段/枚举/错误码 → XPIN 规范，原始码透传 <span class="mono">subCode</span> 便于排障。</p></div>
+    </div>
+
+    <div class="grid g2 reveal" style="margin-top:20px">
+      <div class="card">
+        <h3 style="margin-bottom:14px">🔀 产品 → 供应商路由</h3>
+        <div class="route">
+XPIN <span class="lbl">productCode</span> → [
+  { supplier:<span class="lbl">TUGE</span>,  code:"A-136-…", cost:<span class="cost">2.00</span>, priority:1 },  <span style="color:var(--teal)">// V1 单源</span>
+  { supplier:<span class="lbl">SUP_B</span>, code:"B-JP-1GB", cost:<span class="cost">2.10</span>, priority:2 } <span style="color:var(--faint)">// 🔮 规划</span>
+]</div>
+        <div class="chips" style="margin-top:14px">
+          <span class="chip"><b>PRIMARY_FIRST</b> 主备切换（默认）</span>
+          <span class="chip"><b>LEAST_COST</b> 最低成本</span>
+          <span class="chip"><b>WEIGHTED</b> 权重分流</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:14px">🛟 容灾与一致性</h3>
+        <div class="kv">
+          <div class="row"><span class="k">下单容灾 🔮</span><span class="v">主源失败且订单未成立 → 同 idempotencyKey 切备用源</span></div>
+          <div class="row"><span class="k">同卡强绑定 ✅</span><span class="v">续订 / 加油包 / 终止 必回原订单所属供应商</span></div>
+          <div class="row"><span class="k">回调归属</span><span class="v">按 XPIN orderNo 定位供应商与下游账户，杜绝串单</span></div>
+          <div class="row"><span class="k">对账</span><span class="v">供应商结算价入本，下游批发价出账</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 CONVENTIONS & SECURITY -->
+<section id="conv">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">05</div>
+      <div class="sec-meta">
+        <div class="kicker">Conventions &amp; Security</div>
+        <h2>通用约定与安全</h2>
+      </div>
+    </div>
+
+    <div class="grid g2 reveal">
+      <div class="card">
+        <h3 style="margin-bottom:14px">📐 请求 / 响应约定</h3>
+        <div class="kv">
+          <div class="row"><span class="k">传输</span><span class="v">HTTPS · 统一 POST · UTF-8</span></div>
+          <div class="row"><span class="k">鉴权</span><span class="v">API Key：X-Api-Key + X-Sign（见 §鉴权）</span></div>
+          <div class="row"><span class="k">时间</span><span class="v">UTC+0 · yyyy-MM-dd'T'HH:mm:ss'Z'</span></div>
+          <div class="row"><span class="k">公共响应</span><span class="v">code · msg · subCode · subMsg · data</span></div>
+          <div class="row"><span class="k">分页</span><span class="v">pageNum≥1 · pageSize≤100 · total + list</span></div>
+          <div class="row"><span class="k">成功码</span><span class="v">0000</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:14px">🔐 安全机制</h3>
+        <div class="kv">
+          <div class="row"><span class="k">API Key</span><span class="v">静态 appKey/appSecret，无过期，无刷新</span></div>
+          <div class="row"><span class="k">请求签名</span><span class="v">HMAC-SHA256 + nonce + timestamp ±5min 窗口</span></div>
+          <div class="row"><span class="k">幂等</span><span class="v">(appKey, idempotencyKey) 缓存原响应 ≥24h</span></div>
+          <div class="row"><span class="k">Webhook 签名</span><span class="v">同算法，密钥为账户 appSecret</span></div>
+          <div class="row"><span class="k">兼容模式</span><span class="v">signMode=MD5_LEGACY 兼容途鸽历史对接</span></div>
+          <div class="row"><span class="k">限流</span><span class="v">超 QPS 返回 0429，阈值内正常</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card reveal" style="margin-top:18px">
+      <h3 style="margin-bottom:12px">🚦 错误码归一（平台职责）</h3>
+      <div class="chips">
+        <span class="chip">1003 参数校验</span><span class="chip">2002 Key 无效</span><span class="chip">2003 签名失败</span><span class="chip">2004 过期/重放</span>
+        <span class="chip">0429 限流</span><span class="chip">4001 产品不存在</span><span class="chip">4010 余额不足</span>
+        <span class="chip">5044 开卡失败</span><span class="chip">6002 profile 不存在</span>
+        <span class="chip" style="border-color:rgba(0,212,170,.35)"><b class="accent">供应商码 → XPIN 统一码</b>，原码透传 subCode</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 06 FLOW -->
+<section id="flow">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">06</div>
+      <div class="sec-meta">
+        <div class="kicker">Integration Flow</div>
+        <h2>集成主流程 <small>推荐接入顺序</small></h2>
+      </div>
+    </div>
+
+    <div class="grid g2 reveal" style="align-items:start">
+      <div class="tl">
+        <div class="step"><div class="st">STEP 1</div><h4>同步目录</h4><p><code>products/list</code> 拉取可售套餐，按 lastModifiedTime 增量入库。</p></div>
+        <div class="step"><div class="st">STEP 2</div><h4>创建订单</h4><p><code>order/create</code> 携 idempotencyKey + API Key 签名，同步拿到 <code>orderNo</code>。</p></div>
+        <div class="step"><div class="st">STEP 3</div><h4>接收回调</h4><p>Webhook <code>eventType=1</code> 推送 <code>qrCode</code> / <code>iccid</code>，按 orderNo 幂等处理。</p></div>
+        <div class="step"><div class="st">STEP 4</div><h4>交付用户</h4><p>由 qrCode 生成 eSIM 二维码 / iOS 一键安装链接交付。</p></div>
+        <div class="step"><div class="st">STEP 5</div><h4>用量与续期</h4><p><code>order/usage</code> 查流量 · <code>iccid/profile</code> 查安装 · <code>order/renew</code> 续订。</p></div>
+      </div>
+
+      <div style="display:grid;gap:18px">
+        <div class="stats">
+          <div class="stat"><div class="n grad-text">15</div><div class="l">开放接口</div></div>
+          <div class="stat"><div class="n grad-text">3</div><div class="l">回调事件</div></div>
+          <div class="stat"><div class="n grad-text">3</div><div class="l">架构层</div></div>
+          <div class="stat"><div class="n grad-text">N</div><div class="l">可插拔供应商</div></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:12px">✅ 下游接入清单</h3>
+          <div class="kv">
+            <div class="row"><span class="k">01</span><span class="v">获取 appKey / appSecret，报备回调 IP 白名单</span></div>
+            <div class="row"><span class="k">02</span><span class="v">实现 API Key 请求签名与 Webhook 验签</span></div>
+            <div class="row"><span class="k">03</span><span class="v">对接 products/list，同步售卖目录</span></div>
+            <div class="row"><span class="k">04</span><span class="v">对接 order/create + 幂等重试</span></div>
+            <div class="row"><span class="k">05</span><span class="v">实现回调接收，落地 qrCode 交付</span></div>
+            <div class="row"><span class="k">06</span><span class="v">按需对接续订 / 加油包 / 用量查询</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <h3 class="grad-text">一套接口，接住下游；一层适配，接入多源</h3>
+    <p>XPIN 对下游沿用途鸽 V2.0 的接口语义，对上游以 SPI 抽象隔离差异 —— 下游一次对接，供应商随需增减。</p>
+    <div class="slogan">Free the data, free the world!</div>
+    <div class="copy">XPIN eSIM 数据平台 · 接口设计方案 V1.1（内部技术评审）· 参考蓝本《途鸽科技 eSIM 业务 API V2.0》 · © 2026 XPIN Network</div>
+  </div>
+</footer>
+
+<script>
+  document.documentElement.classList.add('js');
+  const io=new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>XPIN Global eSIM Data Platform · Partner Integration</title>
+<style>
+  :root{
+    --bg:#0B0E11; --bg2:#10141A; --surface:#12171E; --surface2:#161C25;
+    --text:#EAECEF; --muted:#8b93a1; --faint:#5b6572;
+    --gold:#F0B90B; --teal:#00D4AA; --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.14);
+    --grad:linear-gradient(90deg,var(--gold),var(--teal));
+    --grad135:linear-gradient(135deg,var(--gold),var(--teal));
+    --font:"PingFang SC","Microsoft YaHei","Noto Sans SC","Noto Sans JP","Noto Sans KR","Noto Sans Arabic","Segoe UI",system-ui,sans-serif;
+    --mono:"SF Mono","JetBrains Mono","Roboto Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  ::selection{background:rgba(0,212,170,.25)}
+
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .mono{font-family:var(--mono)}
+
+  nav{position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);background:rgba(11,14,17,.72);border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex;align-items:center;justify-content:space-between;height:60px;gap:16px}
+  .brand{font-weight:800;letter-spacing:.5px;font-size:15px;white-space:nowrap}
+  .brand .x{color:var(--faint);margin:0 8px;font-weight:400}
+  .navright{display:flex;align-items:center;gap:22px}
+  .navlinks{display:flex;gap:26px;font-size:13px;color:var(--muted)}
+  .navlinks a{transition:color .2s;white-space:nowrap} .navlinks a:hover{color:var(--text)}
+  @media(max-width:820px){.navlinks{display:none}}
+  .langsel{background:var(--bg2);border:1px solid var(--line2);color:var(--text);border-radius:8px;padding:7px 10px;font-size:12.5px;font-family:var(--font);cursor:pointer}
+  .langsel:focus{outline:none;border-color:var(--teal)}
+  .langsel option{background:var(--bg2);color:var(--text)}
+
+  header{position:relative;padding:120px 0 90px;text-align:center;overflow:hidden}
+  header::before{content:"";position:absolute;inset:0;background:
+    radial-gradient(55% 55% at 22% 0%,rgba(240,185,11,.16),transparent),
+    radial-gradient(55% 55% at 78% 0%,rgba(0,212,170,.13),transparent);pointer-events:none}
+  .eyebrow-brand{position:relative;font-size:14px;font-weight:700;letter-spacing:3px;color:var(--muted)}
+  .eyebrow-brand b{color:var(--gold)} .eyebrow-brand i{color:var(--teal);font-style:normal}
+  h1{position:relative;font-size:clamp(38px,6vw,72px);font-weight:800;line-height:1.08;margin:22px 0 18px;letter-spacing:-1px}
+  .sub{position:relative;font-size:clamp(14px,2vw,18px);color:var(--muted);font-weight:500}
+  .sub b{color:var(--teal);font-weight:600}
+  .hero-tags{position:relative;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:38px}
+  .tag{border:1px solid var(--line2);border-radius:999px;padding:8px 18px;font-size:13px;color:var(--muted);background:rgba(255,255,255,.02)}
+  .tag b{color:var(--text);font-weight:600}
+
+  section{padding:80px 0;border-top:1px solid var(--line)}
+  .sec-head{display:flex;align-items:flex-end;gap:20px;margin-bottom:44px}
+  .sec-num{font-size:64px;font-weight:800;line-height:.8;color:transparent;-webkit-text-stroke:1.5px rgba(240,185,11,.55);font-family:var(--mono)}
+  .sec-meta .kicker{font-size:12px;letter-spacing:3px;font-weight:700;color:var(--teal);text-transform:uppercase}
+  .sec-meta h2{font-size:clamp(24px,3.4vw,36px);font-weight:800;margin-top:6px;letter-spacing:-.5px}
+  .sec-meta h2 small{font-size:15px;font-weight:500;color:var(--muted);letter-spacing:0;margin-left:10px}
+
+  .grid{display:grid;gap:18px}
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:860px){.g3{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:560px){.g2,.g3{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px;transition:border-color .25s,transform .25s}
+  .card:hover{border-color:var(--line2);transform:translateY(-3px)}
+  .card .ic{font-size:24px;margin-bottom:12px;display:block}
+  .card h3{font-size:16px;font-weight:700;margin-bottom:8px}
+  .card p{font-size:13.5px;color:var(--muted)}
+  .card .accent{color:var(--teal)}
+
+  .flowline{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .node{flex:1;min-width:240px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px 24px;text-align:center}
+  .node.mid{border-color:rgba(0,212,170,.35);background:linear-gradient(180deg,rgba(0,212,170,.06),rgba(240,185,11,.04))}
+  .node .role{font-size:11px;letter-spacing:2px;color:var(--faint);text-transform:uppercase}
+  .node .name{font-size:22px;font-weight:800;margin:8px 0 6px}
+  .node .desc{font-size:12.5px;color:var(--muted)}
+  .node ul{list-style:none;margin-top:16px;text-align:left;font-size:12.5px;color:var(--muted);display:grid;gap:7px}
+  .node ul li::before{content:"▹ ";color:var(--teal)}
+  .arrow{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:0 10px;color:var(--faint);min-width:130px}
+  .arrow .a1{color:var(--gold);font-size:15px} .arrow .a2{color:var(--teal);font-size:15px}
+  .arrow small{font-size:10.5px;letter-spacing:1px;margin:3px 0 12px}
+  .arrow small:last-child{margin-bottom:0}
+  @media(max-width:860px){.arrow{transform:rotate(90deg);min-width:auto;padding:16px 0}}
+
+  .sample{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:16px}
+  .sample .sh{display:flex;align-items:center;gap:10px;padding:14px 18px;background:var(--bg2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .sample .sh .m{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--teal);border:1px solid rgba(0,212,170,.35);border-radius:5px;padding:2px 7px}
+  .sample .sh .path{font-family:var(--mono);font-size:13px;color:var(--text)}
+  .sample .sh .nm{font-size:12.5px;color:var(--muted);margin-left:auto}
+  .sample .sb{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  .sample .sb.one{grid-template-columns:1fr}
+  @media(max-width:720px){.sample .sb{grid-template-columns:1fr}}
+  .pane{padding:16px 18px} .pane+.pane{border-left:1px solid var(--line)}
+  @media(max-width:720px){.pane+.pane{border-left:none;border-top:1px solid var(--line)}}
+  .pane .lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--teal);margin-bottom:10px}
+  .pane .lbl.g{color:var(--gold)}
+  pre{margin:0;overflow-x:auto}
+  code.json{font-family:var(--mono);font-size:12px;line-height:1.75;white-space:pre;color:#cdd4dd;display:block;direction:ltr;text-align:left}
+  .jk{color:var(--teal)} .jn{color:var(--gold)} .js{color:#cdd4dd}
+
+  .disclaimer{font-size:12.5px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;padding:14px 18px;margin-top:8px}
+  .disclaimer b{color:var(--text)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:12px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:5px 11px}
+  .chip b{color:var(--text);font-weight:600}
+  .kv{display:grid;gap:10px}
+  .kv .row{display:flex;gap:12px;font-size:13px;align-items:baseline}
+  .kv .row .k{color:var(--gold);font-family:var(--mono);font-size:12px;min-width:26px;flex-shrink:0}
+  .kv .row .v{color:var(--muted)}
+
+  .tl{position:relative;padding-left:36px}
+  .tl::before{content:"";position:absolute;left:11px;top:6px;bottom:6px;width:2px;background:linear-gradient(180deg,var(--gold),var(--teal))}
+  .tl .step{position:relative;padding:0 0 28px}
+  .tl .step:last-child{padding-bottom:0}
+  .tl .step::before{content:"";position:absolute;left:-30px;top:3px;width:14px;height:14px;border-radius:50%;background:var(--bg);border:2px solid var(--teal)}
+  .tl .step .st{font-size:11px;letter-spacing:2px;color:var(--gold);font-weight:700;font-family:var(--mono)}
+  .tl .step h4{font-size:16px;font-weight:700;margin:3px 0 5px}
+  .tl .step p{font-size:13px;color:var(--muted)}
+  .tl .step code{font-family:var(--mono);font-size:11.5px;color:var(--teal);background:var(--bg2);padding:1px 6px;border-radius:5px}
+
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  @media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{text-align:center;padding:22px 10px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+  .stat .n{font-size:30px;font-weight:800;font-family:var(--mono)}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:4px}
+
+  footer{border-top:1px solid var(--line);padding:60px 0 46px;text-align:center;position:relative;overflow:hidden}
+  footer::before{content:"";position:absolute;inset:0;background:radial-gradient(60% 100% at 50% 100%,rgba(0,212,170,.10),transparent);pointer-events:none}
+  footer h3{position:relative;font-size:clamp(20px,3vw,30px);font-weight:800;margin-bottom:12px}
+  footer p{position:relative;color:var(--muted);font-size:14px;max-width:640px;margin:0 auto}
+  footer .slogan{position:relative;margin-top:22px;font-family:var(--mono);color:var(--teal);font-size:13px;letter-spacing:1px}
+  footer .copy{position:relative;margin-top:26px;color:var(--faint);font-size:12px}
+
+  html.js .reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+  html.js .reveal.in{opacity:1;transform:none}
+
+  /* flow chain */
+  .chain{margin-top:26px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 20px}
+  .chain-t{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--teal);margin-bottom:16px;font-weight:700}
+  .chain-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+  .cn{font-size:12.5px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 13px}
+  .cn.hl{color:var(--text);border-color:rgba(0,212,170,.5);background:rgba(0,212,170,.08);box-shadow:0 0 0 1px rgba(0,212,170,.15)}
+  .ca{color:var(--gold);font-size:14px;flex-shrink:0}
+  /* ops reference: callback events + common errors */
+  .opsgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px}
+  @media(max-width:720px){.opsgrid{grid-template-columns:1fr}}
+  .opsbox{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .opsbox .evh{font-size:14px;font-weight:700;margin-bottom:13px}
+  .opsbox p{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.75}
+  .opsbox p b{color:var(--gold);font-family:var(--mono);font-weight:600}
+
+  /* RTL (Arabic) */
+  [dir=rtl] .sec-meta h2 small{margin-left:0;margin-right:10px}
+  [dir=rtl] .node ul{text-align:right}
+  [dir=rtl] .node ul li::before{content:"◃ "}
+  [dir=rtl] .sample .sh .nm{margin-left:0;margin-right:auto}
+  [dir=rtl] .pane .lbl,[dir=rtl] .card p,[dir=rtl] .card h3,[dir=rtl] .stat .l,[dir=rtl] .tl .step p,[dir=rtl] .tl .step h4,[dir=rtl] .kv .row .v{text-align:right}
+  [dir=rtl] .disclaimer{border-left:none;border-right:3px solid var(--gold);text-align:right}
+  [dir=rtl] .pane+.pane{border-left:none;border-right:1px solid var(--line)}
+  [dir=rtl] .tl{padding-left:0;padding-right:36px}
+  [dir=rtl] .tl::before{left:auto;right:11px}
+  [dir=rtl] .tl .step::before{left:auto;right:-30px}
+  [dir=rtl] .ca{display:inline-block;transform:scaleX(-1)}
+  [dir=rtl] .chain-t,[dir=rtl] .opsbox .evh,[dir=rtl] .opsbox p{text-align:right}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="brand">XPIN<span class="x">·</span><span class="grad-text">eSIM Platform</span></div>
+    <div class="navright">
+      <div class="navlinks">
+        <a href="#cap" data-i18n="nav.cap">Capabilities</a>
+        <a href="#pic" data-i18n="nav.pic">Overview</a>
+        <a href="#api" data-i18n="nav.api">APIs</a>
+        <a href="#flow" data-i18n="nav.flow">Integration</a>
+        <a href="#sec" data-i18n="nav.sec">Security</a>
+      </div>
+      <select class="langsel" id="langsel" aria-label="Language">
+        <option value="en">English</option>
+        <option value="zh">中文</option>
+        <option value="ja">日本語</option>
+        <option value="ko">한국어</option>
+        <option value="fr">Français</option>
+        <option value="de">Deutsch</option>
+        <option value="ar">العربية</option>
+        <option value="ru">Русский</option>
+      </select>
+    </div>
+  </div>
+</nav>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow-brand"><b>XPIN NETWORK</b> &nbsp;·&nbsp; <i>GLOBAL eSIM DATA PLATFORM</i></div>
+    <h1 data-i18n="hero.h1">Global eSIM Data Platform<br/><span class="grad-text">Integrate once, online on landing</span></h1>
+    <p class="sub" data-i18n="hero.sub">Deliver instant, reliable, worldwide mobile data to your users · <b>Standard API, simple integration</b></p>
+    <div class="hero-tags">
+      <span class="tag" data-i18n="hero.t1"><b>149+</b> Countries / Regions</span>
+      <span class="tag" data-i18n="hero.t2"><b>Seconds</b> to provision</span>
+      <span class="tag" data-i18n="hero.t3"><b>REST + API Key</b> access</span>
+      <span class="tag" data-i18n="hero.t4"><b>Full lifecycle</b> support</span>
+    </div>
+  </div>
+</header>
+
+<!-- 00 CAPABILITIES -->
+<section id="cap">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">00</div>
+      <div class="sec-meta">
+        <div class="kicker" data-i18n="cap.kicker">What We Offer</div>
+        <h2 data-i18n="cap.h2">Platform Capabilities <small>Bring global connectivity into your business</small></h2>
+      </div>
+    </div>
+    <div class="grid g3 reveal">
+      <div class="card"><span class="ic">🌍</span><h3 data-i18n="cap.c1t">Global Coverage</h3><p data-i18n="cap.c1d">Local and regional eSIM plans across 149+ countries and regions, selectable by country/region.</p></div>
+      <div class="card"><span class="ic">📦</span><h3 data-i18n="cap.c2t">Diverse Plans</h3><p data-i18n="cap.c2d">Multiple plan types including fixed-data and Unlimited, covering travel, long-stay and events.</p></div>
+      <div class="card"><span class="ic">⚡</span><h3 data-i18n="cap.c3t">Instant Provisioning</h3><p data-i18n="cap.c3d">Auto-activation after ordering; installation info is returned via callback in real time for immediate delivery.</p></div>
+      <div class="card"><span class="ic">🔄</span><h3 data-i18n="cap.c4t">Full Lifecycle</h3><p data-i18n="cap.c4d">Usage, renewal and card &amp; plan status in one place — the card is manageable end to end.</p></div>
+      <div class="card"><span class="ic">🛡</span><h3 data-i18n="cap.c5t">Stable &amp; Reliable</h3><p data-i18n="cap.c5d">Idempotent ordering, automatic callback retries and account data isolation for stable integration and fund safety.</p></div>
+      <div class="card"><span class="ic">🧩</span><h3 data-i18n="cap.c6t">Easy Integration</h3><p data-i18n="cap.c6d">Standard RESTful API + API Key auth, with sandbox and test plans for a fast go-live.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 01 THE BIG PICTURE -->
+<section id="pic">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">01</div>
+      <div class="sec-meta">
+        <div class="kicker" data-i18n="pic.kicker">The Big Picture</div>
+        <h2 data-i18n="pic.h2">Integration Overview <small>You handle sales &amp; users, XPIN handles provisioning &amp; fulfillment</small></h2>
+      </div>
+    </div>
+
+    <div class="flowline reveal">
+      <div class="node">
+        <div class="role" data-i18n="pic.n1role">Your Business</div>
+        <div class="name" data-i18n="pic.n1name">Your Platform / App</div>
+        <div class="desc" data-i18n="pic.n1desc">Sell &amp; present to users</div>
+        <ul>
+          <li data-i18n="pic.n1l1">Show the eSIM plan catalog</li>
+          <li data-i18n="pic.n1l2">User ordering &amp; payment</li>
+          <li data-i18n="pic.n1l3">Deliver install info to users</li>
+          <li data-i18n="pic.n1l4">Show usage / renewal entry</li>
+        </ul>
+      </div>
+      <div class="arrow">
+        <div class="a1">──▶</div><small data-i18n="pic.arr1">API request</small>
+        <div class="a2">◀──</div><small data-i18n="pic.arr2">Callback / data</small>
+      </div>
+      <div class="node mid">
+        <div class="role" data-i18n="pic.n2role">XPIN Platform</div>
+        <div class="name grad-text" data-i18n="pic.n2name">XPIN eSIM Platform</div>
+        <div class="desc" data-i18n="pic.n2desc">Provision · Fulfill · Data</div>
+        <ul>
+          <li data-i18n="pic.n2l1">Provide the sellable catalog</li>
+          <li data-i18n="pic.n2l2">Provision on order, return install info</li>
+          <li data-i18n="pic.n2l3">Usage / renewal / card &amp; plan status</li>
+          <li data-i18n="pic.n2l4">Full-cycle status callbacks &amp; support</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="chain reveal">
+      <div class="chain-t" data-i18n="chain.t">End-to-end flow</div>
+      <div class="chain-row">
+        <span class="cn" data-i18n="chain.n1">Catalog sync</span><span class="ca">→</span>
+        <span class="cn" data-i18n="chain.n2">User orders &amp; pays</span><span class="ca">→</span>
+        <span class="cn" data-i18n="chain.n3">Call /order/create</span><span class="ca">→</span>
+        <span class="cn" data-i18n="chain.n4">XPIN provisions</span><span class="ca">→</span>
+        <span class="cn" data-i18n="chain.n5">Callback returns eSIM install info</span><span class="ca">→</span>
+        <span class="cn" data-i18n="chain.n6">Show to user</span><span class="ca">→</span>
+        <span class="cn" data-i18n="chain.n7">Usage · status · renewal</span>
+      </div>
+    </div>
+
+    <div class="grid g3 reveal" style="margin-top:28px">
+      <div class="card"><span class="ic">🛍</span><h3 data-i18n="pic.f1t">① Onboard Plans</h3><p data-i18n="pic.f1d">Sync the XPIN catalog and sell at your own price on your platform.</p></div>
+      <div class="card"><span class="ic">💳</span><h3 data-i18n="pic.f2t">② Order &amp; Provision</h3><p data-i18n="pic.f2d">After payment, call the order API; XPIN provisions automatically.</p></div>
+      <div class="card"><span class="ic">📲</span><h3 data-i18n="pic.f3t">③ Deliver &amp; Operate</h3><p data-i18n="pic.f3d">Callback returns install info for instant delivery; usage, renewal and status are queryable anytime.</p></div>
+    </div>
+
+    <p style="text-align:center;margin-top:30px;font-size:15px;color:var(--muted)" data-i18n="pic.tag">You decide <b style="color:var(--text)">what and how to sell</b> · XPIN ensures <b style="color:var(--text)">it works once bought, and works well</b></p>
+  </div>
+</section>
+
+<!-- 02 API CAPABILITIES -->
+<section id="api">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">02</div>
+      <div class="sec-meta">
+        <div class="kicker" data-i18n="api.kicker">API Capabilities</div>
+        <h2 data-i18n="api.h2">API Capabilities <small>Standard RESTful · explained with sample data</small></h2>
+      </div>
+    </div>
+
+    <div class="disclaimer reveal" style="margin-bottom:26px" data-i18n="api.disc">
+      💡 All of the following are <b>illustrative data samples</b> to help you understand how the APIs are called and what they return; actual fields, value ranges and the full spec are defined by the <b>official integration doc and sandbox</b>.
+    </div>
+
+    <div class="sample reveal">
+      <div class="sh"><span class="m">POST</span><span class="path">/products/list</span><span class="nm" data-i18n="api.s1nm">Query the sellable catalog</span></div>
+      <div class="sb one">
+        <div class="pane">
+          <div class="lbl g" data-i18n="api.lblResp">Response sample</div>
+<pre><code class="json">{
+  "code": "0000",
+  "msg": "success",
+  "data": {
+    "total": 128,
+    "list": [
+      {
+        "productCode": "XP-EU30-5GB-30D",
+        "productName": "Europe 30 Countries · 5GB / 30 Days",
+        "productType": "DATA_PACK",
+        "countryCodeList": ["FR", "DE", "IT", "ES", "..."],
+        "dataTotal": 5,
+        "dataUnit": "GB",
+        "usagePeriod": 30,
+        "validityPeriod": 180
+      },
+      {
+        "productCode": "XP-JP-DAILY-1GB",
+        "productName": "Japan · 1GB High-Speed / Day",
+        "productType": "DAILY_PACK",
+        "countryCodeList": ["JP"],
+        "usagePeriod": 1,
+        "validityPeriod": 90
+      }
+    ]
+  }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="sample reveal">
+      <div class="sh"><span class="m">POST</span><span class="path">/order/create</span><span class="nm" data-i18n="api.s2nm">Create order · provision on order (async callback delivery)</span></div>
+      <div class="sb">
+        <div class="pane">
+          <div class="lbl" data-i18n="api.lblReq">Request sample</div>
+<pre><code class="json">{
+  "productCode": "XP-EU30-5GB-30D",
+  "channelOrderNo": "PO-20260720-0001",
+  "idempotencyKey": "550e8400-e29b-41d4-a716-446655440000"
+}</code></pre>
+        </div>
+        <div class="pane">
+          <div class="lbl g" data-i18n="api.lblResp">Response sample</div>
+<pre><code class="json">{
+  "code": "0000",
+  "msg": "success",
+  "data": {
+    "orderNo": "XP20260720190119280001"
+  }
+}</code></pre>
+        </div>
+      </div>
+      <div class="sb one" style="border-top:1px solid var(--line)">
+        <div class="pane">
+          <div class="lbl" data-i18n="api.cbnm">Provisioning callback sample (platform → your callback URL)</div>
+<pre><code class="json">{
+  "code": "0000",
+  "msg": "success",
+  "timestamp": "2026-07-20T11:02:33Z",
+  "sign": "b7e2c1a9f04d…",
+  "data": {
+    "eventType": 1,
+    "orderInfo": {
+      "orderNo": "XP20260720190119280001",
+      "iccid": "8944000000000000012",
+      "qrCode": "LPA:1$rsp.xpin.network$A1B2C3D4E5F6G7H8",
+      "activatedEndTime": "2026-08-19T11:02:33Z"
+    }
+  }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid g3 reveal">
+      <div class="sample" style="margin:0">
+        <div class="sh"><span class="m">POST</span><span class="path">/order/usage</span><span class="nm" data-i18n="api.uNm">Real-time usage</span></div>
+        <div class="sb one"><div class="pane"><div class="lbl g" data-i18n="api.lblRespMB">Response sample (MB)</div>
+<pre><code class="json">{
+  "code": "0000",
+  "msg": "success",
+  "data": {
+    "dataTotal": "5120",
+    "dataUsage": "1280",
+    "dataResidual": "3840"
+  }
+}</code></pre>
+        </div></div>
+      </div>
+      <div class="sample" style="margin:0">
+        <div class="sh"><span class="m">POST</span><span class="path">/order/query</span><span class="nm" data-i18n="api.qNm">Order / card &amp; plan status</span></div>
+        <div class="sb one"><div class="pane"><div class="lbl g" data-i18n="api.lblResp">Response sample</div>
+<pre><code class="json">{
+  "code": "0000",
+  "msg": "success",
+  "data": {
+    "list": [{
+      "orderNo": "XP20260720190119280001",
+      "orderStatus": "INUSE",
+      "profileStatus": "activated",
+      "iccid": "8944000000000000012"
+    }]
+  }
+}</code></pre>
+        </div></div>
+      </div>
+      <div class="sample" style="margin:0">
+        <div class="sh"><span class="m">POST</span><span class="path">/order/renew</span><span class="nm" data-i18n="api.rNm">Renewal</span></div>
+        <div class="sb one"><div class="pane"><div class="lbl" data-i18n="api.lblReq">Request sample</div>
+<pre><code class="json">{
+  "productCode": "XP-EU30-5GB-30D",
+  "iccid": "8944000000000000012",
+  "channelOrderNo": "RN-0001",
+  "idempotencyKey": "a1b2c3d4"
+}</code></pre>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="chips reveal" style="margin-top:22px;justify-content:center">
+      <span class="chip" data-i18n="api.chip1">📦 Catalog</span>
+      <span class="chip" data-i18n="api.chip2">🧾 Order &amp; provision</span>
+      <span class="chip" data-i18n="api.chip3">🔔 Provisioning callback</span>
+      <span class="chip" data-i18n="api.chip4">📊 Real-time usage</span>
+      <span class="chip" data-i18n="api.chip5">🔍 Order / card &amp; plan status</span>
+      <span class="chip" data-i18n="api.chip6">🔄 Renewal</span>
+    </div>
+
+    <div class="opsgrid reveal">
+      <div class="opsbox">
+        <div class="evh" data-i18n="cb.evh">🔔 Callback events</div>
+        <div class="chips">
+          <span class="chip" data-i18n="cb.e1">✅ Provisioning success</span>
+          <span class="chip" data-i18n="cb.e2">⚠️ Provisioning failed</span>
+          <span class="chip" data-i18n="cb.e3">🔄 Status change</span>
+          <span class="chip" data-i18n="cb.e4">📊 Usage alert</span>
+          <span class="chip" data-i18n="cb.e5">⏰ Expiry reminder</span>
+        </div>
+      </div>
+      <div class="opsbox">
+        <div class="evh" data-i18n="err.h">⚠️ Common errors (draft)</div>
+        <p data-i18n="err.note">Failures return <b>code ≠ 0000</b> with subCode / subMsg; provisioning failures also arrive via callback. Codes are finalized before sandbox release.</p>
+        <div class="chips">
+          <span class="chip" data-i18n="err.e1">Invalid parameter</span>
+          <span class="chip" data-i18n="err.e2">Signature error</span>
+          <span class="chip" data-i18n="err.e3">Plan not sellable</span>
+          <span class="chip" data-i18n="err.e4">Duplicate order</span>
+          <span class="chip" data-i18n="err.e5">Provisioning failed</span>
+          <span class="chip" data-i18n="err.e6">System processing</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 INTEGRATION FLOW -->
+<section id="flow">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">03</div>
+      <div class="sec-meta">
+        <div class="kicker" data-i18n="flow.kicker">Integration</div>
+        <h2 data-i18n="flow.h2">Integration Plan &amp; Flow <small>Live in five steps, supported throughout</small></h2>
+      </div>
+    </div>
+
+    <div class="grid g2 reveal" style="align-items:start">
+      <div class="tl">
+        <div class="step"><div class="st" data-i18n="flow.s1st">STEP 1 · APPLY</div><h4 data-i18n="flow.s1h">Get credentials</h4><p data-i18n="flow.s1p">XPIN issues <code>appKey</code> / <code>appSecret</code> (one set each for sandbox &amp; production); report your callback URL and egress IP.</p></div>
+        <div class="step"><div class="st" data-i18n="flow.s2st">STEP 2 · AUTH</div><h4 data-i18n="flow.s2h">API Key signing</h4><p data-i18n="flow.s2p">Send <code>appKey</code> and a signature in the headers — <b style="color:var(--text)">static keys, no token exchange</b>, configure once and use long-term.</p></div>
+        <div class="step"><div class="st" data-i18n="flow.s3st">STEP 3 · SYNC</div><h4 data-i18n="flow.s3h">Pull plans</h4><p data-i18n="flow.s3p">Call <code>/products/list</code> to sync sellable plans, then price, organize and present them on your platform.</p></div>
+        <div class="step"><div class="st" data-i18n="flow.s4st">STEP 4 · ORDER</div><h4 data-i18n="flow.s4h">Create order</h4><p data-i18n="flow.s4p">After payment call <code>/order/create</code> with a unique <code>idempotencyKey</code>; the order number returns synchronously.</p></div>
+        <div class="step"><div class="st" data-i18n="flow.s5st">STEP 5 · DELIVER</div><h4 data-i18n="flow.s5h">Receive install info</h4><p data-i18n="flow.s5p">After provisioning the platform pushes install info via callback; generate the eSIM to deliver, then usage / renewal are queryable anytime.</p></div>
+      </div>
+
+      <div style="display:grid;gap:18px">
+        <div class="stats">
+          <div class="stat"><div class="n grad-text">149+</div><div class="l" data-i18n="flow.sLbl1">Countries / Regions</div></div>
+          <div class="stat"><div class="n grad-text" data-i18n="flow.sNum2">Instant</div><div class="l" data-i18n="flow.sLbl2">Provisioning</div></div>
+          <div class="stat"><div class="n grad-text" data-i18n="flow.sNum3">Full</div><div class="l" data-i18n="flow.sLbl3">Support</div></div>
+          <div class="stat"><div class="n grad-text">1</div><div class="l" data-i18n="flow.sLbl4">API set to go live</div></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:12px" data-i18n="flow.clh">✅ Integration checklist</h3>
+          <div class="kv">
+            <div class="row"><span class="k">01</span><span class="v" data-i18n="flow.ck1">Get appKey / appSecret; report callback URL and IP</span></div>
+            <div class="row"><span class="k">02</span><span class="v" data-i18n="flow.ck2">Implement API Key request signing and callback verification</span></div>
+            <div class="row"><span class="k">03</span><span class="v" data-i18n="flow.ck3">Sync the plan catalog and build the sales page</span></div>
+            <div class="row"><span class="k">04</span><span class="v" data-i18n="flow.ck4">Integrate the order API with idempotent retry</span></div>
+            <div class="row"><span class="k">05</span><span class="v" data-i18n="flow.ck5">Implement callback receiving and complete install-info delivery</span></div>
+            <div class="row"><span class="k">06</span><span class="v" data-i18n="flow.ck6">Sandbox test → switch to production → go live</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 04 SECURITY -->
+<section id="sec">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="sec-num">04</div>
+      <div class="sec-meta">
+        <div class="kicker" data-i18n="sec.kicker">Security &amp; Reliability</div>
+        <h2 data-i18n="sec.h2">Security &amp; Reliability</h2>
+      </div>
+    </div>
+    <div class="grid g3 reveal">
+      <div class="card"><span class="ic">🔐</span><h3 data-i18n="sec.c1t">API Key + Signature</h3><p data-i18n="sec.c1d">Static key + HMAC request signature, with a timestamp window and nonce to prevent tampering and replay.</p></div>
+      <div class="card"><span class="ic">🛡</span><h3 data-i18n="sec.c2t">Idempotent Safety</h3><p data-i18n="sec.c2d">Order APIs use <span class="accent">idempotencyKey</span> so retries never double-provision or overcharge on network errors.</p></div>
+      <div class="card"><span class="ic">🔔</span><h3 data-i18n="sec.c3t">Reliable Callbacks</h3><p data-i18n="sec.c3d">Provisioning results are pushed asynchronously and retried until your system confirms, with an IP allowlist to keep the source trusted.</p></div>
+      <div class="card"><span class="ic">🧱</span><h3 data-i18n="sec.c4t">Data Isolation</h3><p data-i18n="sec.c4d">Each account can only query and operate its own orders and cards; accounts cannot see each other's data.</p></div>
+      <div class="card"><span class="ic">🌐</span><h3 data-i18n="sec.c5t">Sandbox</h3><p data-i18n="sec.c5d">Independent sandbox and test plans; integration incurs no real cost — switch to production once verified.</p></div>
+      <div class="card"><span class="ic">🤝</span><h3 data-i18n="sec.c6t">Integration Support</h3><p data-i18n="sec.c6d">Docs, sample code and technical support to help you go live smoothly.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <h3 class="grad-text" data-i18n="foot.h3">Integrate once, bring global connectivity to your users</h3>
+    <p data-i18n="foot.p">Standard API, simple integration, full fulfillment — let your users be online the moment they land.</p>
+    <div class="slogan">Free the data, free the world!</div>
+    <div class="copy" data-i18n="foot.copy">XPIN Global eSIM Data Platform · Partner Integration · © 2026 XPIN Network</div>
+  </div>
+</footer>
+
+<script>
+  document.documentElement.classList.add('js');
+
+  const I18N = {
+    en: {
+      "nav.cap":"Capabilities","nav.pic":"Overview","nav.api":"APIs","nav.flow":"Integration","nav.sec":"Security",
+      "hero.h1":"Global eSIM Data Platform<br/><span class='grad-text'>Integrate once, online on landing</span>",
+      "hero.sub":"Deliver instant, reliable, worldwide mobile data to your users · <b>Standard API, simple integration</b>",
+      "hero.t1":"<b>149+</b> Countries / Regions","hero.t2":"<b>Seconds</b> to provision","hero.t3":"<b>REST + API Key</b> access","hero.t4":"<b>Full lifecycle</b> support",
+      "cap.kicker":"What We Offer","cap.h2":"Platform Capabilities <small>Bring global connectivity into your business</small>",
+      "cap.c1t":"Global Coverage","cap.c1d":"Local and regional eSIM plans across 149+ countries and regions, selectable by country/region.",
+      "cap.c2t":"Diverse Plans","cap.c2d":"Multiple plan types including fixed-data and Unlimited, covering travel, long-stay and events.",
+      "cap.c3t":"Instant Provisioning","cap.c3d":"Auto-activation after ordering; installation info is returned via callback in real time for immediate delivery.",
+      "cap.c4t":"Full Lifecycle","cap.c4d":"Usage, renewal and card & plan status in one place — the card is manageable end to end.",
+      "cap.c5t":"Stable & Reliable","cap.c5d":"Idempotent ordering, automatic callback retries and account data isolation for stable integration and fund safety.",
+      "cap.c6t":"Easy Integration","cap.c6d":"Standard RESTful API + API Key auth, with sandbox and test plans for a fast go-live.",
+      "pic.kicker":"The Big Picture","pic.h2":"Integration Overview <small>You handle sales & users, XPIN handles provisioning & fulfillment</small>",
+      "pic.n1role":"Your Business","pic.n1name":"Your Platform / App","pic.n1desc":"Sell & present to users",
+      "pic.n1l1":"Show the eSIM plan catalog","pic.n1l2":"User ordering & payment","pic.n1l3":"Deliver install info to users","pic.n1l4":"Show usage / renewal entry",
+      "pic.arr1":"API request","pic.arr2":"Callback / data",
+      "pic.n2role":"XPIN Platform","pic.n2name":"XPIN eSIM Platform","pic.n2desc":"Provision · Fulfill · Data",
+      "pic.n2l1":"Provide the sellable catalog","pic.n2l2":"Provision on order, return install info","pic.n2l3":"Usage / renewal / card & plan status","pic.n2l4":"Full-cycle status callbacks & support",
+      "pic.f1t":"① Onboard Plans","pic.f1d":"Sync the XPIN catalog and sell at your own price on your platform.",
+      "pic.f2t":"② Order & Provision","pic.f2d":"After payment, call the order API; XPIN provisions automatically.",
+      "pic.f3t":"③ Deliver & Operate","pic.f3d":"Callback returns install info for instant delivery; usage, renewal and status are queryable anytime.",
+      "pic.tag":"You decide <b style='color:var(--text)'>what and how to sell</b> · XPIN ensures <b style='color:var(--text)'>it works once bought, and works well</b>",
+      "api.kicker":"API Capabilities","api.h2":"API Capabilities <small>Standard RESTful · explained with sample data</small>",
+      "api.disc":"💡 All of the following are <b>illustrative data samples</b> to help you understand how the APIs are called and what they return; actual fields, value ranges and the full spec are defined by the <b>official integration doc and sandbox</b>.",
+      "api.s1nm":"Query the sellable catalog","api.lblResp":"Response sample","api.lblReq":"Request sample","api.lblRespMB":"Response sample (MB)",
+      "api.s2nm":"Create order · provision on order (async callback delivery)","api.cbnm":"Provisioning callback sample (platform → your callback URL)",
+      "api.uNm":"Real-time usage","api.qNm":"Order / card & plan status","api.rNm":"Renewal",
+      "api.chip1":"📦 Catalog","api.chip2":"🧾 Order & provision","api.chip3":"🔔 Provisioning callback","api.chip4":"📊 Real-time usage","api.chip5":"🔍 Order / card & plan status","api.chip6":"🔄 Renewal",
+      "flow.kicker":"Integration","flow.h2":"Integration Plan & Flow <small>Live in five steps, supported throughout</small>",
+      "flow.s1st":"STEP 1 · APPLY","flow.s1h":"Get credentials","flow.s1p":"XPIN issues <code>appKey</code> / <code>appSecret</code> (one set each for sandbox & production); report your callback URL and egress IP.",
+      "flow.s2st":"STEP 2 · AUTH","flow.s2h":"API Key signing","flow.s2p":"Send <code>appKey</code> and a signature in the headers — <b style='color:var(--text)'>static keys, no token exchange</b>, configure once and use long-term.",
+      "flow.s3st":"STEP 3 · SYNC","flow.s3h":"Pull plans","flow.s3p":"Call <code>/products/list</code> to sync sellable plans, then price, organize and present them on your platform.",
+      "flow.s4st":"STEP 4 · ORDER","flow.s4h":"Create order","flow.s4p":"After payment call <code>/order/create</code> with a unique <code>idempotencyKey</code>; the order number returns synchronously.",
+      "flow.s5st":"STEP 5 · DELIVER","flow.s5h":"Receive install info","flow.s5p":"After provisioning the platform pushes install info via callback; generate the eSIM to deliver, then usage / renewal are queryable anytime.",
+      "flow.sNum2":"Instant","flow.sNum3":"Full","flow.sLbl1":"Countries / Regions","flow.sLbl2":"Provisioning","flow.sLbl3":"Support","flow.sLbl4":"API set to go live",
+      "flow.clh":"✅ Integration checklist",
+      "flow.ck1":"Get appKey / appSecret; report callback URL and IP","flow.ck2":"Implement API Key request signing and callback verification","flow.ck3":"Sync the plan catalog and build the sales page","flow.ck4":"Integrate the order API with idempotent retry","flow.ck5":"Implement callback receiving and complete install-info delivery","flow.ck6":"Sandbox test → switch to production → go live",
+      "sec.kicker":"Security & Reliability","sec.h2":"Security & Reliability",
+      "sec.c1t":"API Key + Signature","sec.c1d":"Static key + HMAC request signature, with a timestamp window and nonce to prevent tampering and replay.",
+      "sec.c2t":"Idempotent Safety","sec.c2d":"Order APIs use <span class='accent'>idempotencyKey</span> so retries never double-provision or overcharge on network errors.",
+      "sec.c3t":"Reliable Callbacks","sec.c3d":"Provisioning results are pushed asynchronously and retried until your system confirms, with an IP allowlist to keep the source trusted.",
+      "sec.c4t":"Data Isolation","sec.c4d":"Each account can only query and operate its own orders and cards; accounts cannot see each other's data.",
+      "sec.c5t":"Sandbox","sec.c5d":"Independent sandbox and test plans; integration incurs no real cost — switch to production once verified.",
+      "sec.c6t":"Integration Support","sec.c6d":"Docs, sample code and technical support to help you go live smoothly.",
+      "foot.h3":"Integrate once, bring global connectivity to your users","foot.p":"Standard API, simple integration, full fulfillment — let your users be online the moment they land.",
+      "foot.copy":"XPIN Global eSIM Data Platform · Partner Integration · © 2026 XPIN Network",
+      "chain.t":"End-to-end flow","chain.n1":"Catalog sync","chain.n2":"User orders & pays","chain.n3":"Call /order/create","chain.n4":"XPIN provisions","chain.n5":"Callback returns eSIM install info","chain.n6":"Show to user","chain.n7":"Usage · status · renewal",
+      "cb.evh":"🔔 Callback events","cb.e1":"✅ Provisioning success","cb.e2":"⚠️ Provisioning failed","cb.e3":"🔄 Status change","cb.e4":"📊 Usage alert","cb.e5":"⏰ Expiry reminder",
+      "err.h":"⚠️ Common errors (draft)","err.note":"Failures return <b>code ≠ 0000</b> with subCode / subMsg; provisioning failures also arrive via callback. Codes are finalized before sandbox release.","err.e1":"Invalid parameter","err.e2":"Signature error","err.e3":"Plan not sellable","err.e4":"Duplicate order","err.e5":"Provisioning failed","err.e6":"System processing"
+    },
+    zh: {
+      "nav.cap":"平台能力","nav.pic":"对接总览","nav.api":"接口能力","nav.flow":"接入流程","nav.sec":"安全可靠",
+      "hero.h1":"全球 eSIM 数据平台<br/><span class='grad-text'>一次对接，落地即在线</span>",
+      "hero.sub":"为你的用户提供即时、可靠、覆盖全球的移动数据连接 · <b>标准 API，简单集成</b>",
+      "hero.t1":"<b>149+</b> 国家 / 地区","hero.t2":"<b>秒级</b> 开通交付","hero.t3":"<b>REST + API Key</b> 接入","hero.t4":"<b>全生命周期</b> 支撑",
+      "cap.kicker":"What We Offer","cap.h2":"平台能力 <small>把全球连接，接入你的业务</small>",
+      "cap.c1t":"全球覆盖","cap.c1d":"覆盖 149+ 国家与地区的本地及区域 eSIM 套餐，按国家/区域灵活选品。",
+      "cap.c2t":"多样套餐","cap.c2d":"固定流量 + Unlimited 等多种套餐类型，满足差旅、长居、会展等场景。",
+      "cap.c3t":"秒级开通","cap.c3d":"下单后自动开卡，通过回调实时返回安装信息，即刻交付用户安装。",
+      "cap.c4t":"全生命周期","cap.c4d":"用量查询、续订、卡 & 套餐状态一站式覆盖，卡的全程可管理。",
+      "cap.c5t":"稳定可靠","cap.c5d":"幂等下单、回调自动重投、账户数据隔离，保障对接稳定与资金安全。",
+      "cap.c6t":"简单集成","cap.c6d":"标准 RESTful API + API Key 鉴权，提供沙箱环境与测试套餐，快速联调上线。",
+      "pic.kicker":"The Big Picture","pic.h2":"对接总览 <small>你负责售卖与用户，XPIN 负责开通与履约</small>",
+      "pic.n1role":"Your Business","pic.n1name":"你的平台 / App","pic.n1desc":"面向用户售卖与展示",
+      "pic.n1l1":"展示 eSIM 套餐目录","pic.n1l2":"用户下单与收款","pic.n1l3":"交付安装信息给用户","pic.n1l4":"展示用量 / 续期入口",
+      "pic.arr1":"API 请求","pic.arr2":"回调 / 数据",
+      "pic.n2role":"XPIN Platform","pic.n2name":"XPIN eSIM 平台","pic.n2desc":"开通 · 履约 · 数据支撑",
+      "pic.n2l1":"提供可售套餐目录","pic.n2l2":"下单即开卡，返回安装信息","pic.n2l3":"用量 / 续订 / 卡 & 套餐状态","pic.n2l4":"全程状态回调与支撑",
+      "pic.f1t":"① 选品上架","pic.f1d":"同步 XPIN 套餐目录，在你的平台自主定价与售卖。",
+      "pic.f2t":"② 下单开通","pic.f2d":"用户支付后，你调用下单接口，XPIN 自动完成开卡。",
+      "pic.f3t":"③ 交付与运营","pic.f3d":"回调返回安装信息即刻交付；用量、续订、状态随时可查。",
+      "pic.tag":"你决定 <b style='color:var(--text)'>卖什么、怎么卖</b> · XPIN 保证 <b style='color:var(--text)'>买了就能用、用了就好用</b>",
+      "api.kicker":"API Capabilities","api.h2":"接口能力 <small>标准 RESTful · 以数据示例说明</small>",
+      "api.disc":"💡 以下均为<b>数据形态示例</b>，用于帮助理解接口的调用方式与返回结构；实际字段、取值范围与完整规范以<b>正式联调文档与沙箱环境</b>为准。",
+      "api.s1nm":"查询可售套餐目录","api.lblResp":"Response 示例","api.lblReq":"Request 示例","api.lblRespMB":"Response 示例（单位 MB）",
+      "api.s2nm":"创建订单 · 下单即开卡（异步回调交付）","api.cbnm":"开卡回调示例（平台 → 你的回调地址）",
+      "api.uNm":"实时用量","api.qNm":"订单 / 卡 & 套餐状态","api.rNm":"续订",
+      "api.chip1":"📦 套餐目录","api.chip2":"🧾 下单开卡","api.chip3":"🔔 开卡回调","api.chip4":"📊 实时用量","api.chip5":"🔍 订单 / 卡 & 套餐状态","api.chip6":"🔄 续订",
+      "flow.kicker":"Integration","flow.h2":"接入方案与流程 <small>五步上线，全程有支撑</small>",
+      "flow.s1st":"STEP 1 · 申请接入","flow.s1h":"获取密钥","flow.s1p":"XPIN 分配 <code>appKey</code> / <code>appSecret</code>（沙箱 + 生产各一套），报备你的回调地址与出口 IP。",
+      "flow.s2st":"STEP 2 · 鉴权","flow.s2h":"API Key 签名","flow.s2p":"请求头携带 <code>appKey</code> 与签名，<b style='color:var(--text)'>静态密钥、无需换取令牌</b>，一次配置长期可用。",
+      "flow.s3st":"STEP 3 · 同步目录","flow.s3h":"拉取套餐","flow.s3p":"调用 <code>/products/list</code> 同步可售套餐，在你的平台自主定价、组织与展示。",
+      "flow.s4st":"STEP 4 · 下单开卡","flow.s4h":"创建订单","flow.s4p":"用户支付后调用 <code>/order/create</code>，带唯一 <code>idempotencyKey</code>，同步返回订单号。",
+      "flow.s5st":"STEP 5 · 回调交付","flow.s5h":"接收安装信息","flow.s5p":"开卡完成后平台回调推送安装信息，你据此生成 eSIM 交付用户；随后用量 / 续订随时可查。",
+      "flow.sNum2":"秒级","flow.sNum3":"全程","flow.sLbl1":"国家 / 地区","flow.sLbl2":"开通交付","flow.sLbl3":"对接支撑","flow.sLbl4":"套接口上线",
+      "flow.clh":"✅ 接入清单",
+      "flow.ck1":"获取 appKey / appSecret，报备回调地址与 IP","flow.ck2":"实现 API Key 请求签名与回调验签","flow.ck3":"同步套餐目录，完成售卖页展示","flow.ck4":"对接下单接口，落地幂等重试","flow.ck5":"实现回调接收，完成安装信息交付","flow.ck6":"沙箱联调 → 切换生产 → 正式上线",
+      "sec.kicker":"Security & Reliability","sec.h2":"安全与可靠",
+      "sec.c1t":"API Key + 签名","sec.c1d":"静态密钥 + HMAC 请求签名，配合时间戳窗口与 nonce 防篡改、防重放。",
+      "sec.c2t":"幂等安全","sec.c2d":"下单类接口以 <span class='accent'>idempotencyKey</span> 保证重试不重复开卡，网络异常也不多扣费。",
+      "sec.c3t":"可靠回调","sec.c3d":"开卡结果异步回调并自动重投，直至你的系统确认接收，配合 IP 白名单保障来源可信。",
+      "sec.c4t":"数据隔离","sec.c4d":"每个账户仅能查询与操作自身订单与卡片，账户间数据互不可见。",
+      "sec.c5t":"沙箱环境","sec.c5d":"提供独立沙箱与测试套餐，联调不产生真实费用，验证通过再切生产。",
+      "sec.c6t":"联调支撑","sec.c6d":"提供接入文档、示例代码与技术支持，全程协助你顺利上线。",
+      "foot.h3":"一次对接，把全球连接带给你的用户","foot.p":"标准接口、简单集成、全程履约 —— 让你的用户，落地即在线。",
+      "foot.copy":"XPIN 全球 eSIM 数据平台 · 合作接入方案 · © 2026 XPIN Network",
+      "chain.t":"端到端流程","chain.n1":"套餐同步","chain.n2":"用户下单付款","chain.n3":"调用 /order/create","chain.n4":"XPIN 开卡","chain.n5":"回调返回 eSIM 安装信息","chain.n6":"展示给用户","chain.n7":"查用量 · 状态 · 续订",
+      "cb.evh":"🔔 回调事件","cb.e1":"✅ 开卡成功","cb.e2":"⚠️ 开卡失败","cb.e3":"🔄 状态变更","cb.e4":"📊 用量告警","cb.e5":"⏰ 到期提醒",
+      "err.h":"⚠️ 常见错误码（初版）","err.note":"失败时返回 <b>code ≠ 0000</b> 并带 subCode / subMsg；开卡失败也会通过回调送达。错误码将在沙箱发布前最终确定。","err.e1":"参数错误","err.e2":"签名错误","err.e3":"套餐不可售","err.e4":"重复订单","err.e5":"开卡失败","err.e6":"系统处理中"
+    },
+    ja: {
+"nav.cap":"機能","nav.pic":"概要","nav.api":"API","nav.flow":"連携","nav.sec":"セキュリティ",
+"hero.h1":"グローバルeSIMデータプラットフォーム<br/><span class='grad-text'>一度の連携で、到着とともにオンライン</span>",
+"hero.sub":"高速で信頼性の高いモバイルデータを世界中のユーザーへ · <b>標準API、シンプルな連携</b>",
+"hero.t1":"<b>149+</b> の国・地域","hero.t2":"<b>数秒</b>でプロビジョニング","hero.t3":"<b>REST + API Key</b> でアクセス","hero.t4":"<b>ライフサイクル全体</b>をサポート",
+"cap.kicker":"What We Offer","cap.h2":"プラットフォーム機能 <small>グローバル接続をあなたのビジネスへ</small>",
+"cap.c1t":"グローバルカバレッジ","cap.c1d":"149以上の国・地域にわたるローカルおよびリージョナルのeSIMプランを、国・地域ごとに選択できます。",
+"cap.c2t":"多彩なプラン","cap.c2d":"固定データ量やUnlimitedなど複数のプランタイプを用意し、旅行・長期滞在・イベントに対応します。",
+"cap.c3t":"即時プロビジョニング","cap.c3d":"注文後に自動でアクティベートされ、インストール情報はコールバックでリアルタイムに返却され、即座に提供できます。",
+"cap.c4t":"ライフサイクル全体","cap.c4d":"利用状況・更新・カードとプランのステータスを一元管理でき、カードを一貫して管理できます。",
+"cap.c5t":"安定性と信頼性","cap.c5d":"冪等な注文処理、コールバックの自動リトライ、アカウントデータの分離により、安定した連携と資金の安全性を実現します。",
+"cap.c6t":"容易な連携","cap.c6d":"標準的なRESTful APIとAPI Key認証に加え、サンドボックスとテストプランを備え、迅速な本番稼働を支援します。",
+"pic.kicker":"The Big Picture","pic.h2":"連携の全体像 <small>販売とユーザー対応はあなたが、プロビジョニングと提供はXPINが担当</small>",
+"pic.n1role":"Your Business","pic.n1name":"あなたのプラットフォーム / アプリ","pic.n1desc":"ユーザーへの販売と提示",
+"pic.n1l1":"eSIMプランのカタログを表示","pic.n1l2":"ユーザーの注文と決済","pic.n1l3":"インストール情報をユーザーに提供","pic.n1l4":"利用状況・更新の導線を表示",
+"pic.arr1":"APIリクエスト","pic.arr2":"コールバック / データ",
+"pic.n2role":"XPIN Platform","pic.n2name":"XPIN eSIMプラットフォーム","pic.n2desc":"プロビジョニング · 提供 · データ",
+"pic.n2l1":"販売可能なカタログを提供","pic.n2l2":"注文時にプロビジョニングし、インストール情報を返却","pic.n2l3":"利用状況 / 更新 / カードとプランのステータス","pic.n2l4":"全期間のステータスコールバックとサポート",
+"pic.f1t":"① プランの取り込み","pic.f1d":"XPINのカタログを同期し、あなたのプラットフォームで独自価格で販売します。",
+"pic.f2t":"② 注文とプロビジョニング","pic.f2d":"決済後に注文APIを呼び出すと、XPINが自動でプロビジョニングします。",
+"pic.f3t":"③ 提供と運用","pic.f3d":"コールバックがインストール情報を返却して即時提供でき、利用状況・更新・ステータスはいつでも照会できます。",
+"pic.tag":"<b style='color:var(--text)'>何をどう売るか</b>はあなたが決定 · XPINが<b style='color:var(--text)'>購入後の動作と快適な利用</b>を保証",
+"api.kicker":"API Capabilities","api.h2":"API機能 <small>標準的なRESTful · サンプルデータで解説</small>",
+"api.disc":"💡 以下はすべて、APIの呼び出し方と返却内容を理解いただくための<b>説明用のデータサンプル</b>です。実際のフィールド、値の範囲、および完全な仕様は<b>公式の連携ドキュメントとサンドボックス</b>で定義されます。",
+"api.s1nm":"販売可能なカタログを照会","api.lblResp":"レスポンスサンプル","api.lblReq":"リクエストサンプル","api.lblRespMB":"レスポンスサンプル (MB)",
+"api.s2nm":"注文作成 · 注文時にプロビジョニング(非同期コールバックで提供)","api.cbnm":"プロビジョニングコールバックのサンプル(プラットフォーム → あなたのコールバックURL)",
+"api.uNm":"リアルタイム利用状況","api.qNm":"注文 / カードとプランのステータス","api.rNm":"更新",
+"api.chip1":"📦 カタログ","api.chip2":"🧾 注文とプロビジョニング","api.chip3":"🔔 プロビジョニングコールバック","api.chip4":"📊 リアルタイム利用状況","api.chip5":"🔍 注文 / カードとプランのステータス","api.chip6":"🔄 更新",
+"flow.kicker":"Integration","flow.h2":"連携プランとフロー <small>5つのステップで稼働、全期間を通してサポート</small>",
+"flow.s1st":"STEP 1 · 申請","flow.s1h":"認証情報を取得","flow.s1p":"XPINが<code>appKey</code> / <code>appSecret</code>を発行します(サンドボックスと本番それぞれに1組ずつ)。コールバックURLと送信元IPをお知らせください。",
+"flow.s2st":"STEP 2 · 認証","flow.s2h":"API Key署名","flow.s2p":"ヘッダーに<code>appKey</code>と署名を送信します — <b style='color:var(--text)'>静的キーでトークン交換は不要</b>、一度設定すれば長期間利用できます。",
+"flow.s3st":"STEP 3 · 同期","flow.s3h":"プランを取得","flow.s3p":"<code>/products/list</code>を呼び出して販売可能なプランを同期し、あなたのプラットフォームで価格設定・整理・提示します。",
+"flow.s4st":"STEP 4 · 注文","flow.s4h":"注文を作成","flow.s4p":"決済後、一意の<code>idempotencyKey</code>を付けて<code>/order/create</code>を呼び出すと、注文番号が同期的に返却されます。",
+"flow.s5st":"STEP 5 · 提供","flow.s5h":"インストール情報を受信","flow.s5p":"プロビジョニング後、プラットフォームがコールバックでインストール情報をプッシュします。eSIMを生成して提供でき、その後の利用状況・更新はいつでも照会できます。",
+"flow.sNum2":"即時","flow.sNum3":"完全","flow.sLbl1":"国・地域","flow.sLbl2":"プロビジョニング","flow.sLbl3":"サポート","flow.sLbl4":"稼働可能なAPIセット",
+"flow.clh":"✅ 連携チェックリスト",
+"flow.ck1":"appKey / appSecretを取得し、コールバックURLとIPをお知らせ","flow.ck2":"API Keyのリクエスト署名とコールバック検証を実装","flow.ck3":"プランカタログを同期して販売ページを構築","flow.ck4":"冪等リトライ付きで注文APIを連携","flow.ck5":"コールバック受信を実装し、インストール情報の提供を完了","flow.ck6":"サンドボックスでテスト → 本番へ切り替え → 稼働開始",
+"sec.kicker":"Security & Reliability","sec.h2":"セキュリティと信頼性",
+"sec.c1t":"API Key + 署名","sec.c1d":"静的キーとHMACリクエスト署名に加え、タイムスタンプウィンドウとnonceにより改ざんとリプレイを防止します。",
+"sec.c2t":"冪等性による安全性","sec.c2d":"注文APIは<span class='accent'>idempotencyKey</span>を使用するため、ネットワークエラー時のリトライでも二重プロビジョニングや過剰請求が発生しません。",
+"sec.c3t":"信頼性の高いコールバック","sec.c3d":"プロビジョニング結果は非同期でプッシュされ、あなたのシステムが確認するまでリトライされます。IP許可リストにより送信元の信頼性を保ちます。",
+"sec.c4t":"データ分離","sec.c4d":"各アカウントは自身の注文とカードのみを照会・操作でき、アカウント間で互いのデータは見えません。",
+"sec.c5t":"サンドボックス","sec.c5d":"独立したサンドボックスとテストプランを提供し、連携に実費は発生しません。検証後に本番へ切り替えられます。",
+"sec.c6t":"連携サポート","sec.c6d":"ドキュメント、サンプルコード、技術サポートにより、スムーズな本番稼働を支援します。",
+"chain.t":"エンドツーエンドのフロー","chain.n1":"カタログ同期","chain.n2":"ユーザーの注文と支払い","chain.n3":"/order/create の呼び出し","chain.n4":"XPIN によるプロビジョニング","chain.n5":"コールバックで eSIM インストール情報を返却","chain.n6":"ユーザーへ表示","chain.n7":"利用状況 · ステータス · 更新","cb.evh":"🔔 コールバックイベント","cb.e1":"✅ プロビジョニング成功","cb.e2":"⚠️ プロビジョニング失敗","cb.e3":"🔄 ステータス変更","cb.e4":"📊 利用量アラート","cb.e5":"⏰ 有効期限リマインダー","err.h":"⚠️ 一般的なエラー（下書き）","err.note":"失敗時は <b>code ≠ 0000</b> が subCode / subMsg とともに返されます。プロビジョニングの失敗はコールバックでも通知されます。コードはサンドボックス公開前に確定されます。","err.e1":"無効なパラメータ","err.e2":"署名エラー","err.e3":"プランが販売不可","err.e4":"注文の重複","err.e5":"プロビジョニング失敗","err.e6":"システム処理中","foot.h3":"一度の連携で、グローバル接続をユーザーへ","foot.p":"標準API、シンプルな連携、完全な提供 — ユーザーが到着した瞬間からオンラインに。",
+"foot.copy":"XPIN Global eSIM Data Platform · Partner Integration · © 2026 XPIN Network"
+    },
+    ko: {
+"nav.cap":"핵심 기능","nav.pic":"개요","nav.api":"API","nav.flow":"연동","nav.sec":"보안",
+"hero.h1":"글로벌 eSIM 데이터 플랫폼<br/><span class='grad-text'>한 번의 연동으로, 도착 즉시 온라인</span>",
+"hero.sub":"사용자에게 즉각적이고 안정적인 전 세계 모바일 데이터를 제공하세요 · <b>표준 API, 간편한 연동</b>",
+"hero.t1":"<b>149+</b>개 국가/지역","hero.t2":"<b>수 초</b> 만에 개통","hero.t3":"<b>REST + API Key</b> 접근","hero.t4":"<b>전체 수명 주기</b> 지원",
+"cap.kicker":"What We Offer","cap.h2":"플랫폼 기능 <small>글로벌 연결성을 비즈니스에 도입하세요</small>",
+"cap.c1t":"글로벌 커버리지","cap.c1d":"149+개 국가 및 지역에 걸친 로컬 및 지역별 eSIM 요금제를 국가/지역별로 선택할 수 있습니다.",
+"cap.c2t":"다양한 요금제","cap.c2d":"정액 데이터 및 무제한을 포함한 다양한 요금제 유형으로 여행, 장기 체류, 이벤트를 모두 아우릅니다.",
+"cap.c3t":"즉시 개통","cap.c3d":"주문 후 자동 활성화되며, 설치 정보는 콜백을 통해 실시간으로 반환되어 즉시 전달됩니다.",
+"cap.c4t":"전체 수명 주기","cap.c4d":"사용량, 갱신, 카드 및 요금제 상태를 한곳에서 관리 — 카드를 처음부터 끝까지 관리할 수 있습니다.",
+"cap.c5t":"안정성과 신뢰성","cap.c5d":"멱등성 주문, 자동 콜백 재시도, 계정 데이터 격리로 안정적인 연동과 자금 안전을 보장합니다.",
+"cap.c6t":"손쉬운 연동","cap.c6d":"표준 RESTful API + API Key 인증에 샌드박스와 테스트 요금제를 더해 빠른 출시가 가능합니다.",
+"pic.kicker":"The Big Picture","pic.h2":"연동 개요 <small>판매와 사용자 관리는 귀사가, 개통과 이행은 XPIN이 담당합니다</small>",
+"pic.n1role":"Your Business","pic.n1name":"귀사의 플랫폼 / 앱","pic.n1desc":"사용자에게 판매 및 노출",
+"pic.n1l1":"eSIM 요금제 카탈로그 노출","pic.n1l2":"사용자 주문 및 결제","pic.n1l3":"사용자에게 설치 정보 전달","pic.n1l4":"사용량 / 갱신 진입점 노출",
+"pic.arr1":"API 요청","pic.arr2":"콜백 / 데이터",
+"pic.n2role":"XPIN Platform","pic.n2name":"XPIN eSIM 플랫폼","pic.n2desc":"개통 · 이행 · 데이터",
+"pic.n2l1":"판매 가능한 카탈로그 제공","pic.n2l2":"주문 시 개통, 설치 정보 반환","pic.n2l3":"사용량 / 갱신 / 카드 및 요금제 상태","pic.n2l4":"전체 주기 상태 콜백 및 지원",
+"pic.f1t":"① 요금제 온보딩","pic.f1d":"XPIN 카탈로그를 동기화하여 귀사 플랫폼에서 원하는 가격으로 판매하세요.",
+"pic.f2t":"② 주문 및 개통","pic.f2d":"결제 후 주문 API를 호출하면 XPIN이 자동으로 개통합니다.",
+"pic.f3t":"③ 전달 및 운영","pic.f3d":"콜백으로 설치 정보를 반환하여 즉시 전달하며, 사용량, 갱신, 상태를 언제든지 조회할 수 있습니다.",
+"pic.tag":"귀사는 <b style='color:var(--text)'>무엇을 어떻게 판매할지</b> 결정하고 · XPIN은 <b style='color:var(--text)'>구매 후 정상 작동과 원활한 운영</b>을 보장합니다",
+"api.kicker":"API Capabilities","api.h2":"API 기능 <small>표준 RESTful · 샘플 데이터로 설명</small>",
+"api.disc":"💡 아래 내용은 모두 API가 어떻게 호출되고 무엇을 반환하는지 이해를 돕기 위한 <b>예시용 데이터 샘플</b>이며, 실제 필드, 값의 범위 및 전체 사양은 <b>공식 연동 문서 및 샌드박스</b>에서 정의됩니다.",
+"api.s1nm":"판매 가능한 카탈로그 조회","api.lblResp":"응답 샘플","api.lblReq":"요청 샘플","api.lblRespMB":"응답 샘플 (MB)",
+"api.s2nm":"주문 생성 · 주문 시 개통 (비동기 콜백 전달)","api.cbnm":"개통 콜백 샘플 (플랫폼 → 귀사 콜백 URL)",
+"api.uNm":"실시간 사용량","api.qNm":"주문 / 카드 및 요금제 상태","api.rNm":"갱신",
+"api.chip1":"📦 카탈로그","api.chip2":"🧾 주문 및 개통","api.chip3":"🔔 개통 콜백","api.chip4":"📊 실시간 사용량","api.chip5":"🔍 주문 / 카드 및 요금제 상태","api.chip6":"🔄 갱신",
+"flow.kicker":"Integration","flow.h2":"연동 방안 및 흐름 <small>다섯 단계로 출시, 전 과정 지원</small>",
+"flow.s1st":"STEP 1 · 신청","flow.s1h":"인증 정보 발급","flow.s1p":"XPIN이 <code>appKey</code> / <code>appSecret</code>를 발급합니다 (샌드박스 및 프로덕션 각 1세트); 콜백 URL과 아웃바운드 IP를 보고하세요.",
+"flow.s2st":"STEP 2 · 인증","flow.s2h":"API Key 서명","flow.s2p":"헤더에 <code>appKey</code>와 서명을 전송하세요 — <b style='color:var(--text)'>정적 키, 토큰 교환 불필요</b>, 한 번 설정하여 장기간 사용합니다.",
+"flow.s3st":"STEP 3 · 동기화","flow.s3h":"요금제 가져오기","flow.s3p":"<code>/products/list</code>를 호출하여 판매 가능한 요금제를 동기화한 후, 귀사 플랫폼에서 가격을 책정하고 정리하여 노출하세요.",
+"flow.s4st":"STEP 4 · 주문","flow.s4h":"주문 생성","flow.s4p":"결제 후 고유한 <code>idempotencyKey</code>와 함께 <code>/order/create</code>를 호출하면 주문 번호가 동기식으로 반환됩니다.",
+"flow.s5st":"STEP 5 · 전달","flow.s5h":"설치 정보 수신","flow.s5p":"개통 후 플랫폼이 콜백을 통해 설치 정보를 전송하며, 이를 통해 eSIM을 생성하여 전달하고 이후 사용량 / 갱신을 언제든지 조회할 수 있습니다.",
+"flow.sNum2":"즉시","flow.sNum3":"전체","flow.sLbl1":"국가/지역","flow.sLbl2":"개통","flow.sLbl3":"지원","flow.sLbl4":"출시를 위한 API 세트",
+"flow.clh":"✅ 연동 체크리스트",
+"flow.ck1":"appKey / appSecret 발급받기; 콜백 URL 및 IP 보고","flow.ck2":"API Key 요청 서명 및 콜백 검증 구현","flow.ck3":"요금제 카탈로그 동기화 및 판매 페이지 구축","flow.ck4":"멱등 재시도가 포함된 주문 API 연동","flow.ck5":"콜백 수신 구현 및 설치 정보 전달 완성","flow.ck6":"샌드박스 테스트 → 프로덕션 전환 → 출시",
+"sec.kicker":"Security & Reliability","sec.h2":"보안 및 신뢰성",
+"sec.c1t":"API Key + 서명","sec.c1d":"정적 키 + HMAC 요청 서명에 타임스탬프 윈도우와 nonce를 더해 변조 및 재전송을 방지합니다.",
+"sec.c2t":"멱등성 안전","sec.c2d":"주문 API는 <span class='accent'>idempotencyKey</span>를 사용하여 네트워크 오류 시 재시도해도 중복 개통이나 이중 청구가 발생하지 않습니다.",
+"sec.c3t":"신뢰할 수 있는 콜백","sec.c3d":"개통 결과는 비동기로 전송되며 귀사 시스템이 확인할 때까지 재시도되고, IP 허용 목록으로 신뢰할 수 있는 출처를 유지합니다.",
+"sec.c4t":"데이터 격리","sec.c4d":"각 계정은 자체 주문과 카드만 조회하고 조작할 수 있으며, 계정 간에 서로의 데이터를 볼 수 없습니다.",
+"sec.c5t":"샌드박스","sec.c5d":"독립적인 샌드박스와 테스트 요금제로 연동 시 실제 비용이 발생하지 않으며, 검증 후 프로덕션으로 전환하세요.",
+"sec.c6t":"연동 지원","sec.c6d":"문서, 샘플 코드, 기술 지원으로 원활한 출시를 돕습니다.",
+"chain.t":"엔드투엔드 흐름","chain.n1":"카탈로그 동기화","chain.n2":"사용자 주문 및 결제","chain.n3":"/order/create 호출","chain.n4":"XPIN 프로비저닝","chain.n5":"콜백으로 eSIM 설치 정보 반환","chain.n6":"사용자에게 표시","chain.n7":"사용량 · 상태 · 갱신","cb.evh":"🔔 콜백 이벤트","cb.e1":"✅ 프로비저닝 성공","cb.e2":"⚠️ 프로비저닝 실패","cb.e3":"🔄 상태 변경","cb.e4":"📊 사용량 알림","cb.e5":"⏰ 만료 알림","err.h":"⚠️ 일반 오류 (초안)","err.note":"실패 시 subCode / subMsg와 함께 <b>code ≠ 0000</b>이 반환되며, 프로비저닝 실패는 콜백을 통해서도 전달됩니다. 코드는 샌드박스 출시 전에 확정됩니다.","err.e1":"잘못된 매개변수","err.e2":"서명 오류","err.e3":"판매 불가 요금제","err.e4":"중복 주문","err.e5":"프로비저닝 실패","err.e6":"시스템 처리 중","foot.h3":"한 번의 연동으로, 사용자에게 글로벌 연결성을 제공하세요","foot.p":"표준 API, 간편한 연동, 완전한 이행 — 사용자가 도착하는 순간 온라인이 되도록 하세요.",
+"foot.copy":"XPIN Global eSIM Data Platform · Partner Integration · © 2026 XPIN Network"
+    },
+    fr: {
+"nav.cap":"Capacités","nav.pic":"Aperçu","nav.api":"API","nav.flow":"Intégration","nav.sec":"Sécurité",
+"hero.h1":"Plateforme mondiale de données eSIM<br/><span class='grad-text'>Intégrez une fois, en ligne dès l'arrivée</span>",
+"hero.sub":"Offrez à vos utilisateurs des données mobiles instantanées, fiables et mondiales · <b>API standard, intégration simple</b>",
+"hero.t1":"<b>149+</b> pays / régions","hero.t2":"<b>Quelques secondes</b> pour provisionner","hero.t3":"Accès <b>REST + API Key</b>","hero.t4":"Prise en charge du <b>cycle de vie complet</b>",
+"cap.kicker":"What We Offer","cap.h2":"Capacités de la plateforme <small>Apportez la connectivité mondiale à votre entreprise</small>",
+"cap.c1t":"Couverture mondiale","cap.c1d":"Forfaits eSIM locaux et régionaux dans plus de 149 pays et régions, sélectionnables par pays/région.",
+"cap.c2t":"Forfaits variés","cap.c2d":"Plusieurs types de forfaits, y compris à données fixes et Illimité, couvrant les voyages, les longs séjours et les événements.",
+"cap.c3t":"Provisionnement instantané","cap.c3d":"Activation automatique après la commande ; les informations d'installation sont renvoyées en temps réel via callback pour une livraison immédiate.",
+"cap.c4t":"Cycle de vie complet","cap.c4d":"Consommation, renouvellement et statut de la carte et du forfait au même endroit — la carte est gérable de bout en bout.",
+"cap.c5t":"Stable et fiable","cap.c5d":"Commande idempotente, relances automatiques des callbacks et isolation des données de compte pour une intégration stable et la sécurité des fonds.",
+"cap.c6t":"Intégration facile","cap.c6d":"API RESTful standard + authentification API Key, avec un bac à sable et des forfaits de test pour une mise en production rapide.",
+"pic.kicker":"The Big Picture","pic.h2":"Aperçu de l'intégration <small>Vous gérez les ventes et les utilisateurs, XPIN gère le provisionnement et l'exécution</small>",
+"pic.n1role":"Your Business","pic.n1name":"Votre plateforme / application","pic.n1desc":"Vendre et présenter aux utilisateurs",
+"pic.n1l1":"Afficher le catalogue de forfaits eSIM","pic.n1l2":"Commande et paiement de l'utilisateur","pic.n1l3":"Fournir les informations d'installation aux utilisateurs","pic.n1l4":"Afficher l'accès à la consommation / au renouvellement",
+"pic.arr1":"Requête API","pic.arr2":"Callback / données",
+"pic.n2role":"XPIN Platform","pic.n2name":"Plateforme eSIM XPIN","pic.n2desc":"Provisionner · Exécuter · Données",
+"pic.n2l1":"Fournir le catalogue commercialisable","pic.n2l2":"Provisionner à la commande, renvoyer les informations d'installation","pic.n2l3":"Consommation / renouvellement / statut de la carte et du forfait","pic.n2l4":"Callbacks de statut sur tout le cycle et assistance",
+"pic.f1t":"① Intégrer les forfaits","pic.f1d":"Synchronisez le catalogue XPIN et vendez au prix de votre choix sur votre plateforme.",
+"pic.f2t":"② Commander et provisionner","pic.f2d":"Après le paiement, appelez l'API de commande ; XPIN provisionne automatiquement.",
+"pic.f3t":"③ Livrer et exploiter","pic.f3d":"Le callback renvoie les informations d'installation pour une livraison instantanée ; la consommation, le renouvellement et le statut sont consultables à tout moment.",
+"pic.tag":"Vous décidez <b style='color:var(--text)'>quoi vendre et comment</b> · XPIN garantit <b style='color:var(--text)'>que ça fonctionne une fois acheté, et fonctionne bien</b>",
+"api.kicker":"API Capabilities","api.h2":"Capacités des API <small>RESTful standard · expliquées avec des données d'exemple</small>",
+"api.disc":"💡 Tout ce qui suit constitue des <b>exemples de données illustratifs</b> destinés à vous aider à comprendre comment les API sont appelées et ce qu'elles renvoient ; les champs réels, les plages de valeurs et la spécification complète sont définis par la <b>documentation d'intégration officielle et le bac à sable</b>.",
+"api.s1nm":"Interroger le catalogue commercialisable","api.lblResp":"Exemple de réponse","api.lblReq":"Exemple de requête","api.lblRespMB":"Exemple de réponse (MB)",
+"api.s2nm":"Créer une commande · provisionner à la commande (livraison par callback asynchrone)","api.cbnm":"Exemple de callback de provisionnement (plateforme → votre URL de callback)",
+"api.uNm":"Consommation en temps réel","api.qNm":"Statut de la commande / de la carte et du forfait","api.rNm":"Renouvellement",
+"api.chip1":"📦 Catalogue","api.chip2":"🧾 Commande et provisionnement","api.chip3":"🔔 Callback de provisionnement","api.chip4":"📊 Consommation en temps réel","api.chip5":"🔍 Statut de la commande / de la carte et du forfait","api.chip6":"🔄 Renouvellement",
+"flow.kicker":"Integration","flow.h2":"Plan et déroulement de l'intégration <small>En production en cinq étapes, accompagné de bout en bout</small>",
+"flow.s1st":"STEP 1 · DEMANDER","flow.s1h":"Obtenir les identifiants","flow.s1p":"XPIN émet <code>appKey</code> / <code>appSecret</code> (un jeu pour le bac à sable et un pour la production) ; communiquez votre URL de callback et votre IP de sortie.",
+"flow.s2st":"STEP 2 · AUTH","flow.s2h":"Signature API Key","flow.s2p":"Envoyez <code>appKey</code> et une signature dans les en-têtes — <b style='color:var(--text)'>clés statiques, sans échange de jeton</b>, à configurer une fois pour une utilisation à long terme.",
+"flow.s3st":"STEP 3 · SYNCHRONISER","flow.s3h":"Récupérer les forfaits","flow.s3p":"Appelez <code>/products/list</code> pour synchroniser les forfaits commercialisables, puis fixez les prix, organisez-les et présentez-les sur votre plateforme.",
+"flow.s4st":"STEP 4 · COMMANDER","flow.s4h":"Créer une commande","flow.s4p":"Après le paiement, appelez <code>/order/create</code> avec un <code>idempotencyKey</code> unique ; le numéro de commande est renvoyé de façon synchrone.",
+"flow.s5st":"STEP 5 · LIVRER","flow.s5h":"Recevoir les informations d'installation","flow.s5p":"Après le provisionnement, la plateforme transmet les informations d'installation via callback ; générez l'eSIM à livrer, puis la consommation / le renouvellement sont consultables à tout moment.",
+"flow.sNum2":"Instantané","flow.sNum3":"Complet","flow.sLbl1":"Pays / régions","flow.sLbl2":"Provisionnement","flow.sLbl3":"Assistance","flow.sLbl4":"Ensemble d'API prêt pour la production",
+"flow.clh":"✅ Liste de contrôle d'intégration",
+"flow.ck1":"Obtenir appKey / appSecret ; communiquer l'URL de callback et l'IP","flow.ck2":"Implémenter la signature des requêtes API Key et la vérification des callbacks","flow.ck3":"Synchroniser le catalogue de forfaits et créer la page de vente","flow.ck4":"Intégrer l'API de commande avec relance idempotente","flow.ck5":"Implémenter la réception des callbacks et finaliser la livraison des informations d'installation","flow.ck6":"Test en bac à sable → passage en production → mise en ligne",
+"sec.kicker":"Security & Reliability","sec.h2":"Sécurité et fiabilité",
+"sec.c1t":"API Key + signature","sec.c1d":"Clé statique + signature de requête HMAC, avec une fenêtre d'horodatage et un nonce pour prévenir la falsification et la relecture.",
+"sec.c2t":"Sécurité idempotente","sec.c2d":"Les API de commande utilisent <span class='accent'>idempotencyKey</span> afin que les relances ne provisionnent jamais en double ni ne facturent en trop en cas d'erreurs réseau.",
+"sec.c3t":"Callbacks fiables","sec.c3d":"Les résultats de provisionnement sont transmis de façon asynchrone et relancés jusqu'à confirmation par votre système, avec une liste d'autorisation d'IP pour garantir une source de confiance.",
+"sec.c4t":"Isolation des données","sec.c4d":"Chaque compte ne peut interroger et gérer que ses propres commandes et cartes ; les comptes ne peuvent pas voir les données des autres.",
+"sec.c5t":"Bac à sable","sec.c5d":"Bac à sable et forfaits de test indépendants ; l'intégration n'entraîne aucun coût réel — passez en production une fois la vérification effectuée.",
+"sec.c6t":"Assistance à l'intégration","sec.c6d":"Documentation, exemples de code et assistance technique pour vous aider à passer en production sans accroc.",
+"chain.t":"Flux de bout en bout","chain.n1":"Synchronisation du catalogue","chain.n2":"Commande et paiement par l'utilisateur","chain.n3":"Appeler /order/create","chain.n4":"Provisionnement XPIN","chain.n5":"Le callback renvoie les informations d'installation eSIM","chain.n6":"Afficher à l'utilisateur","chain.n7":"Utilisation · statut · renouvellement","cb.evh":"🔔 Événements de callback","cb.e1":"✅ Provisionnement réussi","cb.e2":"⚠️ Échec du provisionnement","cb.e3":"🔄 Changement de statut","cb.e4":"📊 Alerte d'utilisation","cb.e5":"⏰ Rappel d'expiration","err.h":"⚠️ Erreurs courantes (brouillon)","err.note":"Les échecs renvoient <b>code ≠ 0000</b> avec subCode / subMsg ; les échecs de provisionnement arrivent également via callback. Les codes sont finalisés avant la publication du bac à sable.","err.e1":"Paramètre invalide","err.e2":"Erreur de signature","err.e3":"Forfait non commercialisable","err.e4":"Commande en double","err.e5":"Échec du provisionnement","err.e6":"Traitement système en cours","foot.h3":"Intégrez une fois, apportez la connectivité mondiale à vos utilisateurs","foot.p":"API standard, intégration simple, exécution complète — permettez à vos utilisateurs d'être en ligne dès leur arrivée.",
+"foot.copy":"XPIN Plateforme mondiale de données eSIM · Intégration partenaire · © 2026 XPIN Network"
+    },
+    de: {
+"nav.cap":"Funktionen","nav.pic":"Überblick","nav.api":"APIs","nav.flow":"Integration","nav.sec":"Sicherheit",
+"hero.h1":"Globale eSIM-Datenplattform<br/><span class='grad-text'>Einmal integrieren, bei Ankunft online</span>",
+"hero.sub":"Liefern Sie Ihren Nutzern sofortige, zuverlässige, weltweite mobile Daten · <b>Standard-API, einfache Integration</b>",
+"hero.t1":"<b>149+</b> Länder / Regionen","hero.t2":"<b>Sekunden</b> bis zur Bereitstellung","hero.t3":"<b>REST + API Key</b> Zugang","hero.t4":"<b>Vollständige Unterstützung</b> des Lebenszyklus",
+"cap.kicker":"What We Offer","cap.h2":"Plattform-Funktionen <small>Bringen Sie globale Konnektivität in Ihr Unternehmen</small>",
+"cap.c1t":"Globale Abdeckung","cap.c1d":"Lokale und regionale eSIM-Tarife in mehr als 149 Ländern und Regionen, auswählbar nach Land/Region.",
+"cap.c2t":"Vielfältige Tarife","cap.c2d":"Verschiedene Tariftypen einschließlich fester Datenmengen und Unlimited, für Reisen, Langzeitaufenthalte und Events.",
+"cap.c3t":"Sofortige Bereitstellung","cap.c3d":"Automatische Aktivierung nach der Bestellung; Installationsinformationen werden in Echtzeit per Callback zurückgegeben und sofort geliefert.",
+"cap.c4t":"Vollständiger Lebenszyklus","cap.c4d":"Nutzung, Verlängerung sowie Karten- und Tarifstatus an einem Ort — die Karte ist durchgängig verwaltbar.",
+"cap.c5t":"Stabil & Zuverlässig","cap.c5d":"Idempotente Bestellung, automatische Callback-Wiederholungen und Datenisolierung pro Konto für stabile Integration und Sicherheit der Gelder.",
+"cap.c6t":"Einfache Integration","cap.c6d":"Standard-RESTful-API + API-Key-Authentifizierung, mit Sandbox und Testtarifen für einen schnellen Go-Live.",
+"pic.kicker":"The Big Picture","pic.h2":"Integrationsüberblick <small>Sie kümmern sich um Vertrieb & Nutzer, XPIN um Bereitstellung & Erfüllung</small>",
+"pic.n1role":"Your Business","pic.n1name":"Ihre Plattform / App","pic.n1desc":"An Nutzer verkaufen & präsentieren",
+"pic.n1l1":"eSIM-Tarifkatalog anzeigen","pic.n1l2":"Bestellung & Zahlung durch Nutzer","pic.n1l3":"Installationsinformationen an Nutzer liefern","pic.n1l4":"Zugang zu Nutzung / Verlängerung anzeigen",
+"pic.arr1":"API-Anfrage","pic.arr2":"Callback / Daten",
+"pic.n2role":"XPIN Platform","pic.n2name":"XPIN eSIM-Plattform","pic.n2desc":"Bereitstellen · Erfüllen · Daten",
+"pic.n2l1":"Verkaufbaren Katalog bereitstellen","pic.n2l2":"Bei Bestellung bereitstellen, Installationsinformationen zurückgeben","pic.n2l3":"Nutzung / Verlängerung / Karten- und Tarifstatus","pic.n2l4":"Statusrückmeldungen und Support über den gesamten Zyklus",
+"pic.f1t":"① Tarife einbinden","pic.f1d":"Synchronisieren Sie den XPIN-Katalog und verkaufen Sie zu Ihrem eigenen Preis auf Ihrer Plattform.",
+"pic.f2t":"② Bestellen & Bereitstellen","pic.f2d":"Rufen Sie nach der Zahlung die Bestell-API auf; XPIN stellt automatisch bereit.",
+"pic.f3t":"③ Liefern & Betreiben","pic.f3d":"Der Callback gibt Installationsinformationen zur sofortigen Lieferung zurück; Nutzung, Verlängerung und Status sind jederzeit abfragbar.",
+"pic.tag":"Sie entscheiden, <b style='color:var(--text)'>was und wie verkauft wird</b> · XPIN stellt sicher, <b style='color:var(--text)'>dass es nach dem Kauf funktioniert, und zwar gut</b>",
+"api.kicker":"API Capabilities","api.h2":"API-Funktionen <small>Standard-RESTful · erklärt anhand von Beispieldaten</small>",
+"api.disc":"💡 Alle folgenden Angaben sind <b>illustrative Datenbeispiele</b>, die Ihnen helfen zu verstehen, wie die APIs aufgerufen werden und was sie zurückgeben; die tatsächlichen Felder, Wertebereiche und die vollständige Spezifikation werden durch die <b>offizielle Integrationsdokumentation und die Sandbox</b> definiert.",
+"api.s1nm":"Verkaufbaren Katalog abfragen","api.lblResp":"Antwortbeispiel","api.lblReq":"Anfragebeispiel","api.lblRespMB":"Antwortbeispiel (MB)",
+"api.s2nm":"Bestellung erstellen · bei Bestellung bereitstellen (asynchrone Callback-Lieferung)","api.cbnm":"Beispiel für Bereitstellungs-Callback (Plattform → Ihre Callback-URL)",
+"api.uNm":"Nutzung in Echtzeit","api.qNm":"Bestell- / Karten- und Tarifstatus","api.rNm":"Verlängerung",
+"api.chip1":"📦 Katalog","api.chip2":"🧾 Bestellen & bereitstellen","api.chip3":"🔔 Bereitstellungs-Callback","api.chip4":"📊 Nutzung in Echtzeit","api.chip5":"🔍 Bestell- / Karten- und Tarifstatus","api.chip6":"🔄 Verlängerung",
+"flow.kicker":"Integration","flow.h2":"Integrationsplan & Ablauf <small>In fünf Schritten live, durchgängig unterstützt</small>",
+"flow.s1st":"STEP 1 · BEANTRAGEN","flow.s1h":"Zugangsdaten erhalten","flow.s1p":"XPIN stellt <code>appKey</code> / <code>appSecret</code> aus (je ein Satz für Sandbox & Produktion); melden Sie Ihre Callback-URL und Ausgangs-IP.",
+"flow.s2st":"STEP 2 · AUTH","flow.s2h":"API-Key-Signierung","flow.s2p":"Senden Sie <code>appKey</code> und eine Signatur in den Headern — <b style='color:var(--text)'>statische Schlüssel, kein Token-Austausch</b>, einmal konfigurieren und langfristig verwenden.",
+"flow.s3st":"STEP 3 · SYNC","flow.s3h":"Tarife abrufen","flow.s3p":"Rufen Sie <code>/products/list</code> auf, um verkaufbare Tarife zu synchronisieren, und legen Sie dann Preise fest, organisieren und präsentieren Sie sie auf Ihrer Plattform.",
+"flow.s4st":"STEP 4 · BESTELLEN","flow.s4h":"Bestellung erstellen","flow.s4p":"Rufen Sie nach der Zahlung <code>/order/create</code> mit einem eindeutigen <code>idempotencyKey</code> auf; die Bestellnummer wird synchron zurückgegeben.",
+"flow.s5st":"STEP 5 · LIEFERN","flow.s5h":"Installationsinformationen empfangen","flow.s5p":"Nach der Bereitstellung sendet die Plattform Installationsinformationen per Callback; erstellen Sie die eSIM zur Lieferung, danach sind Nutzung / Verlängerung jederzeit abfragbar.",
+"flow.sNum2":"Sofort","flow.sNum3":"Vollständig","flow.sLbl1":"Länder / Regionen","flow.sLbl2":"Bereitstellung","flow.sLbl3":"Support","flow.sLbl4":"API-Satz für Go-Live",
+"flow.clh":"✅ Integrations-Checkliste",
+"flow.ck1":"appKey / appSecret erhalten; Callback-URL und IP melden","flow.ck2":"API-Key-Anfragesignierung und Callback-Verifizierung implementieren","flow.ck3":"Tarifkatalog synchronisieren und Verkaufsseite erstellen","flow.ck4":"Bestell-API mit idempotenter Wiederholung integrieren","flow.ck5":"Callback-Empfang implementieren und Lieferung der Installationsinformationen abschließen","flow.ck6":"Sandbox-Test → Umstellung auf Produktion → Go-Live",
+"sec.kicker":"Security & Reliability","sec.h2":"Sicherheit & Zuverlässigkeit",
+"sec.c1t":"API Key + Signatur","sec.c1d":"Statischer Schlüssel + HMAC-Anfragesignatur, mit einem Zeitstempelfenster und nonce zur Verhinderung von Manipulation und Replay.",
+"sec.c2t":"Idempotente Sicherheit","sec.c2d":"Bestell-APIs verwenden <span class='accent'>idempotencyKey</span>, sodass Wiederholungen bei Netzwerkfehlern nie zu doppelter Bereitstellung oder Doppelbelastung führen.",
+"sec.c3t":"Zuverlässige Callbacks","sec.c3d":"Bereitstellungsergebnisse werden asynchron gesendet und wiederholt, bis Ihr System bestätigt, mit einer IP-Zulassungsliste, um die Quelle vertrauenswürdig zu halten.",
+"sec.c4t":"Datenisolierung","sec.c4d":"Jedes Konto kann nur seine eigenen Bestellungen und Karten abfragen und bearbeiten; Konten können die Daten der anderen nicht einsehen.",
+"sec.c5t":"Sandbox","sec.c5d":"Unabhängige Sandbox und Testtarife; die Integration verursacht keine echten Kosten — nach der Verifizierung auf Produktion umstellen.",
+"sec.c6t":"Integrationsunterstützung","sec.c6d":"Dokumentation, Beispielcode und technischer Support, damit Sie reibungslos live gehen.",
+"chain.t":"Durchgängiger Ablauf","chain.n1":"Katalogsynchronisierung","chain.n2":"Nutzer bestellt & bezahlt","chain.n3":"/order/create aufrufen","chain.n4":"XPIN stellt bereit","chain.n5":"Callback liefert eSIM-Installationsinformationen","chain.n6":"Dem Nutzer anzeigen","chain.n7":"Nutzung · Status · Verlängerung","cb.evh":"🔔 Callback-Ereignisse","cb.e1":"✅ Bereitstellung erfolgreich","cb.e2":"⚠️ Bereitstellung fehlgeschlagen","cb.e3":"🔄 Statusänderung","cb.e4":"📊 Nutzungswarnung","cb.e5":"⏰ Ablauferinnerung","err.h":"⚠️ Häufige Fehler (Entwurf)","err.note":"Fehler geben <b>code ≠ 0000</b> mit subCode / subMsg zurück; Bereitstellungsfehler treffen zudem per Callback ein. Die Codes werden vor der Sandbox-Freigabe finalisiert.","err.e1":"Ungültiger Parameter","err.e2":"Signaturfehler","err.e3":"Tarif nicht verkäuflich","err.e4":"Doppelte Bestellung","err.e5":"Bereitstellung fehlgeschlagen","err.e6":"Systemverarbeitung","foot.h3":"Einmal integrieren, globale Konnektivität für Ihre Nutzer","foot.p":"Standard-API, einfache Integration, vollständige Erfüllung — sorgen Sie dafür, dass Ihre Nutzer online sind, sobald sie ankommen.",
+"foot.copy":"XPIN Global eSIM-Datenplattform · Partner-Integration · © 2026 XPIN Network"
+    },
+    ar: {
+"nav.cap":"القدرات","nav.pic":"نظرة عامة","nav.api":"واجهات API","nav.flow":"التكامل","nav.sec":"الأمان",
+"hero.h1":"منصة بيانات eSIM عالمية<br/><span class='grad-text'>تكامل واحد، اتصال فور الوصول</span>",
+"hero.sub":"قدّم لمستخدميك بيانات جوّال فورية وموثوقة على مستوى العالم · <b>واجهة API قياسية، تكامل بسيط</b>",
+"hero.t1":"<b>149+</b> دولة / منطقة","hero.t2":"<b>ثوانٍ</b> للتفعيل","hero.t3":"وصول عبر <b>REST + API Key</b>","hero.t4":"دعم <b>دورة الحياة الكاملة</b>",
+"cap.kicker":"What We Offer","cap.h2":"قدرات المنصة <small>اجلب الاتصال العالمي إلى أعمالك</small>",
+"cap.c1t":"تغطية عالمية","cap.c1d":"باقات eSIM محلية وإقليمية عبر أكثر من 149 دولة ومنطقة، قابلة للاختيار حسب الدولة/المنطقة.",
+"cap.c2t":"باقات متنوعة","cap.c2d":"أنواع متعددة من الباقات تشمل البيانات المحددة وغير المحدودة، تغطي السفر والإقامة الطويلة والفعاليات.",
+"cap.c3t":"تفعيل فوري","cap.c3d":"تفعيل تلقائي بعد الطلب؛ تُعاد معلومات التثبيت عبر الاستدعاء الراجع في الوقت الفعلي للتسليم الفوري.",
+"cap.c4t":"دورة حياة كاملة","cap.c4d":"الاستخدام والتجديد وحالة البطاقة والباقة في مكان واحد — البطاقة قابلة للإدارة من البداية إلى النهاية.",
+"cap.c5t":"مستقرة وموثوقة","cap.c5d":"طلبات متكافئة، وإعادة محاولات تلقائية للاستدعاء الراجع، وعزل بيانات الحسابات لضمان تكامل مستقر وأمان الأموال.",
+"cap.c6t":"تكامل سهل","cap.c6d":"واجهة RESTful API قياسية + مصادقة API Key، مع بيئة اختبار وباقات تجريبية لإطلاق سريع.",
+"pic.kicker":"The Big Picture","pic.h2":"نظرة عامة على التكامل <small>أنت تتولى المبيعات والمستخدمين، وXPIN تتولى التفعيل والتنفيذ</small>",
+"pic.n1role":"Your Business","pic.n1name":"منصتك / تطبيقك","pic.n1desc":"البيع والعرض للمستخدمين",
+"pic.n1l1":"عرض كتالوج باقات eSIM","pic.n1l2":"طلب المستخدم والدفع","pic.n1l3":"تسليم معلومات التثبيت للمستخدمين","pic.n1l4":"عرض مدخل الاستخدام / التجديد",
+"pic.arr1":"طلب API","pic.arr2":"استدعاء راجع / بيانات",
+"pic.n2role":"XPIN Platform","pic.n2name":"منصة XPIN eSIM","pic.n2desc":"تفعيل · تنفيذ · بيانات",
+"pic.n2l1":"توفير الكتالوج القابل للبيع","pic.n2l2":"التفعيل عند الطلب وإعادة معلومات التثبيت","pic.n2l3":"الاستخدام / التجديد / حالة البطاقة والباقة","pic.n2l4":"استدعاءات حالة كاملة الدورة ودعم",
+"pic.f1t":"① إدراج الباقات","pic.f1d":"زامن كتالوج XPIN وبِع بسعرك الخاص على منصتك.",
+"pic.f2t":"② الطلب والتفعيل","pic.f2d":"بعد الدفع، استدعِ واجهة الطلب؛ تقوم XPIN بالتفعيل تلقائيًا.",
+"pic.f3t":"③ التسليم والتشغيل","pic.f3d":"يُعيد الاستدعاء الراجع معلومات التثبيت للتسليم الفوري؛ الاستخدام والتجديد والحالة قابلة للاستعلام في أي وقت.",
+"pic.tag":"أنت تقرر <b style='color:var(--text)'>ماذا تبيع وكيف</b> · وXPIN تضمن <b style='color:var(--text)'>أنه يعمل بمجرد الشراء، ويعمل بشكل جيد</b>",
+"api.kicker":"API Capabilities","api.h2":"قدرات API <small>RESTful قياسية · موضحة ببيانات نموذجية</small>",
+"api.disc":"💡 كل ما يلي هو <b>عينات بيانات توضيحية</b> لمساعدتك على فهم كيفية استدعاء الواجهات وما تعيده؛ الحقول الفعلية ونطاقات القيم والمواصفات الكاملة محددة في <b>وثيقة التكامل الرسمية وبيئة الاختبار</b>.",
+"api.s1nm":"استعلام الكتالوج القابل للبيع","api.lblResp":"عينة استجابة","api.lblReq":"عينة طلب","api.lblRespMB":"عينة استجابة (MB)",
+"api.s2nm":"إنشاء طلب · التفعيل عند الطلب (تسليم عبر استدعاء راجع غير متزامن)","api.cbnm":"عينة استدعاء راجع للتفعيل (المنصة ← عنوان URL الخاص باستدعائك الراجع)",
+"api.uNm":"الاستخدام في الوقت الفعلي","api.qNm":"حالة الطلب / البطاقة والباقة","api.rNm":"التجديد",
+"api.chip1":"📦 الكتالوج","api.chip2":"🧾 الطلب والتفعيل","api.chip3":"🔔 استدعاء راجع للتفعيل","api.chip4":"📊 الاستخدام في الوقت الفعلي","api.chip5":"🔍 حالة الطلب / البطاقة والباقة","api.chip6":"🔄 التجديد",
+"flow.kicker":"Integration","flow.h2":"خطة التكامل وتدفقه <small>انطلق في خمس خطوات، مع دعم طوال الوقت</small>",
+"flow.s1st":"STEP 1 · التقديم","flow.s1h":"احصل على بيانات الاعتماد","flow.s1p":"تُصدر XPIN <code>appKey</code> / <code>appSecret</code> (مجموعة لكل من بيئة الاختبار والإنتاج)؛ أبلغ عن عنوان URL الخاص باستدعائك الراجع وعنوان IP الصادر.",
+"flow.s2st":"STEP 2 · المصادقة","flow.s2h":"توقيع API Key","flow.s2p":"أرسل <code>appKey</code> وتوقيعًا في الترويسات — <b style='color:var(--text)'>مفاتيح ثابتة، دون تبادل رموز</b>، اضبطها مرة واحدة واستخدمها على المدى الطويل.",
+"flow.s3st":"STEP 3 · المزامنة","flow.s3h":"اسحب الباقات","flow.s3p":"استدعِ <code>/products/list</code> لمزامنة الباقات القابلة للبيع، ثم سعّرها ونظّمها واعرضها على منصتك.",
+"flow.s4st":"STEP 4 · الطلب","flow.s4h":"إنشاء طلب","flow.s4p":"بعد الدفع استدعِ <code>/order/create</code> مع <code>idempotencyKey</code> فريد؛ يُعاد رقم الطلب بشكل متزامن.",
+"flow.s5st":"STEP 5 · التسليم","flow.s5h":"استقبل معلومات التثبيت","flow.s5p":"بعد التفعيل تدفع المنصة معلومات التثبيت عبر الاستدعاء الراجع؛ أنشئ eSIM للتسليم، ثم يصبح الاستخدام / التجديد قابلاً للاستعلام في أي وقت.",
+"flow.sNum2":"فوري","flow.sNum3":"كامل","flow.sLbl1":"دول / مناطق","flow.sLbl2":"تفعيل","flow.sLbl3":"دعم","flow.sLbl4":"مجموعة API جاهزة للإطلاق",
+"flow.clh":"✅ قائمة تحقق التكامل",
+"flow.ck1":"احصل على appKey / appSecret؛ أبلغ عن عنوان URL للاستدعاء الراجع وعنوان IP","flow.ck2":"نفّذ توقيع طلبات API Key والتحقق من الاستدعاء الراجع","flow.ck3":"زامن كتالوج الباقات وأنشئ صفحة المبيعات","flow.ck4":"ادمج واجهة الطلب مع إعادة المحاولة المتكافئة","flow.ck5":"نفّذ استقبال الاستدعاء الراجع وأكمل تسليم معلومات التثبيت","flow.ck6":"اختبر في بيئة الاختبار ← انتقل إلى الإنتاج ← أطلق",
+"sec.kicker":"Security & Reliability","sec.h2":"الأمان والموثوقية",
+"sec.c1t":"API Key + توقيع","sec.c1d":"مفتاح ثابت + توقيع طلب HMAC، مع نافذة طابع زمني وnonce لمنع التلاعب وإعادة الإرسال.",
+"sec.c2t":"أمان متكافئ","sec.c2d":"تستخدم واجهات الطلب <span class='accent'>idempotencyKey</span> بحيث لا تؤدي إعادة المحاولات أبدًا إلى تفعيل مزدوج أو تحميل زائد عند أخطاء الشبكة.",
+"sec.c3t":"استدعاءات راجعة موثوقة","sec.c3d":"تُدفع نتائج التفعيل بشكل غير متزامن وتُعاد المحاولة حتى يؤكدها نظامك، مع قائمة IP مسموح بها للحفاظ على مصدر موثوق.",
+"sec.c4t":"عزل البيانات","sec.c4d":"يمكن لكل حساب الاستعلام عن طلباته وبطاقاته والتعامل معها فقط؛ ولا يمكن للحسابات رؤية بيانات بعضها البعض.",
+"sec.c5t":"بيئة اختبار","sec.c5d":"بيئة اختبار مستقلة وباقات تجريبية؛ لا يترتب على التكامل أي تكلفة فعلية — انتقل إلى الإنتاج بمجرد التحقق.",
+"sec.c6t":"دعم التكامل","sec.c6d":"وثائق وأكواد نموذجية ودعم تقني لمساعدتك على الإطلاق بسلاسة.",
+"chain.t":"التدفق الشامل من البداية إلى النهاية","chain.n1":"مزامنة الكتالوج","chain.n2":"طلب المستخدم والدفع","chain.n3":"استدعاء /order/create","chain.n4":"توفير XPIN","chain.n5":"إرجاع رد الاستدعاء لمعلومات تثبيت eSIM","chain.n6":"العرض للمستخدم","chain.n7":"الاستخدام · الحالة · التجديد","cb.evh":"🔔 أحداث رد الاستدعاء","cb.e1":"✅ نجاح التوفير","cb.e2":"⚠️ فشل التوفير","cb.e3":"🔄 تغيير الحالة","cb.e4":"📊 تنبيه الاستخدام","cb.e5":"⏰ تذكير انتهاء الصلاحية","err.h":"⚠️ الأخطاء الشائعة (مسودة)","err.note":"تُرجع حالات الفشل <b>code ≠ 0000</b> مع subCode / subMsg؛ كما تصل حالات فشل التوفير عبر رد الاستدعاء. تُحدَّد الرموز بشكل نهائي قبل إصدار بيئة الاختبار.","err.e1":"معامل غير صالح","err.e2":"خطأ في التوقيع","err.e3":"الباقة غير قابلة للبيع","err.e4":"طلب مكرر","err.e5":"فشل التوفير","err.e6":"جارٍ معالجة النظام","foot.h3":"تكامل واحد، اجلب الاتصال العالمي إلى مستخدميك","foot.p":"واجهة API قياسية، تكامل بسيط، تنفيذ كامل — دع مستخدميك يتصلون بالإنترنت لحظة وصولهم.",
+"foot.copy":"منصة بيانات XPIN العالمية eSIM · تكامل الشركاء · © 2026 XPIN Network"
+    },
+    ru: {
+"nav.cap":"Возможности","nav.pic":"Обзор","nav.api":"API","nav.flow":"Интеграция","nav.sec":"Безопасность",
+"hero.h1":"Глобальная платформа данных eSIM<br/><span class='grad-text'>Интегрируйтесь один раз — онлайн сразу по прибытии</span>",
+"hero.sub":"Предоставляйте своим пользователям мгновенный, надёжный мобильный интернет по всему миру · <b>Стандартный API, простая интеграция</b>",
+"hero.t1":"<b>149+</b> стран / регионов","hero.t2":"Активация за <b>секунды</b>","hero.t3":"Доступ через <b>REST + API Key</b>","hero.t4":"Поддержка <b>полного жизненного цикла</b>",
+"cap.kicker":"What We Offer","cap.h2":"Возможности платформы <small>Подключите глобальную связь к своему бизнесу</small>",
+"cap.c1t":"Глобальное покрытие","cap.c1d":"Локальные и региональные тарифы eSIM в 149+ странах и регионах с выбором по стране/региону.",
+"cap.c2t":"Разнообразные тарифы","cap.c2d":"Несколько типов тарифов, включая фиксированный объём данных и безлимит, для путешествий, длительного пребывания и мероприятий.",
+"cap.c3t":"Мгновенная активация","cap.c3d":"Автоматическая активация после заказа; данные для установки возвращаются через колбэк в реальном времени для немедленной доставки.",
+"cap.c4t":"Полный жизненный цикл","cap.c4d":"Использование, продление, а также статус карты и тарифа в одном месте — картой можно управлять от начала до конца.",
+"cap.c5t":"Стабильность и надёжность","cap.c5d":"Идемпотентные заказы, автоматические повторы колбэков и изоляция данных аккаунтов обеспечивают стабильную интеграцию и сохранность средств.",
+"cap.c6t":"Простая интеграция","cap.c6d":"Стандартный RESTful API + аутентификация по API Key, песочница и тестовые тарифы для быстрого запуска.",
+"pic.kicker":"The Big Picture","pic.h2":"Обзор интеграции <small>Вы отвечаете за продажи и пользователей, XPIN — за активацию и выполнение</small>",
+"pic.n1role":"Your Business","pic.n1name":"Ваша платформа / приложение","pic.n1desc":"Продажи и представление пользователям",
+"pic.n1l1":"Показ каталога тарифов eSIM","pic.n1l2":"Заказ и оплата пользователем","pic.n1l3":"Доставка данных для установки пользователям","pic.n1l4":"Показ раздела использования / продления",
+"pic.arr1":"Запрос через API","pic.arr2":"Колбэк / данные",
+"pic.n2role":"XPIN Platform","pic.n2name":"Платформа eSIM XPIN","pic.n2desc":"Активация · Выполнение · Данные",
+"pic.n2l1":"Предоставление каталога для продажи","pic.n2l2":"Активация по заказу, возврат данных для установки","pic.n2l3":"Использование / продление / статус карты и тарифа","pic.n2l4":"Колбэки статуса полного цикла и поддержка",
+"pic.f1t":"① Подключение тарифов","pic.f1d":"Синхронизируйте каталог XPIN и продавайте по своей цене на своей платформе.",
+"pic.f2t":"② Заказ и активация","pic.f2d":"После оплаты вызовите API заказа; XPIN активирует автоматически.",
+"pic.f3t":"③ Доставка и обслуживание","pic.f3d":"Колбэк возвращает данные для установки для мгновенной доставки; использование, продление и статус доступны для запроса в любое время.",
+"pic.tag":"Вы решаете, <b style='color:var(--text)'>что и как продавать</b> · XPIN гарантирует, <b style='color:var(--text)'>что купленное работает, и работает хорошо</b>",
+"api.kicker":"API Capabilities","api.h2":"Возможности API <small>Стандартный RESTful · с пояснениями на примерах данных</small>",
+"api.disc":"💡 Всё нижеследующее — <b>иллюстративные примеры данных</b>, помогающие понять, как вызываются API и что они возвращают; фактические поля, диапазоны значений и полная спецификация определяются <b>официальной документацией по интеграции и песочницей</b>.",
+"api.s1nm":"Запрос каталога для продажи","api.lblResp":"Пример ответа","api.lblReq":"Пример запроса","api.lblRespMB":"Пример ответа (MB)",
+"api.s2nm":"Создание заказа · активация по заказу (асинхронная доставка через колбэк)","api.cbnm":"Пример колбэка активации (платформа → ваш URL колбэка)",
+"api.uNm":"Использование в реальном времени","api.qNm":"Статус заказа / карты и тарифа","api.rNm":"Продление",
+"api.chip1":"📦 Каталог","api.chip2":"🧾 Заказ и активация","api.chip3":"🔔 Колбэк активации","api.chip4":"📊 Использование в реальном времени","api.chip5":"🔍 Статус заказа / карты и тарифа","api.chip6":"🔄 Продление",
+"flow.kicker":"Integration","flow.h2":"План и процесс интеграции <small>Запуск за пять шагов с поддержкой на всём пути</small>",
+"flow.s1st":"STEP 1 · ПОДАЧА ЗАЯВКИ","flow.s1h":"Получите учётные данные","flow.s1p":"XPIN выдаёт <code>appKey</code> / <code>appSecret</code> (по одному набору для песочницы и продакшена); сообщите ваш URL колбэка и исходящий IP.",
+"flow.s2st":"STEP 2 · АУТЕНТИФИКАЦИЯ","flow.s2h":"Подпись API Key","flow.s2p":"Отправляйте <code>appKey</code> и подпись в заголовках — <b style='color:var(--text)'>статические ключи, без обмена токенами</b>, настройте один раз и используйте долгосрочно.",
+"flow.s3st":"STEP 3 · СИНХРОНИЗАЦИЯ","flow.s3h":"Загрузите тарифы","flow.s3p":"Вызовите <code>/products/list</code> для синхронизации тарифов для продажи, затем назначьте цены, организуйте и представьте их на своей платформе.",
+"flow.s4st":"STEP 4 · ЗАКАЗ","flow.s4h":"Создайте заказ","flow.s4p":"После оплаты вызовите <code>/order/create</code> с уникальным <code>idempotencyKey</code>; номер заказа возвращается синхронно.",
+"flow.s5st":"STEP 5 · ДОСТАВКА","flow.s5h":"Получите данные для установки","flow.s5p":"После активации платформа отправляет данные для установки через колбэк; сформируйте eSIM для доставки, после чего использование / продление доступны для запроса в любое время.",
+"flow.sNum2":"Мгновенно","flow.sNum3":"Полная","flow.sLbl1":"Страны / регионы","flow.sLbl2":"Активация","flow.sLbl3":"Поддержка","flow.sLbl4":"Набор API для запуска",
+"flow.clh":"✅ Контрольный список интеграции",
+"flow.ck1":"Получите appKey / appSecret; сообщите URL колбэка и IP","flow.ck2":"Реализуйте подпись запросов API Key и проверку колбэков","flow.ck3":"Синхронизируйте каталог тарифов и создайте страницу продаж","flow.ck4":"Интегрируйте API заказа с идемпотентными повторами","flow.ck5":"Реализуйте приём колбэков и завершите доставку данных для установки","flow.ck6":"Тест в песочнице → переход на продакшен → запуск",
+"sec.kicker":"Security & Reliability","sec.h2":"Безопасность и надёжность",
+"sec.c1t":"API Key + подпись","sec.c1d":"Статический ключ + подпись запроса HMAC с временным окном и nonce для защиты от подделки и повторного воспроизведения.",
+"sec.c2t":"Идемпотентная безопасность","sec.c2d":"API заказов используют <span class='accent'>idempotencyKey</span>, поэтому повторы никогда не приводят к двойной активации или переплате при сетевых ошибках.",
+"sec.c3t":"Надёжные колбэки","sec.c3d":"Результаты активации отправляются асинхронно и повторяются до подтверждения вашей системой, а список разрешённых IP сохраняет доверенность источника.",
+"sec.c4t":"Изоляция данных","sec.c4d":"Каждый аккаунт может запрашивать и управлять только своими заказами и картами; аккаунты не видят данные друг друга.",
+"sec.c5t":"Песочница","sec.c5d":"Независимая песочница и тестовые тарифы; интеграция не влечёт реальных затрат — переходите на продакшен после проверки.",
+"sec.c6t":"Поддержка интеграции","sec.c6d":"Документация, примеры кода и техническая поддержка для гладкого запуска.",
+"chain.t":"Сквозной процесс","chain.n1":"Синхронизация каталога","chain.n2":"Пользователь оформляет заказ и оплачивает","chain.n3":"Вызов /order/create","chain.n4":"XPIN выполняет подготовку","chain.n5":"Обратный вызов возвращает данные для установки eSIM","chain.n6":"Показ пользователю","chain.n7":"Использование · статус · продление","cb.evh":"🔔 События обратного вызова","cb.e1":"✅ Успешная подготовка","cb.e2":"⚠️ Ошибка подготовки","cb.e3":"🔄 Изменение статуса","cb.e4":"📊 Уведомление об использовании","cb.e5":"⏰ Напоминание об истечении срока","err.h":"⚠️ Распространённые ошибки (черновик)","err.note":"Ошибки возвращают <b>code ≠ 0000</b> с subCode / subMsg; сбои подготовки также приходят через обратный вызов. Коды будут окончательно определены до выпуска песочницы.","err.e1":"Недопустимый параметр","err.e2":"Ошибка подписи","err.e3":"Тариф недоступен для продажи","err.e4":"Дублирующийся заказ","err.e5":"Ошибка подготовки","err.e6":"Обработка системой","foot.h3":"Интегрируйтесь один раз — обеспечьте глобальную связь для своих пользователей","foot.p":"Стандартный API, простая интеграция, полное выполнение — пусть ваши пользователи будут онлайн в момент прибытия.",
+"foot.copy":"XPIN Global eSIM Data Platform · Партнёрская интеграция · © 2026 XPIN Network"
+    }
+  };
+
+  function applyLang(l){
+    const d = I18N[l] || I18N.en, en = I18N.en;
+    document.querySelectorAll('[data-i18n]').forEach(el=>{
+      const k = el.getAttribute('data-i18n');
+      const v = (d[k] != null) ? d[k] : en[k];
+      if (v != null) el.innerHTML = v;
+    });
+    document.documentElement.lang = l;
+    document.documentElement.dir = (l === 'ar') ? 'rtl' : 'ltr';
+    const sel = document.getElementById('langsel'); if (sel) sel.value = l;
+    try { localStorage.setItem('xpin_lang', l); } catch(e){}
+  }
+
+  function highlightJson(){
+    document.querySelectorAll('code.json').forEach(el=>{
+      if (el.dataset.hl) return; el.dataset.hl = '1';
+      let s = el.textContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      s = s.replace(/("(?:\\.|[^"\\])*")(\s*:)/g,'<span class="jk">$1</span>$2')
+           .replace(/([:\[,]\s*)(-?\d+\.?\d*|true|false|null)(?=[,\s\]\}])/g,'$1<span class="jn">$2</span>');
+      el.innerHTML = s;
+    });
+  }
+
+  highlightJson();
+  let saved = null; try { saved = localStorage.getItem('xpin_lang'); } catch(e){}
+  applyLang(saved || 'en');
+  document.getElementById('langsel').addEventListener('change', e=>applyLang(e.target.value));
+
+  const io = new IntersectionObserver((es)=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.12});
+  document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
+</html>

@@ -1,9 +1,9 @@
 # XPIN eSIM 分销商 OpenAPI 接入说明
 
-> **文档版本：beta V0.11**
+> **文档版本：beta**（2026-09-05）
 >
 > 面向下游分销商的接入文档，覆盖认证、目录、开卡、幂等、履约、ICCID、续订、回调八条链路。
-> 文中的响应样本取自接口的真实返回。
+> 文中的响应样本取自接口的真实返回，其中 ICCID、IMSI、MSISDN、激活码已做脱敏。
 >
 > 当文档与运行中的服务不一致时，**以服务为准**。
 
@@ -13,6 +13,9 @@
 
 1. [基础约定](#1-基础约定)
 2. [认证与签名](#2-认证与签名)
+   - [2.1 签名算法 XPIN-KV1](#21-签名算法-xpin-kv1)
+   - [2.5 签名客户端](#25-签名客户端)
+   - [2.6 自检向量](#26-自检向量)
 3. [错误码](#3-错误码)
 4. [接口详解](#4-接口详解)
    - [4.1 商品列表 `/products/list`](#41-商品列表-productslist)
@@ -67,24 +70,99 @@ HTTP 80 端口的请求会 `301` 跳转到 HTTPS，且 **301 不保留 POST body
 | 请求头 | 说明 |
 |---|---|
 | `x-api-key` | 你的 `app_key` |
-| `x-timestamp` | **毫秒**时间戳，与服务器时钟偏差需 ≤ **5 分钟**（双向） |
+| `x-timestamp` | **毫秒**时间戳（13 位），与服务器时钟偏差需 ≤ **5 分钟**（双向） |
 | `x-nonce` | 随机串，匹配 `^[A-Za-z0-9._:-]{8,128}$`，**同一凭证同一 nonce 只能用一次** |
-| `x-sign` | 下式算出的 HMAC-SHA256 十六进制小写 |
+| `x-sign` | HMAC-SHA256 十六进制**小写**，见 2.1 |
+
+### 2.1 签名算法 XPIN-KV1
+
+签的是**解析后的数据**，不是报文字节 —— 所以你的 body 用任何 JSON 库、任何键序、任何缩进
+发出都行，也**不要求**你能控制 HTTP 客户端实际发出的字节。被签的对象固定七个字段：
+
+```jsonc
+{
+  "sigAlg":    "xpin.esim.openapi.kv1",   // 字面量
+  "apiKey":    "<x-api-key 的值>",
+  "method":    "POST",
+  "path":      "/openapi/v1/order/create", // 归一后：重复斜杠折成一个、去尾斜杠、不解码 %XX
+  "timestamp": "<x-timestamp 的值>",       // 字符串
+  "nonce":     "<x-nonce 的值>",
+  "body":      { ... }                     // 请求体本身
+}
+```
+
+把它按下面四条规则拼成基串，再 `hex(HMAC_SHA256(app_secret, base))`。
+
+**R1 拍平** —— 递归展开成「路径 → 标量」的列表：
+
+- 嵌套对象：路径段用 `.` 连接。`{"data":{"orderNo":"X"}}` → 路径 `data.orderNo`
+- 数组：下标就是一段。`{"tags":["a","b"]}` → `tags.0`、`tags.1`
+- **空对象**落一条 `路径 → o:`，**空数组**落一条 `路径 → a:`。不留痕的话 `{"a":{}}` 与 `{}` 会拼出同一个基串
+- 键名必须匹配 `^[A-Za-z][A-Za-z0-9_]*$`。不匹配就**拒绝**，不要尝试转义 —— 这条正是拍平
+  能保持单射的原因（否则键名里的 `.` 会与路径分隔符混淆）
+
+**R2 值编码**（带类型标记）：
+
+| 值 | 编码 |
+|---|---|
+| 字符串 | `s:` + 原文（UTF-8，**不转义任何字符**） |
+| 整数 | `i:` + 十进制，无前导零，`-0` 写作 `0` |
+| 布尔 | `b:true` / `b:false` |
+| `null` | `n:` |
+
+类型标记不是装饰：没有它，字符串 `"1"` 与整数 `1` 会编码成同一个东西。
+
+**以下值一律拒绝，不要尝试编码**：小数、超出 ±(2⁵³−1) 的整数、`NaN`、`Infinity`。
+它们的字符串化在各语言里不一致（JS 的 `String(1.0)` 是 `"1"`，Java 的 `Double.toString(1.0)`
+是 `"1.0"`），给它们编一个表示等于把跨语言分歧固化进契约。**金额请用最小单位整数或字符串。**
+
+**R3 每一项的字面量**（长度前缀）：
 
 ```
-canonical = METHOD + "\n" + PATH + "\n" + sha256_hex(rawBody) + "\n" + timestamp + "\n" + nonce
-x-sign    = hex( HMAC_SHA256(app_secret, canonical) )
+路径 + "=" + <编码值的 UTF-8 字节数> + ":" + 编码值
 ```
 
-**三条必须遵守的约束**（任一不满足即 `401 SIGNATURE_INVALID`）：
+⚠️ 长度算的是**编码值整体**的字节数，**包含 `s:` / `i:` 这两个字符的类型标记**。
+`"ak_demo"` 编码成 `s:ak_demo`，长度是 **9** 不是 7 —— 这是最常见的一处实现偏差。
 
-1. **`rawBody` 是参与签名的那一份原始字节**。对同一个字符串既算签名又发送，**不要序列化两次**
-   （两次 `JSON.stringify` 的键序或空白可能不同）。
-2. `PATH` 只是路径部分（如 `/openapi/v1/products/list`），**不含域名、不含查询串**。
-   跨路径复用签名会被拒。
-3. 方法恒为 `POST`（大写）。
+长度前缀是**承重的**：没有它，`{"a":"1&b=s:2"}` 与 `{"a":"1","b":"2"}` 会拼出同一个基串 ——
+而 `clientOrderNo` 这类字段的内容由你自由填写。
 
-### 2.1 认证检查顺序
+**R4 排序与连接** —— 按**完整路径的 UTF-8 字节序**升序排序，用 `&` 连接。键名限 ASCII
+之后，字节序 = 码元序 = 字典序，三者不会分叉。
+
+**一个完整例子**，把四条规则串起来：
+
+```jsonc
+// 请求：POST /openapi/v1/order/create
+// x-api-key: ak_demo   x-timestamp: 1788400000000   x-nonce: n_demo0001
+// body:
+{ "productCode": "XP_DEMO", "idempotencyKey": "idem_0001", "qty": 2 }
+```
+
+被签对象拍平、编码、加长度前缀、按路径排序后：
+
+```
+apiKey=9:s:ak_demo&body.idempotencyKey=11:s:idem_0001&body.productCode=9:s:XP_DEMO&body.qty=3:i:2&method=6:s:POST&nonce=12:s:n_demo0001&path=26:s:/openapi/v1/order/create&sigAlg=23:s:xpin.esim.openapi.kv1&timestamp=15:s:1788400000000
+```
+
+再对这串做 `HMAC_SHA256(app_secret, base)` 取十六进制小写，就是 `x-sign`。
+用 `app_secret = demo_secret` 时结果是：
+
+```
+32f3534d7daf9a53458ba2f403924b64dcbbd831dc7eb90f529f6a963d01242c
+```
+
+更多自检向量见 [2.6](#26-自检向量)。
+
+### 2.2 nonce
+
+⚠️ **`x-nonce` 请用真随机值**，不要用时间戳、也不要用 body 的摘要。
+基串各段之间没有标签，而 nonce 的字符集是这两者的超集 —— 拿它们当 nonce 会让"基串
+拼错顺序"这类实现缺陷在联调期**完全隐身**，等你哪天改成随机 nonce 才集体失败，那时
+所有人都会去怀疑刚改的 nonce。
+
+### 2.3 认证检查顺序
 
 多个条件同时不满足时，你只会看到**最先命中**的那一个：
 
@@ -96,10 +174,15 @@ x-sign    = hex( HMAC_SHA256(app_secret, canonical) )
 5. 凭证未过期 ............. 401 CREDENTIAL_EXPIRED
 6. 源 IP 在白名单内 ....... 403 IP_NOT_ALLOWED
 7. QPS 未超限 ............. 429 QPS_LIMITED
-8. 签名正确 ............... 401 SIGNATURE_INVALID
-9. scope 足够 ............. 403 SCOPE_FORBIDDEN
-10. nonce 未被用过 ........ 401 NONCE_REPLAYED
+8. 载荷可规范化 ........... 400 CANONICAL_*
+9. 签名正确 ............... 401 SIGNATURE_INVALID
+10. scope 足够 ............ 403 SCOPE_FORBIDDEN
+11. nonce 未被用过 ........ 401 NONCE_REPLAYED
 ```
+
+第 8 步**刻意与 `SIGNATURE_INVALID` 分开**：它说的是"这份载荷里
+有一个签不了的值"（小数、超范围整数、不合法的键名…），不是"你的密钥不对"。看到
+`CANONICAL_*` 请查载荷，不要查密钥。
 
 两条由此推出、对排障很有用的性质：
 
@@ -107,7 +190,7 @@ x-sign    = hex( HMAC_SHA256(app_secret, canonical) )
   `SIGNATURE_INVALID`、越权重试永远回 `SCOPE_FORBIDDEN`，**不会被自己的重试污染成 `NONCE_REPLAYED`**。
 - **参数校验在鉴权之前**。缺必填字段时你拿到的是 `400 xxx required`，不是 `401`。
 
-### 2.2 scope
+### 2.4 scope
 
 | scope | 覆盖接口 |
 |---|---|
@@ -116,232 +199,159 @@ x-sign    = hex( HMAC_SHA256(app_secret, canonical) )
 
 缺 `esim.write` 调写接口 → `403 SCOPE_FORBIDDEN`（在签名校验**之后**判定，所以它确实是权限问题，不是签名问题）。
 
-### 2.3 Node.js 签名客户端（完整可用）
+### 2.5 签名客户端
+
+两份实现都是完整的，直接抄走即可，除 HTTP 库外不依赖任何第三方包。规则见 2.1。
+
+**Python**
+
+```python
+import hashlib, hmac, re, secrets, time, requests
+
+KEY_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
+
+def _encode(v, path):
+    if v is None:                        return 'n:'
+    if isinstance(v, bool):              return 'b:true' if v else 'b:false'   # 必须先于 int 判断
+    if isinstance(v, str):               return 's:' + v
+    if isinstance(v, int):
+        if abs(v) > 2**53 - 1:           raise ValueError(f'{path}: 只能签安全整数')
+        return 'i:' + str(v)
+    raise ValueError(f'{path}: 不支持的类型 {type(v).__name__}')
+
+def _flatten(v, path, out):
+    if isinstance(v, list):
+        if not v:                        out.append((path, 'a:')); return
+        for i, item in enumerate(v):     _flatten(item, f'{path}.{i}', out)
+    elif isinstance(v, dict):
+        if not v:                        out.append((path, 'o:')); return
+        for k, item in v.items():
+            if not KEY_RE.match(k):      raise ValueError(f'键名不合法: {k}')
+            _flatten(item, f'{path}.{k}' if path else k, out)
+    else:
+        out.append((path, _encode(v, path)))
+
+def canonicalize(root):
+    leaves = []
+    _flatten(root, '', leaves)
+    leaves.sort(key=lambda kv: kv[0].encode('utf-8'))
+    return '&'.join(f'{p}={len(e.encode("utf-8"))}:{e}' for p, e in leaves)
+
+def _norm_path(p):
+    c = re.sub(r'/{2,}', '/', str(p))
+    return c[:-1] if len(c) > 1 and c.endswith('/') else c
+
+def sign_inbound(secret, api_key, method, path, timestamp, nonce, body):
+    base = canonicalize({
+        'sigAlg': 'xpin.esim.openapi.kv1', 'apiKey': api_key,
+        'method': str(method).upper(), 'path': _norm_path(path),
+        'timestamp': str(timestamp), 'nonce': str(nonce), 'body': body or {},
+    })
+    return hmac.new(secret.encode(), base.encode('utf-8'), hashlib.sha256).hexdigest()
+
+APP_KEY, APP_SECRET = 'ak_xxx', 'sk_xxx'
+BASE = 'https://tbetaopenapi.xpin.network'
+
+def call(path, body):
+    ts, nonce = str(int(time.time() * 1000)), 'n_' + secrets.token_hex(8)
+    sign = sign_inbound(APP_SECRET, APP_KEY, 'POST', path, ts, nonce, body)
+    # 可以直接用 json=body：签名不要求你控制发出去的字节，
+    # requests 怎么序列化都不影响验签。
+    return requests.post(BASE + path, json=body, headers={
+        'x-api-key': APP_KEY, 'x-timestamp': ts, 'x-nonce': nonce, 'x-sign': sign,
+    })
+```
+
+**Node.js**（34 行手写，无依赖）
 
 ```js
-'use strict'
 const crypto = require('crypto')
+const KEY = /^[A-Za-z][A-Za-z0-9_]*$/
 
-class XpinEsimClient {
-  /**
-   * @param {{baseUrl:string, appKey:string, appSecret:string, timeoutMs?:number}} opts
-   */
-  constructor({ baseUrl, appKey, appSecret, timeoutMs = 15000 }) {
-    if (!baseUrl || !appKey || !appSecret) throw new Error('baseUrl / appKey / appSecret are required')
-    this.baseUrl = baseUrl.replace(/\/+$/, '')
-    this.appKey = appKey
-    this.appSecret = appSecret
-    this.timeoutMs = timeoutMs
+function encode(v, path) {
+  if (v === null) return 'n:'
+  if (typeof v === 'string') return `s:${v}`
+  if (typeof v === 'boolean') return `b:${v}`
+  if (typeof v === 'number') {
+    if (!Number.isSafeInteger(v)) throw new Error(`${path}: 只能签安全整数`)
+    return `i:${Object.is(v, -0) ? '0' : String(v)}`
   }
-
-  /**
-   * 调用任意 OpenAPI 接口。
-   * @param {string} path 形如 '/openapi/v1/products/list'
-   * @param {object} body 请求体对象
-   * @returns {Promise<{httpStatus:number, code:number, msg:string, data:any}>}
-   */
-  async call(path, body = {}) {
-    // 关键：rawBody 只序列化一次，签名和发送用的是同一份字节
-    const rawBody = JSON.stringify(body)
-    const ts = String(Date.now())
-    const nonce = 'n-' + crypto.randomBytes(16).toString('hex') // 32+2 字符，满足 [8,128]
-    const digest = crypto.createHash('sha256').update(rawBody, 'utf8').digest('hex')
-    const canonical = ['POST', path, digest, ts, nonce].join('\n')
-    const sign = crypto.createHmac('sha256', this.appSecret).update(canonical, 'utf8').digest('hex')
-
-    const ctl = new AbortController()
-    const timer = setTimeout(() => ctl.abort(), this.timeoutMs)
-    try {
-      const res = await fetch(this.baseUrl + path, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.appKey,
-          'x-timestamp': ts,
-          'x-nonce': nonce,
-          'x-sign': sign
-        },
-        body: rawBody,
-        signal: ctl.signal
-      })
-      const text = await res.text()
-      let parsed
-      try {
-        parsed = JSON.parse(text)
-      } catch (e) {
-        throw new Error(`响应不是 JSON: HTTP ${res.status} ${text.slice(0, 200)}`)
-      }
-      return { httpStatus: res.status, code: parsed.code, msg: parsed.msg, data: parsed.data }
-    } finally {
-      clearTimeout(timer)
-    }
-  }
-
-  /** 成功才返回 data，否则抛出带错误码的异常 —— 业务代码通常用这个 */
-  async invoke(path, body = {}) {
-    const r = await this.call(path, body)
-    if (r.code !== 200) {
-      const err = new Error(`${path} failed: ${r.code} ${r.msg}`)
-      err.code = r.code
-      err.msg = r.msg
-      throw err
-    }
-    return r.data
-  }
+  throw new Error(`${path}: 不支持的类型 ${typeof v}`)
 }
 
-module.exports = { XpinEsimClient }
-```
+function flatten(v, path, out) {
+  if (Array.isArray(v)) {
+    if (!v.length) return out.push([path, 'a:'])
+    return v.forEach((item, i) => flatten(item, `${path}.${i}`, out))
+  }
+  if (v !== null && typeof v === 'object') {
+    const keys = Object.keys(v)
+    if (!keys.length) return out.push([path, 'o:'])
+    return keys.forEach((k) => {
+      if (!KEY.test(k)) throw new Error(`键名不合法: ${k}`)
+      flatten(v[k], path ? `${path}.${k}` : k, out)
+    })
+  }
+  out.push([path, encode(v, path)])
+}
 
-用法：
+function canonicalize(root) {
+  const leaves = []
+  flatten(root, '', leaves)
+  leaves.sort((a, b) => Buffer.compare(Buffer.from(a[0]), Buffer.from(b[0])))
+  return leaves.map(([p, e]) => `${p}=${Buffer.byteLength(e)}:${e}`).join('&')
+}
 
-```js
-const { XpinEsimClient } = require('./xpin-esim-client')
-const client = new XpinEsimClient({
-  baseUrl: 'https://tbetaopenapi.xpin.network',
-  appKey: process.env.XPIN_APP_KEY,
-  appSecret: process.env.XPIN_APP_SECRET
-})
+const normalizePath = (p) => {
+  const c = String(p).replace(/\/{2,}/g, '/')
+  return c.length > 1 && c.endsWith('/') ? c.slice(0, -1) : c
+}
 
-const page = await client.invoke('/openapi/v1/products/list', { pageNo: 1, pageSize: 20 })
-console.log(page.list.length, page.hasMore)
-```
-
-### 2.4 Java 签名客户端（**JDK 17+** / Jackson）
-
-> 用到 `record`（16+）、`HexFormat`（17+）与箭头 `switch`（14+）。低于 17 的话，把 `HexFormat`
-> 换成手写的字节转十六进制、`record` 换成普通类即可 —— 签名算法本身不依赖这些语法糖。
-
-```java
-package network.xpin.esim;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.SecureRandom;
-import java.time.Duration;
-import java.util.HexFormat;
-import java.util.Map;
-
-public class XpinEsimClient {
-
-    private final String baseUrl;
-    private final String appKey;
-    private final String appSecret;
-    private final HttpClient http;
-    private final ObjectMapper mapper = new ObjectMapper();
-    private final SecureRandom random = new SecureRandom();
-
-    public XpinEsimClient(String baseUrl, String appKey, String appSecret) {
-        if (baseUrl == null || appKey == null || appSecret == null) {
-            throw new IllegalArgumentException("baseUrl / appKey / appSecret are required");
-        }
-        this.baseUrl = baseUrl.replaceAll("/+$", "");
-        this.appKey = appKey;
-        this.appSecret = appSecret;
-        this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-    }
-
-    /** 统一响应信封 */
-    public record ApiResponse(int httpStatus, int code, String msg, JsonNode data) {
-        public boolean ok() { return code == 200; }
-    }
-
-    public ApiResponse call(String path, Object body) throws Exception {
-        // 关键：rawBody 只序列化一次，签名与发送用同一份字节
-        String rawBody = mapper.writeValueAsString(body == null ? Map.of() : body);
-        String ts = String.valueOf(System.currentTimeMillis());
-        String nonce = "n-" + randomHex(16);
-        String digest = sha256Hex(rawBody);
-        String canonical = String.join("\n", "POST", path, digest, ts, nonce);
-        String sign = hmacSha256Hex(appSecret, canonical);
-
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + path))
-                .timeout(Duration.ofSeconds(15))
-                .header("Content-Type", "application/json")
-                .header("x-api-key", appKey)
-                .header("x-timestamp", ts)
-                .header("x-nonce", nonce)
-                .header("x-sign", sign)
-                .POST(HttpRequest.BodyPublishers.ofString(rawBody, StandardCharsets.UTF_8))
-                .build();
-
-        HttpResponse<String> res = http.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-        JsonNode root;
-        try {
-            root = mapper.readTree(res.body());
-        } catch (Exception e) {
-            throw new IllegalStateException("响应不是 JSON: HTTP " + res.statusCode() + " " + res.body());
-        }
-        return new ApiResponse(res.statusCode(),
-                root.path("code").asInt(-1),
-                root.path("msg").asText(null),
-                root.path("data"));
-    }
-
-    /** 成功才返回 data，否则抛出带错误码的异常 */
-    public JsonNode invoke(String path, Object body) throws Exception {
-        ApiResponse r = call(path, body);
-        if (!r.ok()) throw new XpinEsimException(r.code(), r.msg(), path);
-        return r.data();
-    }
-
-    // ── 签名工具 ────────────────────────────────────────────────
-    private String randomHex(int bytes) {
-        byte[] b = new byte[bytes];
-        random.nextBytes(b);
-        return HexFormat.of().formatHex(b);
-    }
-
-    static String sha256Hex(String s) throws Exception {
-        MessageDigest md = MessageDigest.getInstance("SHA-256");
-        return HexFormat.of().formatHex(md.digest(s.getBytes(StandardCharsets.UTF_8)));
-    }
-
-    static String hmacSha256Hex(String secret, String data) throws Exception {
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-        return HexFormat.of().formatHex(mac.doFinal(data.getBytes(StandardCharsets.UTF_8)));
-    }
-
-    public static class XpinEsimException extends RuntimeException {
-        public final int code;
-        public final String bizMsg;
-        public XpinEsimException(int code, String msg, String path) {
-            super(path + " failed: " + code + " " + msg);
-            this.code = code;
-            this.bizMsg = msg;
-        }
-    }
+function signInbound(secret, { apiKey, method, path, timestamp, nonce, body }) {
+  const base = canonicalize({
+    sigAlg: 'xpin.esim.openapi.kv1',
+    apiKey,
+    method: method.toUpperCase(),
+    path: normalizePath(path),
+    timestamp: String(timestamp),
+    nonce: String(nonce),
+    body: body || {}
+  })
+  return crypto.createHmac('sha256', secret).update(base, 'utf8').digest('hex')
 }
 ```
 
-用法：
+调用时 `fetch(url, { body: JSON.stringify(body) })` 即可 —— **不需要**保证签名用的字符串
+与发送用的字符串逐字节相同。
 
-```java
-XpinEsimClient client = new XpinEsimClient(
-        "https://tbetaopenapi.xpin.network",
-        System.getenv("XPIN_APP_KEY"),
-        System.getenv("XPIN_APP_SECRET"));
+其它语言：Go / Java / PHP / .NET 都能在几十行内写完（只用到排序、UTF-8 字节长度、
+HMAC-SHA256 三样）。**写完请先跑 [2.6](#26-自检向量) 那张自检向量表**，全过再联调。⚠️ 两个语言特有的坑：
+PHP 要注意 `json_decode` 默认给关联数组、布尔要先于整数判断（PHP/Python 的 `bool` 是
+`int` 的子类型，不先判会把 `true` 编码成 `i:1`）；Go 注意 `map` 遍历是随机序，必须显式排序。
 
-JsonNode page = client.invoke("/openapi/v1/products/list", Map.of("pageNo", 1, "pageSize", 20));
-System.out.println(page.get("list").size() + " " + page.get("hasMore").asBoolean());
-```
+### 2.6 自检向量
 
-> **Java 两个坑**：
-> 1. `Map.of()` **不接受 `null` 值** —— `externalUserId` 之类的可选字段为空时会 `NullPointerException`。
->    可选字段请改用 `LinkedHashMap` 并只 `put` 非空值。
-> 2. `Map.of()` 的键序不保证。这不影响签名（签名用的就是你实际发出的那份 `rawBody`），
->    但如果你自己拼 JSON 字符串，务必让**签名和发送用同一个字符串变量**。
+以下向量用 `app_secret = demo_secret`、`x-api-key = ak_demo`、
+`x-timestamp = 1788400000000`、`x-nonce = n_demo0001`、`method = POST`。
+**先让这张表全过，再去联调**——签名对不上时，能省掉绝大部分来回。
+
+| # | 用意 | `path` | `body` | 期望 `x-sign` |
+|---|---|---|---|---|
+| 1 | 最小：空 body | `/openapi/v1/products/list` | `{}` | `3eb1cdb9b139d2de36df73bcae880b72c4b6e408d6c22b8ce9727735b9ee6c75` |
+| 2 | 标量三型 + null | `/openapi/v1/order/list` | `{"a":"x","b":1,"c":true,"d":null}` | `78240ca8b1a938974f2ce3ebf9b95b0ea31103c045fa8940a0989b9ad6d18343` |
+| 3 | 字符串 1 与整数 1 不同签 | `/openapi/v1/products/list` | `{"v":"1"}` | `31f9ec6d8e2098fbdf3d4c749d8c9bc5296479a0db3907196ba5e5d48e6bab89` |
+| 4 | （对照）整数 1 | `/openapi/v1/products/list` | `{"v":1}` | `15a7330e47ebc988b3772f69ca452800125f7b56592372722d5b87d5425a9688` |
+| 5 | 嵌套与数组 | `/openapi/v1/order/create` | `{"data":{"orderNo":"X"},"tags":["a","b"]}` | `a0f6a4db62b1e51330fd67cf61c9b3e3cb7d1fce1c10b022c0fd6be35d95e84d` |
+| 6 | 空对象与空数组要留痕 | `/openapi/v1/products/list` | `{"o":{},"a":[]}` | `2628471b9872c77f1f84391657cf02e8770e06a686024ac20e94ef6cbb40b629` |
+| 7 | （对照）两者都缺省 | `/openapi/v1/products/list` | `{}` | `3eb1cdb9b139d2de36df73bcae880b72c4b6e408d6c22b8ce9727735b9ee6c75` |
+| 8 | 值里含 & = : 不与拆字段碰撞 | `/openapi/v1/order/query` | `{"clientOrderNo":"1&b=s:2"}` | `38b88ad966366fe0b0ab78b9040d188a22ad6dc5f9c62210109b7a488d449053` |
+| 9 | 非 ASCII 原文参与，不转义 | `/openapi/v1/products/detail` | `{"productCode":"套餐-中文"}` | `a7d86f5a2ea0a0e83d36f6112766360afabb08df407de15543600ef8cf2542d5` |
+| 10 | 路径归一：重复斜杠与尾斜杠 | `/openapi/v1//products//detail/` | `{"productCode":"XP_DEMO"}` | `63655a08ff52c78dd0942219cdfab9df4072fcc25d9784f1fcef6e488603f13e` |
+| 11 | （对照）已归一的路径 | `/openapi/v1/products/detail` | `{"productCode":"XP_DEMO"}` | `63655a08ff52c78dd0942219cdfab9df4072fcc25d9784f1fcef6e488603f13e` |
+
+> 第 3 与第 4 条、第 6 与第 7 条、第 10 与第 11 条各是一组**对照**：两条签出不同的值才算对。
+> 第 3/4 组验的是类型标记（少了它字符串 `"1"` 与整数 `1` 会同签），第 6/7 组验的是空容器
+> 留痕，第 10/11 组验的是路径归一（这一组反过来，两条必须**相同**）。
 
 ---
 
@@ -358,7 +368,8 @@ System.out.println(page.get("list").size() + " " + page.get("hasMore").asBoolean
 | `401` | `TIMESTAMP_INVALID` | 时间戳非数字或偏差 > 5 分钟 | **对时**；确认用的是毫秒 |
 | `401` | `APP_KEY_INVALID` | app_key 不存在/已停用/环境不匹配 | 找平台核对凭证 |
 | `401` | `CREDENTIAL_EXPIRED` | 凭证已过期 | 找平台轮换 |
-| `401` | `SIGNATURE_INVALID` | 签名不匹配 | 见 §2 的三条约束，八成是 body 序列化了两次 |
+| `401` | `SIGNATURE_INVALID` | 签名不匹配 | 先跑 [2.6](#26-自检向量) 的自检向量，全过再查联调 |
+| `400` | `CANONICAL_*` | 载荷里有签不了的值（小数、超范围整数、不合法键名、嵌套过深） | **查载荷，不要查密钥**。错误信息会点出是哪个字段 |
 | `401` | `NONCE_REPLAYED` | nonce 已被用过 | 每次请求换新 nonce |
 | `403` | `SCOPE_FORBIDDEN` | 凭证 scope 不足 | 找平台加 scope |
 | `403` | `IP_NOT_ALLOWED` | 源 IP 不在白名单 | 找平台加 IP |
@@ -367,7 +378,7 @@ System.out.println(page.get("list").size() + " " + page.get("hasMore").asBoolean
 | `404` | `PRODUCT_NOT_AVAILABLE` | 下单时商品不可售/不存在 | 同上 |
 | `404` | `ORDER_NOT_FOUND` | 订单不存在或不属于你 | 检查 `clientOrderNo` |
 | `404` | `CARD_NOT_FOUND` | 卡不存在或不属于你 | 检查 `iccid` |
-| `404` | `base:interface does not exist` | 请求路径不存在 | 检查路径拼写与前缀 `/openapi/v1` |
+| `404` | — | 请求路径不存在 | 检查路径拼写与前缀 `/openapi/v1`。这一类的 `msg` 不是稳定错误码，不要对它做断言 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 同 `idempotencyKey` 但请求内容不同 | 换新的幂等键 |
 | `409` | `CLIENT_ORDER_NO_REUSED` | `clientOrderNo` 已被别的订单占用 | 换新的业务单号 |
 | `409` | `RENEW_NOT_ALLOWED` | 这张卡此刻不可续订 | 先调 `iccid/renew` 看 `reasons` |
@@ -838,7 +849,7 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
         "externalUserId": "m1lc-user-1788431700325",
         "productCode": "XP205032025ED92397E2AE461C",
         "orderStatus": "FULFILLED",
-        "iccid": "89852342716026340430",
+        "iccid": "89000000000000000430",
         "profileStatus": null,
         "product": { "...": "同 order/query 的商品快照" }
       }
@@ -918,11 +929,11 @@ public List<JsonNode> listOrdersByUser(XpinEsimClient client, String externalUse
 
 ```json
 // 可续
-{"data":{"allowed":true,"reasons":[],"iccid":"89110342025026040571","productCode":"XP563E64913D5D5E0B8DBC925F"},
+{"data":{"allowed":true,"reasons":[],"iccid":"89000000000000000571","productCode":"XP563E64913D5D5E0B8DBC925F"},
  "code":200,"msg":"ok","t":1788495680855}
 
 // 不可续
-{"data":{"allowed":false,"reasons":["DAYPASS_IN_FORCE"],"iccid":"89852342716026340435","productCode":"XP205032025ED92397E2AE461C"},
+{"data":{"allowed":false,"reasons":["DAYPASS_IN_FORCE"],"iccid":"89000000000000000435","productCode":"XP205032025ED92397E2AE461C"},
  "code":200,"msg":"ok","t":1788505549000}
 ```
 
@@ -1024,7 +1035,7 @@ public RenewCheck checkRenewable(XpinEsimClient client, String iccid, String pro
   "data": {
     "orderNo": "XE17884956816778866A4A70E",
     "clientOrderNo": "m1n-C4-DATA-rn-1788494789993",
-    "iccid": "89110342025026040571",
+    "iccid": "89000000000000000571",
     "productCode": "XP563E64913D5D5E0B8DBC925F",
     "orderStatus": "ACCEPTED",
     "accepted": true,
@@ -1119,11 +1130,11 @@ public String renew(XpinEsimClient client, String iccid, String productCode,
 | `profile.statusTime` | string | 状态时间（ISO-8601） |
 | `profile.changeVersion` | number | 状态变更版本，**单调递增**，可用于丢序检测 |
 | `renewal.renewable` | boolean\|null | 电信运营商给出的可续订性；`null` = 未同步 |
-| `renewal.expirationTime` | string\|null | 续订截止时间 |
+| `renewal.expirationTime` | string\|null | 续订截止时间。**开卡履约完成即可读到**，不必等后续刷新 |
 | `renewal.activePackages` | number | 这张卡当前占用的套餐槽位数（**含尚未履约的在途订单**，见下方警告） |
 | `renewal.maxConcurrentPackages` | number\|null | 并发上限 |
 | `renewal.evidenceFresh` | boolean | 续订证据是否新鲜。新鲜期与刷新时机随电信运营商的数据返回波动 |
-| `renewal.evidenceSyncedAt` | string\|null | 证据同步时刻 |
+| `renewal.evidenceSyncedAt` | string\|null | 证据同步时刻。它是**卡型能力**的刷新时刻，同一卡型的多张卡上取值相同，与 `usage.observedAt` 不是一回事 |
 | `usage` | object\|null | 用量；`null` 见 §4.10 |
 | `packageStatus` | string | `CREATED` / `NOT_ACTIVATED` / `IN_USE` / `EXPIRED` 等 |
 | `packageEndTime` | string\|null | 套餐结束时间 |
@@ -1133,26 +1144,30 @@ public String renew(XpinEsimClient client, String iccid, String productCode,
 ```json
 {
   "data": {
-    "iccid": "89852342716026340430",
-    "externalUserId": "m1lc-user-1788431700325",
+    "iccid": "89000000000000000442",
+    "externalUserId": "your-user-0442",
     "cardType": "ep1",
     "delivery": {
-      "activationCode": "LPA:1$esiminfra.toprsp.com$936B847F552566D5513436",
-      "latestActivationTime": null,
-      "imsi": "453126385970430",
-      "msisdn": "852439016710430"
+      "activationCode": "LPA:1$smdp-a.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE",
+      "latestActivationTime": "2026-12-04T12:53:54.000Z",
+      "imsi": "460000000000442",
+      "msisdn": "850000000000442"
     },
-    "profile": { "status": "UNKNOWN", "statusTime": "2026-09-03T10:35:14.823Z", "changeVersion": 0 },
+    "profile": { "status": "ENABLED", "statusTime": "2026-09-05T13:00:21.079Z", "changeVersion": 1 },
     "renewal": {
-      "renewable": null, "expirationTime": null,
+      "renewable": true, "expirationTime": "2026-12-07T12:53:53.000Z",
       "activePackages": 1, "maxConcurrentPackages": 99,
-      "evidenceFresh": false, "evidenceSyncedAt": null
+      "evidenceFresh": true, "evidenceSyncedAt": "2026-09-05T13:04:45.813Z"
     },
-    "usage": null,
-    "packageStatus": "CREATED",
-    "packageEndTime": null
+    "usage": {
+      "orderNo": "XE1788612831173B352E275F4",
+      "dataTotalBytes": null, "dataUsedBytes": 0, "dataRemainBytes": null,
+      "observedUnit": "MB", "observedAt": "2026-09-05T13:29:24.791Z"
+    },
+    "packageStatus": "NOT_ACTIVATED",
+    "packageEndTime": "2026-09-08T12:53:54.000Z"
   },
-  "code": 200, "msg": "ok", "t": 1788431716510
+  "code": 200, "msg": "ok", "t": 1788615660098
 }
 ```
 
@@ -1190,19 +1205,60 @@ String qrPayload = p.get("delivery").get("activationCode").asText();
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `iccid` | string | 回显 |
-| `usage` | object\|null | 用量投影 |
+| `usage` | object\|null | 用量投影，字段见下 |
+
+**`usage` 对象**
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `orderNo` | string | 这组数字属于**哪一张订单**。见下面的量程说明 |
+| `dataTotalBytes` | number\|null | 套餐总量，**整数字节** |
+| `dataUsedBytes` | number\|null | 已用量，**整数字节** |
+| `dataRemainBytes` | number\|null | 剩余量，**整数字节** |
+| `observedUnit` | string\|null | 这组数字换算前的单位，仅作证据。**它不是上面三个字段的单位** —— 那永远是字节 |
+| `observedAt` | string | 这次读数的观测时刻（ISO-8601） |
+
+> **三个数值字段是整数字节，字段名自带单位。** 不要按 `observedUnit` 去二次换算。
 
 **示例响应**
 
 ```json
-{ "data": { "iccid": "89852342716026340430", "usage": null }, "code": 200, "msg": "ok", "t": 1788431716876 }
+{
+  "data": {
+    "iccid": "89000000000000000430",
+    "usage": {
+      "orderNo": "XE1788614425833E413E81C10",
+      "dataTotalBytes": null,
+      "dataUsedBytes": 0,
+      "dataRemainBytes": null,
+      "observedUnit": "MB",
+      "observedAt": "2026-09-05T13:29:24.791Z"
+    }
+  },
+  "code": 200, "msg": "ok", "t": 1788431716876
+}
 ```
+
+> **不限量套餐没有总量。** `products/list` 里 `dataLimited: "N"` 的套餐，
+> `dataTotalBytes` 与 `dataRemainBytes` 恒为 `null`，只有 `dataUsedBytes` 是数字。
+> 这不是"取数失败"，是这类套餐本来就没有这个概念 —— 不要把它当异常重试。
+
+> 🔴 **这是 `orderNo` 那一单的用量，不是这张卡的合计。** 一张卡上可以同时有多个套餐
+> （见 `cardType` 的 `maxConcurrentPackages`），而这里返回的是**最新那一单**的读数。
+> `orderNo` 就是说明这件事的字段。只读 `dataRemainBytes` 的调用方在多套餐卡上会得到一个
+> **偏小的数** —— 它是最新那一单还剩多少，不是这张卡还能用多少。
 
 > **`usage: null` 有两种成因，靠 `cardType` 的 `capability.supportUsageQuery` 区分**：
 > - `supportUsageQuery: false` → 这个卡型**本来就查不到用量**，永远是 `null`，不要重试。
-> - `supportUsageQuery: true` 但 `usage` 为 `null` → 刚出卡还没有样本，稍后再查。
+> - `supportUsageQuery: true` 但 `usage` 为 `null` → 还没有样本，稍后再查。
+
+> **读数是周期性刷新的**，不是每次调用都实时回源。`observedAt` 就是这次读数的时刻；
+> 两次调用之间它可能不变，那表示期间没有新样本，不是接口失败。
 
 **负例**：卡不存在 → `404 CARD_NOT_FOUND`。
+
+`/iccid/profile` 的 `usage` 与本接口返回的是**同一个投影**，字段与取值完全一致，
+按哪条取都行。
 
 ---
 
@@ -1212,9 +1268,12 @@ String qrPayload = p.get("delivery").get("activationCode").asText();
 
 ```
 ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
-   │                              │                   │
-   │                              └──► RECONCILING ───┘
-   └──► RETRY_PENDING ──► SUBMITTING
+   │              │               │                   │
+   │              │               └──► RECONCILING ───┘
+   │              │                        │
+   └──► RETRY_PENDING ──► SUBMITTING       │
+                  │                        │
+                  └────────► FAILED ◄──────┘
 ```
 
 | 状态 | 含义 | 你该做什么 |
@@ -1225,9 +1284,13 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
 | `RECONCILING` | 提交/对账阶段异常，正在核对 | 继续等，超时联系平台 |
 | `RETRY_PENDING` | 等待重试 | 继续等 |
 | **`FULFILLED`** | **已履约，`iccid` 可用** | 取激活码交付用户 |
+| **`FAILED`** | **终态：这一单不会再出卡** | **停止轮询**。这一单不会自愈，需要出卡就重新下一单（用**新的** `idempotencyKey` 与 `clientOrderNo`）。原因需联系平台核查 |
+
+> 🔴 **轮询必须同时判 `FAILED`。** 只等 `FULFILLED` 的循环会在失败单上一直转到超时，
+> 而那一单永远不会变。`FULFILLED` 与 `FAILED` 都是**终态**，收到任一个就停。
 
 **时延**：开卡与续订的 `ACCEPTED → FULFILLED` 时长根据电信运营商的数据返回，可能在 1～15 分钟左右波动。
-明显超出该区间仍未 `FULFILLED` 时需与平台核查，**不要靠重复下单绕过**
+明显超出该区间仍未 `FULFILLED` 也未 `FAILED` 时需与平台核查，**不要靠重复下单绕过**
 （会建出多张卡）。
 
 ### 5.2 开卡完整流程
@@ -1236,8 +1299,8 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
 1. products/list           取 productCode
 2. order/create            → ACCEPTED + orderNo
 3. 二选一：
-   a. 轮询 order/query 到 FULFILLED
-   b. 等 ORDER_OPEN_RESULT 回调（推荐，见 §6）
+   a. 轮询 order/query 到终态（FULFILLED 或 FAILED）
+   b. 等 ORDER_OPEN_RESULT 回调（推荐，见 §6；失败的单不发事件，所以回调路仍需超时兜底）
 4. iccid/profile           取 delivery.activationCode
 5. 把整串激活码生成二维码交付终端用户
 ```
@@ -1282,7 +1345,7 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
 | 头 | 值 |
 |---|---|
 | `x-event-id` | 与 body 的 `eventId` **完全相同**（可只读头做幂等） |
-| `x-sign` | 与 body 的 `sign` 完全相同 |
+| `x-sign` | 签名，HMAC-SHA256 十六进制小写。**签名只在这个头里，body 里没有 `sign` 字段** |
 
 信封字段：
 
@@ -1296,202 +1359,92 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
 | `timestamp` | string | 本次投递尝试的 ISO-8601 时刻，**重投会变** |
 | `nonce` | string | 每次投递重新生成的 UUID，**重投会变** |
 | `businessType` | string | 恒为 `ESIM` |
-| `sign` | string | HMAC-SHA256 十六进制，**恒为最后一个键** |
 
 **示例报文**（三类各一）
 
 ```json
 // ORDER_OPEN_RESULT
-{"msg":"success","code":"0000","data":{"imsi":"453126385970433","iccid":"89852342716026340433","msisdn":"852439016710433","orderNo":"XE1788489809764F48C390102","orderStatus":"FULFILLED","productCode":"XP205032025ED92397E2AE461C","clientOrderNo":"m1whA-1788489808349","activationCode":"LPA:1$esiminfra.toprsp.com$936B847F552566D5513439","idempotencyKey":"m1whA-idem-1788489808349"},"eventId":"145b1ba79790575ae1fa22a5b172fb2fc6687a27de71d584","eventType":"ORDER_OPEN_RESULT","timestamp":"2026-09-04T02:43:37.180Z","nonce":"b2106d10-f164-4c89-84d9-4c7887dc7d03","businessType":"ESIM","sign":"9a6477a7aa1cf74f4150d8049d6007270ae408ceacd5e74b9ecdd84a11bb6166"}
+{"msg":"success","code":"0000","data":{"imsi":"460000000000433","iccid":"89000000000000000433","msisdn":"850000000000433","orderNo":"XE1788489809764F48C390102","orderStatus":"FULFILLED","productCode":"XP205032025ED92397E2AE461C","clientOrderNo":"m1whA-1788489808349","activationCode":"LPA:1$smdp-a.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE","idempotencyKey":"m1whA-idem-1788489808349"},"eventId":"145b1ba79790575ae1fa22a5b172fb2fc6687a27de71d584","eventType":"ORDER_OPEN_RESULT","timestamp":"2026-09-04T02:43:37.180Z","nonce":"b2106d10-f164-4c89-84d9-4c7887dc7d03","businessType":"ESIM"}
 ```
 
 ```json
 // ORDER_RENEW_RESULT
-{"msg":"success","code":"0000","data":{"imsi":"454126385970574","iccid":"89110342025026040574","msisdn":"852574316910574","orderNo":"XE1788505564505CF4DE8D310","orderStatus":"FULFILLED","productCode":"XP563E64913D5D5E0B8DBC925F","clientOrderNo":"m1n-C4-DATA-rn-1788504527118","activationCode":"LPA:1$ecprsp.eastcompeace.com$B1F607B712364A40B2D990587F260574","idempotencyKey":"m1n-C4-DATA-rnidem-1788504527118"},"eventId":"881c95a391b04045a10b5f91ebecb3512bbb8b99c70584f9","eventType":"ORDER_RENEW_RESULT","timestamp":"2026-09-04T07:06:22.502Z","nonce":"66677339-0820-4926-86aa-53fe1c5bc248","businessType":"ESIM","sign":"114f693a2561c1f438ab9610ac4b23eab7adb4b9398ef753b3df2d1eca90cbcf"}
+{"msg":"success","code":"0000","data":{"imsi":"460000000000574","iccid":"89000000000000000574","msisdn":"850000000000574","orderNo":"XE1788505564505CF4DE8D310","orderStatus":"FULFILLED","productCode":"XP563E64913D5D5E0B8DBC925F","clientOrderNo":"m1n-C4-DATA-rn-1788504527118","activationCode":"LPA:1$smdp-b.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE","idempotencyKey":"m1n-C4-DATA-rnidem-1788504527118"},"eventId":"881c95a391b04045a10b5f91ebecb3512bbb8b99c70584f9","eventType":"ORDER_RENEW_RESULT","timestamp":"2026-09-04T07:06:22.502Z","nonce":"66677339-0820-4926-86aa-53fe1c5bc248","businessType":"ESIM"}
 ```
 
 ```json
 // STATUS_CHANGED
-{"msg":"success","code":"0000","data":{"iccid":"89852342716026340433","orderNo":"XE1788489809764F48C390102","changedAt":"2026-09-04T02:49:39.026Z","entityType":"PROFILE","changeVersion":1,"currentStatus":"ENABLED","previousStatus":"UNKNOWN"},"eventId":"56e045be3d6c736f968e19c690dd01fc6be016055fcc32bf","eventType":"STATUS_CHANGED","timestamp":"2026-09-04T02:49:43.548Z","nonce":"e154774a-636d-4ee3-b2a4-4b007db57a97","businessType":"ESIM","sign":"f8fcba0e97408575d7b41dde496eb2f1364fc8de0c2f139a854d30bb8f673de5"}
+{"msg":"success","code":"0000","data":{"iccid":"89000000000000000433","orderNo":"XE1788489809764F48C390102","changedAt":"2026-09-04T02:49:39.026Z","entityType":"PROFILE","changeVersion":1,"currentStatus":"ENABLED","previousStatus":"UNKNOWN"},"eventId":"56e045be3d6c736f968e19c690dd01fc6be016055fcc32bf","eventType":"STATUS_CHANGED","timestamp":"2026-09-04T02:49:43.548Z","nonce":"e154774a-636d-4ee3-b2a4-4b007db57a97","businessType":"ESIM"}
 ```
 
-> 🔴 **不要假设键序。** 当前键序为 `msg, code, data, eventId, eventType, timestamp, nonce, businessType, sign`，
-> 但唯一被保证的是 **`sign` 恒为最后一个键**。验签必须"保留收到的键序"，见下。
+> 🔴 **不要假设键序。** 当前键序为 `msg, code, data, eventId, eventType, timestamp, nonce, businessType`，
+> 但它**不是契约的一部分**，给 `data` 加一个短字段就可能整体重排。
+>
+> 键序与验签**无关**，随便它怎么排。
 
 ### 6.3 验签
 
-`sign` 覆盖的是"追加 `sign` 之前"的整个 body。**最稳的做法是在原始字节上砍掉末尾的 `,"sign":"..."`**，
-不做对象级重序列化——这样就完全不依赖 JSON 库的键序与转义规则。
+与入站**同一套规则**（2.1 的四条规则），所以你只需实现一次。
+两点要注意：
 
-**Node.js 接收端（Express）**
+1. **`sign` 不在 body 里**，只在 `x-sign` 头；
+2. 被签的不是报文字节，而是从**解析后的数据**拼出的规范串。键序、空白、转义、用哪个
+   JSON 库，全都不影响结果。你**不需要**拿到原始字节。
+
+验签 = 解析 body → 加上 `"sigAlg": "xpin.esim.webhook.kv1"` → 按四条规则算基串 →
+HMAC-SHA256 → 与 `x-sign` 常数时间比对。
+
+```js
+// canonicalize() 与 2.5 里那份逐字相同 —— 入站出站共用，写一次
+function verifyKv1(parsedBody, signHeader, appSecret) {
+  const base = canonicalize({ ...parsedBody, sigAlg: 'xpin.esim.webhook.kv1' })
+  const expected = crypto.createHmac('sha256', appSecret).update(base, 'utf8').digest('hex')
+  if (typeof signHeader !== 'string' || signHeader.length !== expected.length) return false
+  return crypto.timingSafeEqual(Buffer.from(signHeader), Buffer.from(expected))
+}
+```
+
+```python
+import hashlib, hmac
+# canonicalize() 与 2.5 那份逐字相同 —— 入站出站共用，写一次
+def verify_kv1(parsed_body, sign_header, app_secret):
+    base = canonicalize({**parsed_body, 'sigAlg': 'xpin.esim.webhook.kv1'})
+    expected = hmac.new(app_secret.encode(), base.encode('utf-8'), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, sign_header or '')
+```
+
+`express.json()` / `@RequestBody Map` / `request.json` 都可以放心用 —— 拿解析后的对象就够了。
+
+**接收端骨架（Express）**
 
 ```js
 const express = require('express')
-const crypto = require('crypto')
 const app = express()
 
-// 关键：必须拿到原始字节。用 express.json() 会丢掉原文，导致验签永远失败
-app.use('/xpin/webhook', express.raw({ type: 'application/json', limit: '1mb' }))
-
-function verify(rawBody, sign, appSecret) {
-  // 在原始字节上砍掉末尾的 ,"sign":"..."，不做重序列化
-  const marker = rawBody.lastIndexOf(',"sign":')
-  if (marker <= 0) return false
-  const unsigned = rawBody.slice(0, marker) + '}'
-  const expected = crypto.createHmac('sha256', appSecret).update(unsigned, 'utf8').digest('hex')
-  if (typeof sign !== 'string' || sign.length !== expected.length) return false
-  return crypto.timingSafeEqual(Buffer.from(sign), Buffer.from(expected))
-}
+// 可以直接用 express.json()：验签不需要原始字节。
+app.use('/xpin/webhook', express.json({ limit: '1mb' }))
 
 app.post('/xpin/webhook', async (req, res) => {
-  const rawBody = req.body.toString('utf8')
   const eventId = req.get('x-event-id')
-
-  let evt
-  try {
-    evt = JSON.parse(rawBody)
-  } catch (e) {
-    return res.json({ code: '9999', msg: 'bad json' }) // 非 "0000" → 平台会重投
-  }
-
-  if (!verify(rawBody, evt.sign, process.env.XPIN_APP_SECRET)) {
-    console.warn('验签失败', eventId)
+  if (!verifyKv1(req.body, req.get('x-sign'), APP_SECRET)) {
+    // 验不过就不要回 0000 —— 回了我们会认为已送达，这条事件不再重投。
     return res.json({ code: '9999', msg: 'bad signature' })
   }
-
-  // 幂等：同一 eventId 只处理一次。重投是契约，不是异常
-  if (await alreadyProcessed(eventId)) {
-    return res.json({ code: '0000', msg: 'success' })
-  }
-
-  try {
-    switch (evt.eventType) {
-      case 'ORDER_OPEN_RESULT':
-      case 'ORDER_RENEW_RESULT':
-        await onOrderFulfilled(evt.data) // data.iccid / data.activationCode 直接可用
-        break
-      case 'STATUS_CHANGED':
-        await onStatusChanged(evt.data)  // 用 data.changeVersion 做丢序检测
-        break
-      default:
-        console.warn('未知事件类型', evt.eventType) // 仍然 ACK，避免无谓重投
-    }
-    await markProcessed(eventId)
-  } catch (e) {
-    // 处理失败就不要 ACK —— 让平台重投，比自己丢事件安全
-    console.error('处理失败，等待重投', eventId, e)
-    return res.json({ code: '9999', msg: 'processing failed' })
-  }
-
-  // ⚠️ 必须是字符串 "0000"。回 {"code":200} 或 {"code":0} 都会被当作失败而重投
+  // 幂等：同一 eventId 只处理一次。重投是契约，不是异常。
+  if (!(await markProcessedIfNew(eventId))) return res.json({ code: '0000', msg: 'duplicate' })
+  await handle(req.body)
   res.json({ code: '0000', msg: 'success' })
 })
-
-app.listen(8080)
 ```
 
-**Java 接收端（Spring Boot）**
+> **两个提示**
+> 1. **ACK 判据是响应体 `code === "0000"` 加 HTTP 2xx，两者都要**。任何其它组合都按失败
+>    处理并重投（间隔约 5 秒，见 6.4 的上限）。所以处理失败时**不要**回 `0000`。
+> 2. **幂等存储必须跨进程生效**（唯一索引表或 Redis `SETNX`）。我们的重投可能落到你集群
+>    里的另一个实例上，进程内的 `Set` 挡不住。`x-event-id` 头与 body 的 `eventId` 恒等，
+>    用哪个都行 —— 但要注意**头不在签名覆盖范围内**，所以以 body 里的 `eventId` 为准更稳。
 
-```java
-package network.xpin.esim;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.MediaType;
-import org.springframework.web.bind.annotation.*;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.HexFormat;
-import java.util.Map;
-
-@RestController
-public class XpinWebhookController {
-
-    private static final Logger log = LoggerFactory.getLogger(XpinWebhookController.class);
-
-    private final ObjectMapper mapper = new ObjectMapper();
-    private final String appSecret = System.getenv("XPIN_APP_SECRET");
-
-    /** 你自己的幂等存储：alreadyProcessed(eventId) / markProcessed(eventId)。
-     *  用一张带唯一索引的表或 Redis SETNX 都可以，关键是**跨进程**生效 ——
-     *  平台的重投可能落到你集群里的另一个实例上。 */
-    private final ProcessedEventStore store;
-
-    public XpinWebhookController(ProcessedEventStore store) {
-        this.store = store;
-    }
-
-    /**
-     * 关键：以 String 接收原始 body。用 @RequestBody DTO 会丢掉原文，验签必然失败。
-     */
-    @PostMapping(value = "/xpin/webhook", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, String> receive(@RequestBody String rawBody,
-                                       @RequestHeader("x-event-id") String eventId) {
-        JsonNode evt;
-        try {
-            evt = mapper.readTree(rawBody);
-        } catch (Exception e) {
-            return Map.of("code", "9999", "msg", "bad json"); // 非 "0000" → 平台重投
-        }
-
-        if (!verify(rawBody, evt.path("sign").asText(null))) {
-            return Map.of("code", "9999", "msg", "bad signature");
-        }
-
-        // 幂等：同一 eventId 只处理一次
-        if (store.alreadyProcessed(eventId)) {
-            return Map.of("code", "0000", "msg", "success");
-        }
-
-        try {
-            JsonNode data = evt.get("data");
-            switch (evt.get("eventType").asText()) {
-                case "ORDER_OPEN_RESULT", "ORDER_RENEW_RESULT" -> onOrderFulfilled(data);
-                case "STATUS_CHANGED" -> onStatusChanged(data);
-                default -> log.warn("未知事件类型 {}", evt.get("eventType").asText());
-            }
-            store.markProcessed(eventId);
-        } catch (Exception e) {
-            // 处理失败不要 ACK —— 让平台重投比自己丢事件安全
-            log.error("处理失败，等待重投 {}", eventId, e);
-            return Map.of("code", "9999", "msg", "processing failed");
-        }
-
-        // ⚠️ 必须是字符串 "0000"
-        return Map.of("code", "0000", "msg", "success");
-    }
-
-    /** 在原始字节上砍掉末尾 ,"sign":"..." 再算 HMAC，不做重序列化 */
-    private boolean verify(String rawBody, String sign) {
-        if (sign == null) return false;
-        int marker = rawBody.lastIndexOf(",\"sign\":");
-        if (marker <= 0) return false;
-        String unsigned = rawBody.substring(0, marker) + "}";
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            String expected = HexFormat.of()
-                    .formatHex(mac.doFinal(unsigned.getBytes(StandardCharsets.UTF_8)));
-            return MessageDigest.isEqual(
-                    expected.getBytes(StandardCharsets.UTF_8),
-                    sign.getBytes(StandardCharsets.UTF_8));
-        } catch (Exception e) {
-            return false;
-        }
-    }
-}
-```
-
-> **Spring Boot 两个提示**：
-> 1. 如果全局配置了 JSON 反序列化，请确认这个端点拿到的是**未经处理的原文**。常见坑是用
->    `@RequestBody Map<String,Object>` 接收——Jackson 会重排/规范化，验签必然失败。
-> 2. 幂等存储必须**跨进程**生效（唯一索引表或 Redis `SETNX`）。平台的重投可能落到你集群里的
->    另一个实例上，进程内的 `Set` 挡不住。
+---
 
 ### 6.4 ACK 与重投
 

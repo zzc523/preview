@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XPIN eSIM 分销商 OpenAPI 接入说明</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --panel:#ffffff; --ink:#1d2733; --muted:#657487; --line:#dfe5ec;
+    --brand:#1f6feb; --brand-dark:#164f9f; --amber:#b96b00; --red:#c93d36;
+    --amber-soft:#fff8ec; --red-soft:#fff2f0;
+    --radius:14px; --maxw:1180px; --toc:250px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:15px;line-height:1.78;-webkit-font-smoothing:antialiased;}
+  header{background:linear-gradient(135deg,#14346f,#1f6feb 62%,#42a5f5);color:#fff;padding:52px 24px 40px;}
+  header .in{max-width:var(--maxw);margin:0 auto;}
+  .tag{display:inline-block;padding:4px 12px;border:1px solid rgba(255,255,255,.34);border-radius:999px;
+    background:rgba(255,255,255,.14);font-size:12px;letter-spacing:.5px;}
+  header h1{max-width:900px;margin:16px 0 8px;font-size:32px;line-height:1.25;}
+  header p{max-width:900px;margin:0;color:rgba(255,255,255,.9);font-size:14px;}
+
+  .shell{max-width:var(--maxw);margin:0 auto;padding:26px 22px 90px;display:grid;
+    grid-template-columns:var(--toc) minmax(0,1fr);gap:26px;align-items:start;}
+  nav.toc{position:sticky;top:18px;max-height:calc(100vh - 36px);overflow:auto;
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 12px;font-size:13px;}
+  nav.toc a{display:block;padding:3px 8px;border-radius:6px;color:#3b4a5c;text-decoration:none;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  nav.toc a:hover{background:#eef3f9;color:var(--brand);}
+  nav.toc a.l3{padding-left:20px;color:var(--muted);font-size:12.5px;}
+  main{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:8px 30px 40px;box-shadow:0 1px 2px rgba(16,30,54,.04);min-width:0;}
+
+  h2{margin:34px 0 12px;padding-top:12px;font-size:23px;line-height:1.35;border-top:1px solid var(--line);}
+  h2:first-of-type{border-top:none;}
+  h3{margin:26px 0 8px;font-size:17.5px;color:#22344a;}
+  h4{margin:20px 0 6px;font-size:15.5px;color:#33475f;}
+  .anchor{margin-left:8px;color:#c6d2e0;text-decoration:none;font-weight:400;opacity:0;transition:opacity .12s;}
+  h2:hover .anchor,h3:hover .anchor,h4:hover .anchor{opacity:1;}
+  p{margin:10px 0;} ul,ol{margin:10px 0;padding-left:24px;} li{margin:5px 0;}
+  hr{margin:26px 0;border:none;border-top:1px solid var(--line);}
+  strong{font-weight:650;color:#12253c;}
+  a{color:var(--brand);} a:hover{color:var(--brand-dark);}
+
+  code{padding:1.5px 5px;border-radius:5px;background:#eef3f8;color:#22405f;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.8px;
+    word-break:break-word;}
+  .tw{overflow-x:auto;margin:14px 0;}
+  table{width:100%;border-collapse:collapse;border:1px solid var(--line);background:#fff;font-size:13.4px;}
+  th,td{padding:9px 12px;border-bottom:1px solid var(--line);border-right:1px solid #edf1f6;
+    text-align:left;vertical-align:top;}
+  th:last-child,td:last-child{border-right:none;}
+  th{background:#f0f4f9;color:#22344a;font-weight:650;white-space:nowrap;}
+  tr:last-child td{border-bottom:none;} tbody tr:nth-child(even){background:#fafcfe;}
+  td code{background:#f2f6fa;}
+
+  figure.code{position:relative;margin:14px 0;}
+  figure.code::before{content:attr(data-lang);position:absolute;top:0;right:0;
+    padding:2px 9px;border-radius:0 10px 0 8px;background:#243449;color:#8fa6c2;
+    font-size:11px;letter-spacing:.4px;font-family:ui-monospace,Menlo,Consolas,monospace;}
+  figure.code pre{margin:0;padding:15px 17px;border-radius:10px;background:#16202e;overflow-x:auto;}
+  figure.code code{padding:0;background:none;color:#dbe6f3;font-size:12.9px;line-height:1.62;
+    white-space:pre;word-break:normal;}
+  .copy{position:absolute;top:6px;right:64px;padding:3px 10px;border:1px solid #3a4d66;border-radius:6px;
+    background:#243449;color:#9fb6d1;font-size:11.5px;cursor:pointer;opacity:0;transition:opacity .12s;}
+  figure.code:hover .copy{opacity:1;} .copy:hover{color:#fff;border-color:#5b7a9c;}
+  .copy.done{color:#7fd7a6;border-color:#2f6b4d;}
+
+  blockquote.note{margin:14px 0;padding:11px 16px;border-left:3px solid #b9cbe2;border-radius:0 8px 8px 0;
+    background:#f4f8fc;color:#2c3d52;}
+  blockquote.warn{border-left-color:var(--amber);background:var(--amber-soft);}
+  blockquote.note > :first-child{margin-top:0;} blockquote.note > :last-child{margin-bottom:0;}
+  blockquote.note table{font-size:13px;}
+
+  @media (max-width:980px){
+    .shell{grid-template-columns:1fr;} nav.toc{position:static;max-height:none;}
+    main{padding:8px 18px 32px;}
+  }
+  @media print{
+    body{background:#fff;} header{background:#14346f !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    nav.toc,.copy{display:none;} .shell{display:block;padding:0;} main{border:none;box-shadow:none;padding:0;}
+    figure.code pre{background:#f4f6f9;border:1px solid var(--line);}
+    /* 纸面没有横向滚动：让超长单行（基串、单行报文样例）折行，否则会被裁掉 */
+    figure.code code{color:#1d2733;white-space:pre-wrap;word-break:break-all;}
+    figure.code::before{display:none;}
+    h2,h3{break-after:avoid;} table,figure.code,blockquote{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<header><div class="in">
+  <span class="tag">分销商接入文档</span>
+  <h1>XPIN eSIM 分销商 OpenAPI 接入说明</h1>
+  <p>本文档为单文件版本，不引用任何外部资源，可离线阅读与打印。</p>
+</div></header>
+
+<div class="shell">
+  <nav class="toc"><a class="l2" href="#目录">目录</a><a class="l2" href="#1-基础约定">1. 基础约定</a><a class="l2" href="#2-认证与签名">2. 认证与签名</a><a class="l3" href="#21-签名算法-xpin-kv1">2.1 签名算法 XPIN-KV1</a><a class="l3" href="#22-nonce">2.2 nonce</a><a class="l3" href="#23-认证检查顺序">2.3 认证检查顺序</a><a class="l3" href="#24-scope">2.4 scope</a><a class="l3" href="#25-签名客户端">2.5 签名客户端</a><a class="l3" href="#26-自检向量">2.6 自检向量</a><a class="l2" href="#3-错误码">3. 错误码</a><a class="l2" href="#4-接口详解">4. 接口详解</a><a class="l3" href="#41-商品列表-productslist">4.1 商品列表 <code>/products/list</code></a><a class="l3" href="#42-商品详情-productsdetail">4.2 商品详情 <code>/products/detail</code></a><a class="l3" href="#43-卡型能力-cardtype">4.3 卡型能力 <code>/cardType</code></a><a class="l3" href="#44-开卡下单-ordercreate">4.4 开卡下单 <code>/order/create</code></a><a class="l3" href="#45-订单查询-orderquery">4.5 订单查询 <code>/order/query</code></a><a class="l3" href="#46-订单列表-orderlist">4.6 订单列表 <code>/order/list</code></a><a class="l3" href="#47-续订资格判定-iccidrenew">4.7 续订资格判定 <code>/iccid/renew</code></a><a class="l3" href="#48-续订下单-orderrenew">4.8 续订下单 <code>/order/renew</code></a><a class="l3" href="#49-卡档案-iccidprofile">4.9 卡档案 <code>/iccid/profile</code></a><a class="l3" href="#410-用量查询-orderusage">4.10 用量查询 <code>/order/usage</code></a><a class="l2" href="#5-业务流程与状态机">5. 业务流程与状态机</a><a class="l3" href="#51-订单状态机">5.1 订单状态机</a><a class="l3" href="#52-开卡完整流程">5.2 开卡完整流程</a><a class="l3" href="#53-续订完整流程">5.3 续订完整流程</a><a class="l2" href="#6-回调通知">6. 回调通知</a><a class="l3" href="#61-事件类型">6.1 事件类型</a><a class="l3" href="#62-请求形状">6.2 请求形状</a><a class="l3" href="#63-验签">6.3 验签</a><a class="l3" href="#64-ack-与重投">6.4 ACK 与重投</a></nav>
+  <main><blockquote class="note"><p><strong>文档版本：beta</strong>（2026-09-05）</p>
+<p>面向下游分销商的接入文档，覆盖认证、目录、开卡、幂等、履约、ICCID、续订、回调八条链路。
+文中的响应样本取自接口的真实返回，其中 ICCID、IMSI、MSISDN、激活码已做脱敏。</p>
+<p>当文档与运行中的服务不一致时，<strong>以服务为准</strong>。</p></blockquote>
+<hr>
+<h2 id="目录">目录<a class="anchor" href="#目录">#</a></h2>
+<ol><li><a href="#1-基础约定">基础约定</a></li><li><a href="#2-认证与签名">认证与签名</a></li></ol>
+<ul><li><a href="#21-签名算法-xpin-kv1">2.1 签名算法 XPIN-KV1</a></li><li><a href="#25-签名客户端">2.5 签名客户端</a></li><li><a href="#26-自检向量">2.6 自检向量</a></li></ul>
+<ol><li><a href="#3-错误码">错误码</a></li><li><a href="#4-接口详解">接口详解</a></li></ol>
+<ul><li><a href="#41-商品列表-productslist">4.1 商品列表 <code>/products/list</code></a></li><li><a href="#42-商品详情-productsdetail">4.2 商品详情 <code>/products/detail</code></a></li><li><a href="#43-卡型能力-cardtype">4.3 卡型能力 <code>/cardType</code></a></li><li><a href="#44-开卡下单-ordercreate">4.4 开卡下单 <code>/order/create</code></a></li><li><a href="#45-订单查询-orderquery">4.5 订单查询 <code>/order/query</code></a></li><li><a href="#46-订单列表-orderlist">4.6 订单列表 <code>/order/list</code></a></li><li><a href="#47-续订资格判定-iccidrenew">4.7 续订资格判定 <code>/iccid/renew</code></a></li><li><a href="#48-续订下单-orderrenew">4.8 续订下单 <code>/order/renew</code></a></li><li><a href="#49-卡档案-iccidprofile">4.9 卡档案 <code>/iccid/profile</code></a></li><li><a href="#410-用量查询-orderusage">4.10 用量查询 <code>/order/usage</code></a></li></ul>
+<ol><li><a href="#5-业务流程与状态机">业务流程与状态机</a></li><li><a href="#6-回调通知">回调通知</a></li></ol>
+<hr>
+<h2 id="1-基础约定">1. 基础约定<a class="anchor" href="#1-基础约定">#</a></h2>
+<div class="tw"><table><thead><tr><th>项</th><th>值</th></tr></thead><tbody><tr><td>Base URL（沙盒环境）</td><td><code>https://tbetaopenapi.xpin.network</code></td></tr><tr><td>Base URL（生产环境）</td><td>请向平台方获取</td></tr><tr><td>协议</td><td>全部 <code>POST</code>，<code>Content-Type: application/json</code></td></tr><tr><td>字符集</td><td>UTF-8</td></tr><tr><td><strong>成功判定</strong></td><td><strong>看响应体的 <code>code</code> 字段，不看 HTTP 状态码</strong></td></tr><tr><td>凭证</td><td>平台发放的 <code>app_key</code> / <code>app_secret</code>（需要从平台方获取）</td></tr></tbody></table></div>
+<p><strong>所有接口都返回 <code>HTTP 200</code></strong>（少数传输层错误除外），响应体统一为：</p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{ "data": {...}, "code": 200, "msg": "ok", "t": 1788431707137 }</code></pre></figure>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>data</code></td><td>object</td><td>业务数据。失败时为 <code>{}</code></td></tr><tr><td><code>code</code></td><td>number</td><td><strong>业务码</strong>。<code>200</code> 才是成功</td></tr><tr><td><code>msg</code></td><td>string</td><td>成功为 <code>ok</code>；失败为错误码或字段级提示</td></tr><tr><td><code>t</code></td><td>number</td><td>服务端毫秒时间戳</td></tr></tbody></table></div>
+<blockquote class="note warn"><p>⚠️ <strong>断言一定要写 <code>body.code === 200</code></strong>。写 <code>res.status === 200</code> 会把所有失败都当成功。</p></blockquote>
+<p>HTTP 80 端口的请求会 <code>301</code> 跳转到 HTTPS，且 <strong>301 不保留 POST body</strong>——直接用 <code>https://</code>。</p>
+<hr>
+<h2 id="2-认证与签名">2. 认证与签名<a class="anchor" href="#2-认证与签名">#</a></h2>
+<p>每个请求带四个头：</p>
+<div class="tw"><table><thead><tr><th>请求头</th><th>说明</th></tr></thead><tbody><tr><td><code>x-api-key</code></td><td>你的 <code>app_key</code></td></tr><tr><td><code>x-timestamp</code></td><td><strong>毫秒</strong>时间戳（13 位），与服务器时钟偏差需 ≤ <strong>5 分钟</strong>（双向）</td></tr><tr><td><code>x-nonce</code></td><td>随机串，匹配 <code>^[A-Za-z0-9._:-]{8,128}$</code>，<strong>同一凭证同一 nonce 只能用一次</strong></td></tr><tr><td><code>x-sign</code></td><td>HMAC-SHA256 十六进制<strong>小写</strong>，见 2.1</td></tr></tbody></table></div>
+<h3 id="21-签名算法-xpin-kv1">2.1 签名算法 XPIN-KV1<a class="anchor" href="#21-签名算法-xpin-kv1">#</a></h3>
+<p>签的是<strong>解析后的数据</strong>，不是报文字节 —— 所以你的 body 用任何 JSON 库、任何键序、任何缩进
+发出都行，也<strong>不要求</strong>你能控制 HTTP 客户端实际发出的字节。被签的对象固定七个字段：</p>
+<figure class="code" data-lang="jsonc"><button class="copy" type="button">复制</button><pre><code>{
+  "sigAlg":    "xpin.esim.openapi.kv1",   // 字面量
+  "apiKey":    "&lt;x-api-key 的值&gt;",
+  "method":    "POST",
+  "path":      "/openapi/v1/order/create", // 归一后：重复斜杠折成一个、去尾斜杠、不解码 %XX
+  "timestamp": "&lt;x-timestamp 的值&gt;",       // 字符串
+  "nonce":     "&lt;x-nonce 的值&gt;",
+  "body":      { ... }                     // 请求体本身
+}</code></pre></figure>
+<p>把它按下面四条规则拼成基串，再 <code>hex(HMAC_SHA256(app_secret, base))</code>。</p>
+<p><strong>R1 拍平</strong> —— 递归展开成「路径 → 标量」的列表：</p>
+<ul><li>嵌套对象：路径段用 <code>.</code> 连接。<code>{"data":{"orderNo":"X"}}</code> → 路径 <code>data.orderNo</code></li><li>数组：下标就是一段。<code>{"tags":["a","b"]}</code> → <code>tags.0</code>、<code>tags.1</code></li><li><strong>空对象</strong>落一条 <code>路径 → o:</code>，<strong>空数组</strong>落一条 <code>路径 → a:</code>。不留痕的话 <code>{"a":{}}</code> 与 <code>{}</code> 会拼出同一个基串</li><li>键名必须匹配 <code>^[A-Za-z][A-Za-z0-9_]*$</code>。不匹配就<strong>拒绝</strong>，不要尝试转义 —— 这条正是拍平 能保持单射的原因（否则键名里的 <code>.</code> 会与路径分隔符混淆）</li></ul>
+<p><strong>R2 值编码</strong>（带类型标记）：</p>
+<div class="tw"><table><thead><tr><th>值</th><th>编码</th></tr></thead><tbody><tr><td>字符串</td><td><code>s:</code> + 原文（UTF-8，<strong>不转义任何字符</strong>）</td></tr><tr><td>整数</td><td><code>i:</code> + 十进制，无前导零，<code>-0</code> 写作 <code>0</code></td></tr><tr><td>布尔</td><td><code>b:true</code> / <code>b:false</code></td></tr><tr><td><code>null</code></td><td><code>n:</code></td></tr></tbody></table></div>
+<p>类型标记不是装饰：没有它，字符串 <code>"1"</code> 与整数 <code>1</code> 会编码成同一个东西。</p>
+<p><strong>以下值一律拒绝，不要尝试编码</strong>：小数、超出 ±(2⁵³−1) 的整数、<code>NaN</code>、<code>Infinity</code>。
+它们的字符串化在各语言里不一致（JS 的 <code>String(1.0)</code> 是 <code>"1"</code>，Java 的 <code>Double.toString(1.0)</code>
+是 <code>"1.0"</code>），给它们编一个表示等于把跨语言分歧固化进契约。<strong>金额请用最小单位整数或字符串。</strong></p>
+<p><strong>R3 每一项的字面量</strong>（长度前缀）：</p>
+<figure class="code"><button class="copy" type="button">复制</button><pre><code>路径 + "=" + &lt;编码值的 UTF-8 字节数&gt; + ":" + 编码值</code></pre></figure>
+<p>⚠️ 长度算的是<strong>编码值整体</strong>的字节数，<strong>包含 <code>s:</code> / <code>i:</code> 这两个字符的类型标记</strong>。
+<code>"ak_demo"</code> 编码成 <code>s:ak_demo</code>，长度是 <strong>9</strong> 不是 7 —— 这是最常见的一处实现偏差。</p>
+<p>长度前缀是<strong>承重的</strong>：没有它，<code>{"a":"1&amp;b=s:2"}</code> 与 <code>{"a":"1","b":"2"}</code> 会拼出同一个基串 ——
+而 <code>clientOrderNo</code> 这类字段的内容由你自由填写。</p>
+<p><strong>R4 排序与连接</strong> —— 按<strong>完整路径的 UTF-8 字节序</strong>升序排序，用 <code>&amp;</code> 连接。键名限 ASCII
+之后，字节序 = 码元序 = 字典序，三者不会分叉。</p>
+<p><strong>一个完整例子</strong>，把四条规则串起来：</p>
+<figure class="code" data-lang="jsonc"><button class="copy" type="button">复制</button><pre><code>// 请求：POST /openapi/v1/order/create
+// x-api-key: ak_demo   x-timestamp: 1788400000000   x-nonce: n_demo0001
+// body:
+{ "productCode": "XP_DEMO", "idempotencyKey": "idem_0001", "qty": 2 }</code></pre></figure>
+<p>被签对象拍平、编码、加长度前缀、按路径排序后：</p>
+<figure class="code"><button class="copy" type="button">复制</button><pre><code>apiKey=9:s:ak_demo&amp;body.idempotencyKey=11:s:idem_0001&amp;body.productCode=9:s:XP_DEMO&amp;body.qty=3:i:2&amp;method=6:s:POST&amp;nonce=12:s:n_demo0001&amp;path=26:s:/openapi/v1/order/create&amp;sigAlg=23:s:xpin.esim.openapi.kv1&amp;timestamp=15:s:1788400000000</code></pre></figure>
+<p>再对这串做 <code>HMAC_SHA256(app_secret, base)</code> 取十六进制小写，就是 <code>x-sign</code>。
+用 <code>app_secret = demo_secret</code> 时结果是：</p>
+<figure class="code"><button class="copy" type="button">复制</button><pre><code>32f3534d7daf9a53458ba2f403924b64dcbbd831dc7eb90f529f6a963d01242c</code></pre></figure>
+<p>更多自检向量见 <a href="#26-自检向量">2.6</a>。</p>
+<h3 id="22-nonce">2.2 nonce<a class="anchor" href="#22-nonce">#</a></h3>
+<p>⚠️ <strong><code>x-nonce</code> 请用真随机值</strong>，不要用时间戳、也不要用 body 的摘要。
+基串各段之间没有标签，而 nonce 的字符集是这两者的超集 —— 拿它们当 nonce 会让"基串
+拼错顺序"这类实现缺陷在联调期<strong>完全隐身</strong>，等你哪天改成随机 nonce 才集体失败，那时
+所有人都会去怀疑刚改的 nonce。</p>
+<h3 id="23-认证检查顺序">2.3 认证检查顺序<a class="anchor" href="#23-认证检查顺序">#</a></h3>
+<p>多个条件同时不满足时，你只会看到<strong>最先命中</strong>的那一个：</p>
+<figure class="code"><button class="copy" type="button">复制</button><pre><code>1. 四个签名头齐全 ......... 401 AUTH_HEADERS_MISSING
+2. nonce 格式 ............. 401 NONCE_INVALID
+3. 时间戳窗口 ............. 401 TIMESTAMP_INVALID
+4. app_key 存在且启用 ..... 401 APP_KEY_INVALID
+5. 凭证未过期 ............. 401 CREDENTIAL_EXPIRED
+6. 源 IP 在白名单内 ....... 403 IP_NOT_ALLOWED
+7. QPS 未超限 ............. 429 QPS_LIMITED
+8. 载荷可规范化 ........... 400 CANONICAL_*
+9. 签名正确 ............... 401 SIGNATURE_INVALID
+10. scope 足够 ............ 403 SCOPE_FORBIDDEN
+11. nonce 未被用过 ........ 401 NONCE_REPLAYED</code></pre></figure>
+<p>第 8 步<strong>刻意与 <code>SIGNATURE_INVALID</code> 分开</strong>：它说的是"这份载荷里
+有一个签不了的值"（小数、超范围整数、不合法的键名…），不是"你的密钥不对"。看到
+<code>CANONICAL_*</code> 请查载荷，不要查密钥。</p>
+<p>两条由此推出、对排障很有用的性质：</p>
+<ul><li><strong>nonce 只在请求"本可成功"时才被消耗</strong>（第 10 步在最后）。所以错签名重试永远回 <code>SIGNATURE_INVALID</code>、越权重试永远回 <code>SCOPE_FORBIDDEN</code>，<strong>不会被自己的重试污染成 <code>NONCE_REPLAYED</code></strong>。</li><li><strong>参数校验在鉴权之前</strong>。缺必填字段时你拿到的是 <code>400 xxx required</code>，不是 <code>401</code>。</li></ul>
+<h3 id="24-scope">2.4 scope<a class="anchor" href="#24-scope">#</a></h3>
+<div class="tw"><table><thead><tr><th>scope</th><th>覆盖接口</th></tr></thead><tbody><tr><td><code>esim.read</code></td><td><code>products/list</code> <code>products/detail</code> <code>cardType</code> <code>order/query</code> <code>order/list</code> <code>iccid/profile</code> <code>order/usage</code> <code>iccid/renew</code></td></tr><tr><td><code>esim.write</code></td><td><code>order/create</code> <code>order/renew</code></td></tr></tbody></table></div>
+<p>缺 <code>esim.write</code> 调写接口 → <code>403 SCOPE_FORBIDDEN</code>（在签名校验<strong>之后</strong>判定，所以它确实是权限问题，不是签名问题）。</p>
+<h3 id="25-签名客户端">2.5 签名客户端<a class="anchor" href="#25-签名客户端">#</a></h3>
+<p>两份实现都是完整的，直接抄走即可，除 HTTP 库外不依赖任何第三方包。规则见 2.1。</p>
+<p><strong>Python</strong></p>
+<figure class="code" data-lang="python"><button class="copy" type="button">复制</button><pre><code>import hashlib, hmac, re, secrets, time, requests
+
+KEY_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
+
+def _encode(v, path):
+    if v is None:                        return 'n:'
+    if isinstance(v, bool):              return 'b:true' if v else 'b:false'   # 必须先于 int 判断
+    if isinstance(v, str):               return 's:' + v
+    if isinstance(v, int):
+        if abs(v) &gt; 2**53 - 1:           raise ValueError(f'{path}: 只能签安全整数')
+        return 'i:' + str(v)
+    raise ValueError(f'{path}: 不支持的类型 {type(v).__name__}')
+
+def _flatten(v, path, out):
+    if isinstance(v, list):
+        if not v:                        out.append((path, 'a:')); return
+        for i, item in enumerate(v):     _flatten(item, f'{path}.{i}', out)
+    elif isinstance(v, dict):
+        if not v:                        out.append((path, 'o:')); return
+        for k, item in v.items():
+            if not KEY_RE.match(k):      raise ValueError(f'键名不合法: {k}')
+            _flatten(item, f'{path}.{k}' if path else k, out)
+    else:
+        out.append((path, _encode(v, path)))
+
+def canonicalize(root):
+    leaves = []
+    _flatten(root, '', leaves)
+    leaves.sort(key=lambda kv: kv[0].encode('utf-8'))
+    return '&amp;'.join(f'{p}={len(e.encode("utf-8"))}:{e}' for p, e in leaves)
+
+def _norm_path(p):
+    c = re.sub(r'/{2,}', '/', str(p))
+    return c[:-1] if len(c) &gt; 1 and c.endswith('/') else c
+
+def sign_inbound(secret, api_key, method, path, timestamp, nonce, body):
+    base = canonicalize({
+        'sigAlg': 'xpin.esim.openapi.kv1', 'apiKey': api_key,
+        'method': str(method).upper(), 'path': _norm_path(path),
+        'timestamp': str(timestamp), 'nonce': str(nonce), 'body': body or {},
+    })
+    return hmac.new(secret.encode(), base.encode('utf-8'), hashlib.sha256).hexdigest()
+
+APP_KEY, APP_SECRET = 'ak_xxx', 'sk_xxx'
+BASE = 'https://tbetaopenapi.xpin.network'
+
+def call(path, body):
+    ts, nonce = str(int(time.time() * 1000)), 'n_' + secrets.token_hex(8)
+    sign = sign_inbound(APP_SECRET, APP_KEY, 'POST', path, ts, nonce, body)
+    # 可以直接用 json=body：签名不要求你控制发出去的字节，
+    # requests 怎么序列化都不影响验签。
+    return requests.post(BASE + path, json=body, headers={
+        'x-api-key': APP_KEY, 'x-timestamp': ts, 'x-nonce': nonce, 'x-sign': sign,
+    })</code></pre></figure>
+<p><strong>Node.js</strong>（34 行手写，无依赖）</p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>const crypto = require('crypto')
+const KEY = /^[A-Za-z][A-Za-z0-9_]*$/
+
+function encode(v, path) {
+  if (v === null) return 'n:'
+  if (typeof v === 'string') return `s:${v}`
+  if (typeof v === 'boolean') return `b:${v}`
+  if (typeof v === 'number') {
+    if (!Number.isSafeInteger(v)) throw new Error(`${path}: 只能签安全整数`)
+    return `i:${Object.is(v, -0) ? '0' : String(v)}`
+  }
+  throw new Error(`${path}: 不支持的类型 ${typeof v}`)
+}
+
+function flatten(v, path, out) {
+  if (Array.isArray(v)) {
+    if (!v.length) return out.push([path, 'a:'])
+    return v.forEach((item, i) =&gt; flatten(item, `${path}.${i}`, out))
+  }
+  if (v !== null &amp;&amp; typeof v === 'object') {
+    const keys = Object.keys(v)
+    if (!keys.length) return out.push([path, 'o:'])
+    return keys.forEach((k) =&gt; {
+      if (!KEY.test(k)) throw new Error(`键名不合法: ${k}`)
+      flatten(v[k], path ? `${path}.${k}` : k, out)
+    })
+  }
+  out.push([path, encode(v, path)])
+}
+
+function canonicalize(root) {
+  const leaves = []
+  flatten(root, '', leaves)
+  leaves.sort((a, b) =&gt; Buffer.compare(Buffer.from(a[0]), Buffer.from(b[0])))
+  return leaves.map(([p, e]) =&gt; `${p}=${Buffer.byteLength(e)}:${e}`).join('&amp;')
+}
+
+const normalizePath = (p) =&gt; {
+  const c = String(p).replace(/\/{2,}/g, '/')
+  return c.length &gt; 1 &amp;&amp; c.endsWith('/') ? c.slice(0, -1) : c
+}
+
+function signInbound(secret, { apiKey, method, path, timestamp, nonce, body }) {
+  const base = canonicalize({
+    sigAlg: 'xpin.esim.openapi.kv1',
+    apiKey,
+    method: method.toUpperCase(),
+    path: normalizePath(path),
+    timestamp: String(timestamp),
+    nonce: String(nonce),
+    body: body || {}
+  })
+  return crypto.createHmac('sha256', secret).update(base, 'utf8').digest('hex')
+}</code></pre></figure>
+<p>调用时 <code>fetch(url, { body: JSON.stringify(body) })</code> 即可 —— <strong>不需要</strong>保证签名用的字符串
+与发送用的字符串逐字节相同。</p>
+<p>其它语言：Go / Java / PHP / .NET 都能在几十行内写完（只用到排序、UTF-8 字节长度、
+HMAC-SHA256 三样）。<strong>写完请先跑 <a href="#26-自检向量">2.6</a> 那张自检向量表</strong>，全过再联调。⚠️ 两个语言特有的坑：
+PHP 要注意 <code>json_decode</code> 默认给关联数组、布尔要先于整数判断（PHP/Python 的 <code>bool</code> 是
+<code>int</code> 的子类型，不先判会把 <code>true</code> 编码成 <code>i:1</code>）；Go 注意 <code>map</code> 遍历是随机序，必须显式排序。</p>
+<h3 id="26-自检向量">2.6 自检向量<a class="anchor" href="#26-自检向量">#</a></h3>
+<p>以下向量用 <code>app_secret = demo_secret</code>、<code>x-api-key = ak_demo</code>、
+<code>x-timestamp = 1788400000000</code>、<code>x-nonce = n_demo0001</code>、<code>method = POST</code>。
+<strong>先让这张表全过，再去联调</strong>——签名对不上时，能省掉绝大部分来回。</p>
+<div class="tw"><table><thead><tr><th>#</th><th>用意</th><th><code>path</code></th><th><code>body</code></th><th>期望 <code>x-sign</code></th></tr></thead><tbody><tr><td>1</td><td>最小：空 body</td><td><code>/openapi/v1/products/list</code></td><td><code>{}</code></td><td><code>3eb1cdb9b139d2de36df73bcae880b72c4b6e408d6c22b8ce9727735b9ee6c75</code></td></tr><tr><td>2</td><td>标量三型 + null</td><td><code>/openapi/v1/order/list</code></td><td><code>{"a":"x","b":1,"c":true,"d":null}</code></td><td><code>78240ca8b1a938974f2ce3ebf9b95b0ea31103c045fa8940a0989b9ad6d18343</code></td></tr><tr><td>3</td><td>字符串 1 与整数 1 不同签</td><td><code>/openapi/v1/products/list</code></td><td><code>{"v":"1"}</code></td><td><code>31f9ec6d8e2098fbdf3d4c749d8c9bc5296479a0db3907196ba5e5d48e6bab89</code></td></tr><tr><td>4</td><td>（对照）整数 1</td><td><code>/openapi/v1/products/list</code></td><td><code>{"v":1}</code></td><td><code>15a7330e47ebc988b3772f69ca452800125f7b56592372722d5b87d5425a9688</code></td></tr><tr><td>5</td><td>嵌套与数组</td><td><code>/openapi/v1/order/create</code></td><td><code>{"data":{"orderNo":"X"},"tags":["a","b"]}</code></td><td><code>a0f6a4db62b1e51330fd67cf61c9b3e3cb7d1fce1c10b022c0fd6be35d95e84d</code></td></tr><tr><td>6</td><td>空对象与空数组要留痕</td><td><code>/openapi/v1/products/list</code></td><td><code>{"o":{},"a":[]}</code></td><td><code>2628471b9872c77f1f84391657cf02e8770e06a686024ac20e94ef6cbb40b629</code></td></tr><tr><td>7</td><td>（对照）两者都缺省</td><td><code>/openapi/v1/products/list</code></td><td><code>{}</code></td><td><code>3eb1cdb9b139d2de36df73bcae880b72c4b6e408d6c22b8ce9727735b9ee6c75</code></td></tr><tr><td>8</td><td>值里含 &amp; = : 不与拆字段碰撞</td><td><code>/openapi/v1/order/query</code></td><td><code>{"clientOrderNo":"1&amp;b=s:2"}</code></td><td><code>38b88ad966366fe0b0ab78b9040d188a22ad6dc5f9c62210109b7a488d449053</code></td></tr><tr><td>9</td><td>非 ASCII 原文参与，不转义</td><td><code>/openapi/v1/products/detail</code></td><td><code>{"productCode":"套餐-中文"}</code></td><td><code>a7d86f5a2ea0a0e83d36f6112766360afabb08df407de15543600ef8cf2542d5</code></td></tr><tr><td>10</td><td>路径归一：重复斜杠与尾斜杠</td><td><code>/openapi/v1//products//detail/</code></td><td><code>{"productCode":"XP_DEMO"}</code></td><td><code>63655a08ff52c78dd0942219cdfab9df4072fcc25d9784f1fcef6e488603f13e</code></td></tr><tr><td>11</td><td>（对照）已归一的路径</td><td><code>/openapi/v1/products/detail</code></td><td><code>{"productCode":"XP_DEMO"}</code></td><td><code>63655a08ff52c78dd0942219cdfab9df4072fcc25d9784f1fcef6e488603f13e</code></td></tr></tbody></table></div>
+<blockquote class="note"><p>第 3 与第 4 条、第 6 与第 7 条、第 10 与第 11 条各是一组<strong>对照</strong>：两条签出不同的值才算对。
+第 3/4 组验的是类型标记（少了它字符串 <code>"1"</code> 与整数 <code>1</code> 会同签），第 6/7 组验的是空容器
+留痕，第 10/11 组验的是路径归一（这一组反过来，两条必须<strong>相同</strong>）。</p></blockquote>
+<hr>
+<h2 id="3-错误码">3. 错误码<a class="anchor" href="#3-错误码">#</a></h2>
+<div class="tw"><table><thead><tr><th><code>code</code></th><th><code>msg</code></th><th>含义</th><th>你该做什么</th></tr></thead><tbody><tr><td><code>200</code></td><td><code>ok</code></td><td>成功</td><td>—</td></tr><tr><td><code>400</code></td><td><code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code> / <code>&lt;字段&gt; Range error</code> / <code>&lt;字段&gt; Type error, ...</code></td><td>参数校验失败（<strong>自由文本，不是稳定错误码</strong>）</td><td>修参数。判定用 <code>code===400</code> + 字段名子串，不要精确匹配 <code>msg</code></td></tr><tr><td><code>400</code></td><td><code>ORDER_RANGE_SELECTOR_REQUIRED</code> / <code>ORDER_RANGE_SELECTOR_CONFLICT</code> / <code>ORDER_PAGE_TOKEN_INVALID</code></td><td>列表选择器/游标非法</td><td>见 §4.6</td></tr><tr><td><code>400</code></td><td><code>REQUEST_BODY_NOT_JSON</code> / <code>REQUEST_BODY_MUST_BE_OBJECT</code></td><td>请求体不是 JSON，或是 JSON 但不是对象</td><td>检查序列化</td></tr><tr><td><code>401</code></td><td><code>AUTH_HEADERS_MISSING</code></td><td>四个签名头缺任意一个</td><td>补头</td></tr><tr><td><code>401</code></td><td><code>NONCE_INVALID</code></td><td>nonce 格式不符</td><td>用 <code>^[A-Za-z0-9._:-]{8,128}$</code></td></tr><tr><td><code>401</code></td><td><code>TIMESTAMP_INVALID</code></td><td>时间戳非数字或偏差 &gt; 5 分钟</td><td><strong>对时</strong>；确认用的是毫秒</td></tr><tr><td><code>401</code></td><td><code>APP_KEY_INVALID</code></td><td>app_key 不存在/已停用/环境不匹配</td><td>找平台核对凭证</td></tr><tr><td><code>401</code></td><td><code>CREDENTIAL_EXPIRED</code></td><td>凭证已过期</td><td>找平台轮换</td></tr><tr><td><code>401</code></td><td><code>SIGNATURE_INVALID</code></td><td>签名不匹配</td><td>先跑 <a href="#26-自检向量">2.6</a> 的自检向量，全过再查联调</td></tr><tr><td><code>400</code></td><td><code>CANONICAL_*</code></td><td>载荷里有签不了的值（小数、超范围整数、不合法键名、嵌套过深）</td><td><strong>查载荷，不要查密钥</strong>。错误信息会点出是哪个字段</td></tr><tr><td><code>401</code></td><td><code>NONCE_REPLAYED</code></td><td>nonce 已被用过</td><td>每次请求换新 nonce</td></tr><tr><td><code>403</code></td><td><code>SCOPE_FORBIDDEN</code></td><td>凭证 scope 不足</td><td>找平台加 scope</td></tr><tr><td><code>403</code></td><td><code>IP_NOT_ALLOWED</code></td><td>源 IP 不在白名单</td><td>找平台加 IP</td></tr><tr><td><code>403</code></td><td><code>SOURCE_PARTNER_NOT_ALLOWED</code></td><td><code>sourcePartnerCode</code> 不是你名下的子分销商</td><td>检查该字段</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_FOUND</code></td><td>商品不存在或不属于你</td><td>从 <code>products/list</code> 动态取码</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_AVAILABLE</code></td><td>下单时商品不可售/不存在</td><td>同上</td></tr><tr><td><code>404</code></td><td><code>ORDER_NOT_FOUND</code></td><td>订单不存在或不属于你</td><td>检查 <code>clientOrderNo</code></td></tr><tr><td><code>404</code></td><td><code>CARD_NOT_FOUND</code></td><td>卡不存在或不属于你</td><td>检查 <code>iccid</code></td></tr><tr><td><code>404</code></td><td>—</td><td>请求路径不存在</td><td>检查路径拼写与前缀 <code>/openapi/v1</code>。这一类的 <code>msg</code> 不是稳定错误码，不要对它做断言</td></tr><tr><td><code>409</code></td><td><code>IDEMPOTENCY_KEY_REUSED</code></td><td>同 <code>idempotencyKey</code> 但请求内容不同</td><td>换新的幂等键</td></tr><tr><td><code>409</code></td><td><code>CLIENT_ORDER_NO_REUSED</code></td><td><code>clientOrderNo</code> 已被别的订单占用</td><td>换新的业务单号</td></tr><tr><td><code>409</code></td><td><code>RENEW_NOT_ALLOWED</code></td><td>这张卡此刻不可续订</td><td>先调 <code>iccid/renew</code> 看 <code>reasons</code></td></tr><tr><td><code>413</code></td><td><code>REQUEST_ENTITY_TOO_LARGE</code></td><td>请求体超过 256KB</td><td>拆小</td></tr><tr><td><code>415</code></td><td><code>CONTENT_TYPE_MUST_BE_JSON</code></td><td><code>Content-Type</code> 不是 <code>application/json</code></td><td>改头</td></tr><tr><td><code>429</code></td><td><code>QPS_LIMITED</code></td><td>超过凭证每秒请求上限</td><td>退避重试</td></tr><tr><td><code>503</code></td><td><code>OPENAPI_AUTH_UNAVAILABLE</code> / <code>PLATFORM_NOT_ENABLED</code></td><td>服务端依赖不可用</td><td>退避重试并联系平台</td></tr></tbody></table></div>
+<p><strong>跨租户隔离</strong>：查不到与"不属于你"返回<strong>同一个</strong> <code>404</code>，平台不会告诉你"这个单存在但不是你的"。
+所以 <code>404</code> 不能用来探测他人数据是否存在。</p>
+<hr>
+<h2 id="4-接口详解">4. 接口详解<a class="anchor" href="#4-接口详解">#</a></h2>
+<blockquote class="note"><p>全部路径前缀 <code>/openapi/v1</code>。下文的响应样本均为接口的真实返回结构。</p></blockquote>
+<h3 id="41-商品列表-productslist">4.1 商品列表 <code>/products/list</code><a class="anchor" href="#41-商品列表-productslist">#</a></h3>
+<p>拉取<strong>发布给你</strong>的在售商品。这是获取 <code>productCode</code> 的<strong>唯一正确来源</strong>。</p>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th><th>说明</th></tr></thead><tbody><tr><td><code>pageNo</code></td><td>number</td><td>否</td><td>下界 <code>1</code>，默认 <code>1</code></td><td>页码。深翻页有上界保护，越界返回 <code>400 pageNo Range error</code>；正常翻页碰不到</td></tr><tr><td><code>pageSize</code></td><td>number</td><td>否</td><td><code>[1, 100]</code>，默认 <code>20</code></td><td>每页条数</td></tr></tbody></table></div>
+<p><strong>响应 <code>data</code></strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>list</code></td><td>array</td><td>商品数组，见下</td></tr><tr><td><code>hasMore</code></td><td>boolean</td><td>是否还有下一页（翻页终止条件）</td></tr><tr><td><code>pageNo</code> / <code>pageSize</code></td><td>number</td><td>回显</td></tr><tr><td><code>language</code></td><td>string</td><td>商品文案的语言，当前恒为 <code>en</code></td></tr></tbody></table></div>
+<p><strong>商品对象</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td>对外商品码，下单用它</td></tr><tr><td><code>productName</code></td><td>string</td><td>商品名</td></tr><tr><td><code>tagName</code></td><td>string</td><td>分组标签，如 <code>Europe</code></td></tr><tr><td><code>volume</code></td><td>string</td><td>流量额度（字符串数值），单位 MB；不限量为 <code>"0.000000"</code></td></tr><tr><td><code>dataLimited</code></td><td>string</td><td><code>Y</code> 限量 / <code>N</code> 不限量</td></tr><tr><td><code>validity</code></td><td>number</td><td>套餐天数</td></tr><tr><td><code>expireDay</code></td><td>number</td><td>卡有效期天数（从开卡起算）</td></tr><tr><td><code>cardType</code></td><td>string</td><td>卡型，如 <code>ep1</code> <code>ep3</code> <code>eo1</code> <code>C4</code></td></tr><tr><td><code>productType</code></td><td>string</td><td>形态：<code>DATA_PACKAGE</code> 流量包 / <code>DAYPASS</code> 日包</td></tr><tr><td><code>mccList</code></td><td>string[]</td><td>覆盖国家的 MCC 列表</td></tr><tr><td><code>attributes</code></td><td>object|null</td><td>扩展属性</td></tr><tr><td><code>retailPrice</code></td><td>string</td><td>零售价（字符串数值）</td></tr><tr><td><code>currency</code></td><td>string</td><td>币种，如 <code>USD</code></td></tr><tr><td><code>configVersion</code></td><td>number</td><td>商品配置版本，变更时递增</td></tr></tbody></table></div>
+<p><strong>示例响应</strong>（截取一条）</p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
+  "data": {
+    "list": [
+      {
+        "productCode": "XP205032025ED92397E2AE461C",
+        "productName": "Europe Unlimited 3 Days",
+        "tagName": "Europe",
+        "volume": "0.000000",
+        "dataLimited": "N",
+        "validity": 3,
+        "expireDay": 90,
+        "cardType": "ep1",
+        "productType": "DAYPASS",
+        "mccList": ["276", "232", "206", "218", "248"],
+        "attributes": null,
+        "retailPrice": "0.000000",
+        "currency": "USD",
+        "configVersion": 1
+      }
+    ],
+    "hasMore": false,
+    "pageNo": 1,
+    "pageSize": 20,
+    "language": "en"
+  },
+  "code": 200,
+  "msg": "ok",
+  "t": 1788431706435
+}</code></pre></figure>
+<p><strong>Node.js</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>async function listAllProducts(client) {
+  const all = []
+  for (let pageNo = 1; ; pageNo++) {
+    const page = await client.invoke('/openapi/v1/products/list', { pageNo, pageSize: 100 })
+    all.push(...page.list)
+    if (!page.hasMore) break
+  }
+  return all
+}</code></pre></figure>
+<p><strong>Java</strong></p>
+<figure class="code" data-lang="java"><button class="copy" type="button">复制</button><pre><code>public List&lt;JsonNode&gt; listAllProducts(XpinEsimClient client) throws Exception {
+    List&lt;JsonNode&gt; all = new ArrayList&lt;&gt;();
+    for (int pageNo = 1; ; pageNo++) {
+        JsonNode page = client.invoke("/openapi/v1/products/list",
+                Map.of("pageNo", pageNo, "pageSize", 100));
+        page.get("list").forEach(all::add);
+        if (!page.get("hasMore").asBoolean()) break;
+    }
+    return all;
+}</code></pre></figure>
+<blockquote class="note warn"><p>⚠️ <strong>不要硬编码 <code>productCode</code></strong>，也不要拿电信运营商的 SKU 当 <code>productCode</code>（电信运营商的 SKU 一律返回 <code>404 PRODUCT_NOT_FOUND</code>）。
+平台可能调整商品目录，对外码会随之变化。</p></blockquote>
+<h4 id="沙盒环境联调用的套餐码">沙盒环境联调用的套餐码<a class="anchor" href="#沙盒环境联调用的套餐码">#</a></h4>
+<p>平台方为你配置好账号后，请<strong>向平台方索取本账号在沙盒环境可用于开卡 / 续充的套餐码</strong>；
+生产环境可以直接调用 <code>products/list</code> 拉取——它返回的就是发布给你的全部在售商品。</p>
+<p><strong>联调选型建议</strong>（与具体码无关，按 <code>products/list</code> 返回的属性挑）：</p>
+<div class="tw"><table><thead><tr><th>你要验证的</th><th>怎么挑</th></tr></thead><tbody><tr><td>开卡</td><td>任选一个即可</td></tr><tr><td>续充正向流程</td><td>选 <code>productType = DATA_PACKAGE</code> 的。日包（<code>DAYPASS</code>）在套餐生效期间整张卡都不可续订，会稳定返回 <code>DAYPASS_IN_FORCE</code>，跑不了正向流程</td></tr><tr><td>续充的"不可续"分支</td><td>反过来选 <code>DAYPASS</code>，正好用来验证你对 <code>DAYPASS_IN_FORCE</code> 的处理</td></tr><tr><td>跨形态续充规则</td><td>给 <code>ep1</code> 流量包卡续一个 <code>ep1</code> 日包，会得到 <code>DAYPASS_REQUIRES_EMPTY_CARD</code>；而 <code>C4</code> 卡型在同卡型内跨形态续充是放行的</td></tr></tbody></table></div>
+<blockquote class="note warn"><p>⚠️ <strong>沙盒环境与生产环境的 <code>productCode</code> 完全不同</strong>，切换环境时必须重新拉取目录，不能沿用联调期的码。</p></blockquote>
+<hr>
+<h3 id="42-商品详情-productsdetail">4.2 商品详情 <code>/products/detail</code><a class="anchor" href="#42-商品详情-productsdetail">#</a></h3>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[1, 160]</code></td></tr></tbody></table></div>
+<p><strong>响应 <code>data</code></strong>：字段与 §4.1 的商品对象相同，另加 <code>language</code>（商品文案语言，当前恒为 <code>en</code>）。</p>
+<p><strong>示例响应</strong></p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
+  "data": {
+    "language": "en",
+    "productCode": "XP205032025ED92397E2AE461C",
+    "productName": "Europe Unlimited 3 Days",
+    "tagName": "Europe",
+    "volume": "0.000000",
+    "dataLimited": "N",
+    "validity": 3,
+    "expireDay": 90,
+    "cardType": "ep1",
+    "productType": "DAYPASS",
+    "mccList": ["276", "232", "206"],
+    "attributes": null,
+    "retailPrice": "0.000000",
+    "currency": "USD",
+    "configVersion": 1
+  },
+  "code": 200, "msg": "ok", "t": 1788431706435
+}</code></pre></figure>
+<p><strong>负例</strong>：不存在的码 → <code>404 PRODUCT_NOT_FOUND</code>。</p>
+<p><strong>Node.js / Java</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>const detail = await client.invoke('/openapi/v1/products/detail', { productCode })</code></pre></figure>
+<figure class="code" data-lang="java"><button class="copy" type="button">复制</button><pre><code>JsonNode detail = client.invoke("/openapi/v1/products/detail",
+        Map.of("productCode", productCode));</code></pre></figure>
+<hr>
+<h3 id="43-卡型能力-cardtype">4.3 卡型能力 <code>/cardType</code><a class="anchor" href="#43-卡型能力-cardtype">#</a></h3>
+<p>查这个商品对应卡型的<strong>静态能力</strong>。</p>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td></tr></tbody></table></div>
+<p><strong>响应 <code>data</code></strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td>回显</td></tr><tr><td><code>cardType</code></td><td>string</td><td>卡型</td></tr><tr><td><code>productType</code></td><td>string</td><td>形态</td></tr><tr><td><code>capability.renewable</code></td><td>boolean</td><td><strong>这个卡型</strong>原理上是否支持续订</td></tr><tr><td><code>capability.supportUsageQuery</code></td><td>boolean</td><td>是否支持用量查询</td></tr><tr><td><code>capability.maxRenewCount</code></td><td>number|null</td><td>卡上并发套餐数上限；<code>null</code> = 不限</td></tr><tr><td><code>capability.timeZone</code></td><td>string</td><td>卡型的计费时区，如 <code>UTC+0</code> / <code>UTC+8</code></td></tr><tr><td><code>capability.observedAt</code></td><td>string</td><td>该能力的同步时刻（ISO-8601）</td></tr></tbody></table></div>
+<p><strong>示例响应</strong></p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
+  "data": {
+    "productCode": "XP205032025ED92397E2AE461C",
+    "cardType": "ep1",
+    "productType": "DAYPASS",
+    "capability": {
+      "renewable": true,
+      "supportUsageQuery": false,
+      "maxRenewCount": 99,
+      "timeZone": "UTC+0",
+      "observedAt": "2026-09-03T10:22:40.620Z"
+    }
+  },
+  "code": 200, "msg": "ok", "t": 1788431706780
+}</code></pre></figure>
+<blockquote class="note warn"><p>🔴 <strong><code>capability.renewable</code> 不能用来点亮"续订"按钮。</strong> 它说的是"这个卡型原理上能续"，
+不是"这张卡现在能续"。判据只能是 §4.7 的 <code>allowed</code>。同一个 <code>renewable:true</code> 的卡型，
+不同的卡 / 商品组合会给出不同答案。</p>
+<p>同理 <code>supportUsageQuery:false</code> 的卡型，<code>order/usage</code> 恒返回 <code>usage: null</code> —— 那不是"还没数据"。</p></blockquote>
+<p><strong>负例</strong>：不存在的码 → <code>404 PRODUCT_NOT_FOUND</code>。</p>
+<hr>
+<h3 id="44-开卡下单-ordercreate">4.4 开卡下单 <code>/order/create</code><a class="anchor" href="#44-开卡下单-ordercreate">#</a></h3>
+<p><strong>需要 <code>esim.write</code> scope。</strong></p>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th><th>说明</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td><code>[1, 160]</code></td><td>从 <code>products/list</code> 取</td></tr><tr><td><code>idempotencyKey</code></td><td>string</td><td><strong>是</strong></td><td><code>[8, 96]</code></td><td>幂等键，见下</td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>否</td><td>—</td><td>你自己的业务单号，全局唯一</td></tr><tr><td><code>externalUserId</code></td><td>string</td><td>否</td><td>—</td><td>你系统里的终端用户标识</td></tr><tr><td><code>sourcePartnerCode</code></td><td>string</td><td>否</td><td>—</td><td>委托下单时指定你名下的子分销商</td></tr></tbody></table></div>
+<p><strong>响应 <code>data</code></strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>orderNo</code></td><td>string</td><td>平台订单号</td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>回显</td></tr><tr><td><code>productCode</code></td><td>string</td><td>回显</td></tr><tr><td><code>orderStatus</code></td><td>string</td><td>恒为 <code>ACCEPTED</code></td></tr><tr><td><code>accepted</code></td><td>boolean</td><td>恒为 <code>true</code></td></tr><tr><td><code>replayed</code></td><td>boolean</td><td><code>true</code> = 这是一次幂等重放，没有新建单</td></tr></tbody></table></div>
+<p><strong>示例响应</strong></p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
+  "data": {
+    "orderNo": "XE1788431707121E04989EE4D",
+    "clientOrderNo": "m1lc-1788431700325-1",
+    "productCode": "XP205032025ED92397E2AE461C",
+    "orderStatus": "ACCEPTED",
+    "accepted": true,
+    "replayed": false
+  },
+  "code": 200, "msg": "ok", "t": 1788431707137
+}</code></pre></figure>
+<blockquote class="note warn"><p>🔴 <strong><code>ACCEPTED</code> 只是受理，不是出卡。</strong> 出卡是异步的，时长根据电信运营商的数据返回，可能在 1～15 分钟左右波动。
+拿到 <code>orderNo</code> 后要么轮询 §4.5，要么等 §6 的 <code>ORDER_OPEN_RESULT</code> 回调。</p></blockquote>
+<h4 id="幂等语义">幂等语义<a class="anchor" href="#幂等语义">#</a></h4>
+<div class="tw"><table><thead><tr><th>情况</th><th>结果</th></tr></thead><tbody><tr><td>同 <code>idempotencyKey</code> + <strong>相同请求内容</strong></td><td><code>200</code>，返回<strong>同一个</strong> <code>orderNo</code>，<code>replayed: true</code></td></tr><tr><td>同 <code>idempotencyKey</code> + <strong>不同请求内容</strong></td><td><code>409 IDEMPOTENCY_KEY_REUSED</code></td></tr><tr><td>同 <code>clientOrderNo</code> + <strong>不同</strong> <code>idempotencyKey</code></td><td><code>409 CLIENT_ORDER_NO_REUSED</code></td></tr></tbody></table></div>
+<p>所以：<strong>网络超时后原样重发是安全的</strong>，不会重复建单。但换了内容就必须换幂等键。</p>
+<p><strong>负例</strong>：商品不存在或不可售 → <code>404 PRODUCT_NOT_AVAILABLE</code>；非法 <code>sourcePartnerCode</code> → <code>403 SOURCE_PARTNER_NOT_ALLOWED</code>。</p>
+<p><strong>Node.js</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>async function createOrder(client, { productCode, clientOrderNo, externalUserId }) {
+  // 幂等键与业务单号绑定：重试时必须复用同一个键，否则会建出第二张卡
+  const idempotencyKey = `open-${clientOrderNo}`
+  const data = await client.invoke('/openapi/v1/order/create', {
+    productCode,
+    idempotencyKey,
+    clientOrderNo,
+    externalUserId
+  })
+  if (data.replayed) console.log('幂等重放，复用已有订单', data.orderNo)
+  return data.orderNo
+}</code></pre></figure>
+<p><strong>Java</strong></p>
+<figure class="code" data-lang="java"><button class="copy" type="button">复制</button><pre><code>public String createOrder(XpinEsimClient client, String productCode,
+                          String clientOrderNo, String externalUserId) throws Exception {
+    // 幂等键与业务单号绑定：重试时必须复用同一个键
+    String idempotencyKey = "open-" + clientOrderNo;
+    JsonNode data = client.invoke("/openapi/v1/order/create", Map.of(
+            "productCode", productCode,
+            "idempotencyKey", idempotencyKey,
+            "clientOrderNo", clientOrderNo,
+            "externalUserId", externalUserId));
+    if (data.get("replayed").asBoolean()) {
+        log.info("幂等重放，复用已有订单 {}", data.get("orderNo").asText());
+    }
+    return data.get("orderNo").asText();
+}</code></pre></figure>
+<hr>
+<h3 id="45-订单查询-orderquery">4.5 订单查询 <code>/order/query</code><a class="anchor" href="#45-订单查询-orderquery">#</a></h3>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th></tr></thead><tbody><tr><td><code>clientOrderNo</code></td><td>string</td><td><strong>是</strong></td></tr></tbody></table></div>
+<p><strong>响应 <code>data</code></strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>orderNo</code></td><td>string</td><td>平台订单号</td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>你的业务单号</td></tr><tr><td><code>externalUserId</code></td><td>string|null</td><td>终端用户标识</td></tr><tr><td><code>productCode</code></td><td>string</td><td>商品码</td></tr><tr><td><code>orderStatus</code></td><td>string</td><td>见 §5 状态机</td></tr><tr><td><code>iccid</code></td><td>string|null</td><td><strong>只有履约后才有值</strong></td></tr><tr><td><code>profileStatus</code></td><td>string|null</td><td>卡的 profile 状态</td></tr><tr><td><code>product</code></td><td>object</td><td>下单时刻的<strong>商品快照</strong>（含 <code>settlementPrice</code> 结算价）</td></tr></tbody></table></div>
+<p><strong>示例响应</strong>（履约中）</p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
+  "data": {
+    "orderNo": "XE1788431707121E04989EE4D",
+    "clientOrderNo": "m1lc-1788431700325-1",
+    "externalUserId": "m1lc-user-1788431700325",
+    "productCode": "XP205032025ED92397E2AE461C",
+    "orderStatus": "PROVIDER_ACCEPTED",
+    "iccid": null,
+    "profileStatus": null,
+    "product": {
+      "productCode": "XP205032025ED92397E2AE461C",
+      "productName": "Europe Unlimited 3 Days",
+      "volume": "0", "dataLimited": "N", "validity": 3, "expireDay": 90,
+      "cardType": "ep1", "productType": "DAYPASS",
+      "mccList": ["276", "232"],
+      "retailPrice": "0", "settlementPrice": null, "currency": "USD",
+      "configVersion": 1
+    }
+  },
+  "code": 200, "msg": "ok", "t": 1788431709839
+}</code></pre></figure>
+<p><strong>Node.js —— 轮询到出卡</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>// 仍在流转中的状态（见 §5.1 状态机）。落到这个集合之外且不是 FULFILLED，就是终态失败
+const IN_FLIGHT = new Set(['ACCEPTED', 'SUBMITTING', 'PROVIDER_ACCEPTED', 'RECONCILING', 'RETRY_PENDING'])
+
+// 超时要覆盖履约时延的上沿（见 §5.1），设太短会把正常的慢单误判成失败
+async function waitForFulfilled(client, clientOrderNo, { timeoutMs = 20 * 60 * 1000, intervalMs = 5000 } = {}) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() &lt; deadline) {
+    const d = await client.invoke('/openapi/v1/order/query', { clientOrderNo })
+    if (d.orderStatus === 'FULFILLED' &amp;&amp; d.iccid) return d
+    if (!IN_FLIGHT.has(d.orderStatus)) throw new Error(`订单落入终态但未履约: ${d.orderStatus}`)
+    await new Promise((r) =&gt; setTimeout(r, intervalMs))
+  }
+  throw new Error(`${timeoutMs}ms 内未出卡，请联系平台核查`)
+}</code></pre></figure>
+<p><strong>Java</strong></p>
+<figure class="code" data-lang="java"><button class="copy" type="button">复制</button><pre><code>/** 仍在流转中的状态（见 §5.1 状态机） */
+private static final Set&lt;String&gt; IN_FLIGHT = Set.of(
+        "ACCEPTED", "SUBMITTING", "PROVIDER_ACCEPTED", "RECONCILING", "RETRY_PENDING");
+
+/** timeoutMs 要覆盖履约时延的上沿（见 §5.1），设太短会把正常的慢单误判成失败 */
+public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
+                                 long timeoutMs, long intervalMs) throws Exception {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    while (System.currentTimeMillis() &lt; deadline) {
+        JsonNode d = client.invoke("/openapi/v1/order/query", Map.of("clientOrderNo", clientOrderNo));
+        String status = d.get("orderStatus").asText();
+        if ("FULFILLED".equals(status) &amp;&amp; !d.get("iccid").isNull()) return d;
+        if (!IN_FLIGHT.contains(status)) {
+            throw new IllegalStateException("订单落入终态但未履约: " + status);
+        }
+        Thread.sleep(intervalMs);
+    }
+    throw new IllegalStateException(timeoutMs + "ms 内未出卡，请联系平台核查");
+}</code></pre></figure>
+<hr>
+<h3 id="46-订单列表-orderlist">4.6 订单列表 <code>/order/list</code><a class="anchor" href="#46-订单列表-orderlist">#</a></h3>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td><code>externalUserId</code> | <code>iccid</code> | <code>productCode</code></td><td>string</td><td><strong>恰好一个</strong></td><td>范围选择器</td></tr><tr><td><code>pageSize</code></td><td>number</td><td>否</td><td>默认 20</td></tr><tr><td><code>pageToken</code></td><td>string</td><td>否</td><td>上一页返回的 <code>nextPageToken</code></td></tr></tbody></table></div>
+<p><strong>三条硬规则</strong>：</p>
+<div class="tw"><table><thead><tr><th>构造</th><th>结果</th></tr></thead><tbody><tr><td>零个选择器</td><td><code>400 ORDER_RANGE_SELECTOR_REQUIRED</code></td></tr><tr><td>两个及以上选择器</td><td><code>400 ORDER_RANGE_SELECTOR_CONFLICT</code></td></tr><tr><td><strong>只传 <code>pageToken</code> 不带选择器</strong></td><td><code>400 ORDER_RANGE_SELECTOR_REQUIRED</code>（不是游标错误！）</td></tr><tr><td>选择器 + 伪造/过期游标</td><td><code>400 ORDER_PAGE_TOKEN_INVALID</code></td></tr></tbody></table></div>
+<blockquote class="note warn"><p>🔴 <strong><code>pageToken</code> 不是独立的选择器</strong>，翻页时必须把<strong>原来的选择器一起带上</strong>。游标带签名且<strong>有效期约 10 分钟</strong>。</p></blockquote>
+<p><strong>响应 <code>data</code></strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>list</code></td><td>array</td><td>订单数组，元素结构同 §4.5 的 <code>data</code></td></tr><tr><td><code>hasMore</code></td><td>boolean</td><td>是否还有下一页</td></tr><tr><td><code>nextPageToken</code></td><td>string|null</td><td>下一页游标；<code>null</code> 表示到底</td></tr></tbody></table></div>
+<p><strong>示例响应</strong></p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
+  "data": {
+    "list": [
+      {
+        "orderNo": "XE1788431707121E04989EE4D",
+        "clientOrderNo": "m1lc-1788431700325-1",
+        "externalUserId": "m1lc-user-1788431700325",
+        "productCode": "XP205032025ED92397E2AE461C",
+        "orderStatus": "FULFILLED",
+        "iccid": "89000000000000000430",
+        "profileStatus": null,
+        "product": { "...": "同 order/query 的商品快照" }
+      }
+    ],
+    "hasMore": false,
+    "nextPageToken": null
+  },
+  "code": 200, "msg": "ok", "t": 1788431720198
+}</code></pre></figure>
+<p><strong>Node.js —— 正确的游标翻页</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>async function listOrdersByUser(client, externalUserId) {
+  const all = []
+  let pageToken = null
+  do {
+    // 选择器必须每页都带上，不能只带 pageToken
+    const body = { externalUserId, pageSize: 50 }
+    if (pageToken) body.pageToken = pageToken
+    const page = await client.invoke('/openapi/v1/order/list', body)
+    all.push(...page.list)
+    pageToken = page.nextPageToken
+  } while (pageToken)
+  return all
+}</code></pre></figure>
+<p><strong>Java</strong></p>
+<figure class="code" data-lang="java"><button class="copy" type="button">复制</button><pre><code>public List&lt;JsonNode&gt; listOrdersByUser(XpinEsimClient client, String externalUserId) throws Exception {
+    List&lt;JsonNode&gt; all = new ArrayList&lt;&gt;();
+    String pageToken = null;
+    do {
+        Map&lt;String, Object&gt; body = new LinkedHashMap&lt;&gt;();
+        body.put("externalUserId", externalUserId);   // 选择器必须每页都带
+        body.put("pageSize", 50);
+        if (pageToken != null) body.put("pageToken", pageToken);
+        JsonNode page = client.invoke("/openapi/v1/order/list", body);
+        page.get("list").forEach(all::add);
+        JsonNode next = page.get("nextPageToken");
+        pageToken = next.isNull() ? null : next.asText();
+    } while (pageToken != null);
+    return all;
+}</code></pre></figure>
+<blockquote class="note"><p><strong>按 <code>iccid</code> 查是对账的主要抓手</strong>：一张卡的开卡单与全部续订单都挂在同一个 ICCID 下，一次查全。</p></blockquote>
+<hr>
+<h3 id="47-续订资格判定-iccidrenew">4.7 续订资格判定 <code>/iccid/renew</code><a class="anchor" href="#47-续订资格判定-iccidrenew">#</a></h3>
+<p><strong>只读接口，不产生订单。</strong> 续订按钮的可用性<strong>只能</strong>由它决定。</p>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[10, 32]</code></td></tr><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td>想续的目标商品</td></tr><tr><td><code>externalUserId</code></td><td>string</td><td>否</td><td>传了才会校验用户归属</td></tr></tbody></table></div>
+<p><strong>响应 <code>data</code></strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>allowed</code></td><td>boolean</td><td><strong>唯一判据</strong></td></tr><tr><td><code>reasons</code></td><td>string[]</td><td>不可续的<strong>全部</strong>原因；<code>allowed:true</code> 时为 <code>[]</code></td></tr><tr><td><code>iccid</code> / <code>productCode</code></td><td>string</td><td>回显</td></tr></tbody></table></div>
+<blockquote class="note"><p>这个接口<strong>不用错误码表达"不可续"</strong>：卡不存在也是 <code>200</code>，判定在 <code>allowed:false</code> + <code>reasons:["CARD_NOT_FOUND"]</code>。</p></blockquote>
+<p><strong>示例响应</strong></p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>// 可续
+{"data":{"allowed":true,"reasons":[],"iccid":"89000000000000000571","productCode":"XP563E64913D5D5E0B8DBC925F"},
+ "code":200,"msg":"ok","t":1788495680855}
+
+// 不可续
+{"data":{"allowed":false,"reasons":["DAYPASS_IN_FORCE"],"iccid":"89000000000000000435","productCode":"XP205032025ED92397E2AE461C"},
+ "code":200,"msg":"ok","t":1788505549000}</code></pre></figure>
+<h4 id="reasons-全表按性质分类这是接入方最需要的一张表"><code>reasons</code> 全表（按性质分类，这是接入方最需要的一张表）<a class="anchor" href="#reasons-全表按性质分类这是接入方最需要的一张表">#</a></h4>
+<div class="tw"><table><thead><tr><th>reason</th><th>含义</th><th>性质</th></tr></thead><tbody><tr><td><code>CARD_NOT_FOUND</code></td><td>卡不存在或不属于你</td><td>❌ 终局</td></tr><tr><td><code>PRODUCT_NOT_FOUND</code></td><td>目标商品不存在或不属于你</td><td>❌ 终局</td></tr><tr><td><code>PRODUCT_OFF_SALE</code></td><td>目标商品已下架</td><td>⚠️ 可恢复（换商品或等上架）</td></tr><tr><td><code>CARD_NOT_RENEWABLE</code></td><td>电信运营商明确这张卡不可续</td><td>❌ 终局</td></tr><tr><td><code>CARD_TYPE_MISMATCH</code></td><td>目标商品的卡型与这张卡不同</td><td>❌ 终局（续订永不换卡型）</td></tr><tr><td><code>RENEW_WINDOW_EXPIRED</code></td><td>续订窗口已过</td><td>❌ 终局</td></tr><tr><td><code>ORDER_NOT_RENEWABLE</code></td><td>当前套餐没有续订截止时间</td><td>❌ 终局</td></tr><tr><td><code>EXTERNAL_USER_ID_CONFLICT</code></td><td>传入的 <code>externalUserId</code> 与卡上绑定的不一致</td><td>❌ 终局（改传对的）</td></tr><tr><td><code>DAYPASS_REQUIRES_EMPTY_CARD</code></td><td>日包只能装在空卡上</td><td>❌ 终局（该组合永远不行）</td></tr><tr><td><strong><code>RENEWABILITY_PENDING_SYNC</code></strong></td><td>平台还没从电信运营商同步到这张卡的可续订性</td><td>🔄 <strong>稍后重试</strong></td></tr><tr><td><strong><code>RENEW_WINDOW_PENDING_SYNC</code></strong></td><td>续订窗口尚未同步</td><td>🔄 <strong>稍后重试</strong></td></tr><tr><td><strong><code>RENEWABILITY_STALE</code></strong></td><td>同步过但证据已过期</td><td>🔄 <strong>稍后重试</strong></td></tr><tr><td><strong><code>DAYPASS_IN_FORCE</code></strong></td><td>日包在用期间整张卡不可续（用流量包续也不行）</td><td>🔄 日包结束后解除</td></tr><tr><td><code>CONCURRENT_ORDER_LIMIT_REACHED</code></td><td>卡上并发套餐数已达上限</td><td>🔄 有套餐到期后解除</td></tr><tr><td><code>CARD_CAPABILITY_UNKNOWN</code></td><td>卡型能力未同步</td><td>🔄 稍后重试</td></tr><tr><td><code>CARD_TYPE_RULE_NOT_PUBLISHED</code></td><td>该卡型的续订能力尚未开放</td><td>⚙️ 联系平台</td></tr></tbody></table></div>
+<blockquote class="note warn"><p>🔴 <strong>不要把"稍后重试"类的 reason 当成永久拒绝</strong>。尤其是 <code>RENEWABILITY_STALE</code>：
+平台的续订证据有新鲜期，过期就会出现这一条，而它随时可能被刷新。
+新鲜期与同步时机根据电信运营商的数据返回，可能在 1～15 分钟左右波动。
+正确做法是<strong>在用户点击时实时查一次</strong>，而不是缓存资格结果。</p></blockquote>
+<h4 id="规则按卡型差异化示例">规则按卡型差异化（示例）<a class="anchor" href="#规则按卡型差异化示例">#</a></h4>
+<div class="tw"><table><thead><tr><th>卡</th><th>用同形态商品续</th><th>用同卡型的另一形态商品续</th></tr></thead><tbody><tr><td><code>C4</code> / 流量包卡</td><td>✅ 可续</td><td>✅ 可续</td></tr><tr><td><code>ep1</code> / 流量包卡</td><td>✅ 可续</td><td>❌ <code>DAYPASS_REQUIRES_EMPTY_CARD</code></td></tr><tr><td><code>ep1</code> / 日包卡</td><td>❌ <code>DAYPASS_IN_FORCE</code></td><td>❌ <code>DAYPASS_IN_FORCE</code></td></tr></tbody></table></div>
+<p><strong>Node.js</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>const RETRYABLE = new Set([
+  'RENEWABILITY_PENDING_SYNC', 'RENEW_WINDOW_PENDING_SYNC', 'RENEWABILITY_STALE',
+  'DAYPASS_IN_FORCE', 'CONCURRENT_ORDER_LIMIT_REACHED', 'CARD_CAPABILITY_UNKNOWN'
+])
+
+async function checkRenewable(client, iccid, productCode) {
+  const d = await client.invoke('/openapi/v1/iccid/renew', { iccid, productCode })
+  return {
+    allowed: d.allowed,
+    reasons: d.reasons,
+    // 只有全部原因都是"可恢复"时，才提示用户稍后再试；否则是终局拒绝
+    retryable: !d.allowed &amp;&amp; d.reasons.length &gt; 0 &amp;&amp; d.reasons.every((r) =&gt; RETRYABLE.has(r))
+  }
+}</code></pre></figure>
+<p><strong>Java</strong></p>
+<figure class="code" data-lang="java"><button class="copy" type="button">复制</button><pre><code>private static final Set&lt;String&gt; RETRYABLE = Set.of(
+        "RENEWABILITY_PENDING_SYNC", "RENEW_WINDOW_PENDING_SYNC", "RENEWABILITY_STALE",
+        "DAYPASS_IN_FORCE", "CONCURRENT_ORDER_LIMIT_REACHED", "CARD_CAPABILITY_UNKNOWN");
+
+public record RenewCheck(boolean allowed, List&lt;String&gt; reasons, boolean retryable) {}
+
+public RenewCheck checkRenewable(XpinEsimClient client, String iccid, String productCode) throws Exception {
+    JsonNode d = client.invoke("/openapi/v1/iccid/renew", Map.of("iccid", iccid, "productCode", productCode));
+    boolean allowed = d.get("allowed").asBoolean();
+    List&lt;String&gt; reasons = new ArrayList&lt;&gt;();
+    d.get("reasons").forEach(n -&gt; reasons.add(n.asText()));
+    // 只有全部原因都可恢复时才提示稍后再试
+    boolean retryable = !allowed &amp;&amp; !reasons.isEmpty() &amp;&amp; RETRYABLE.containsAll(reasons);
+    return new RenewCheck(allowed, reasons, retryable);
+}</code></pre></figure>
+<hr>
+<h3 id="48-续订下单-orderrenew">4.8 续订下单 <code>/order/renew</code><a class="anchor" href="#48-续订下单-orderrenew">#</a></h3>
+<p><strong>需要 <code>esim.write</code> scope。</strong> 给<strong>已有的卡</strong>追加套餐，<strong>不换卡、不换激活码</strong>。</p>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[10, 32]</code></td></tr><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td>目标商品</td></tr><tr><td><code>idempotencyKey</code></td><td>string</td><td><strong>是</strong></td><td><code>[8, 96]</code></td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>否</td><td>你的业务单号</td></tr><tr><td><code>externalUserId</code></td><td>string</td><td>否</td><td>终端用户标识</td></tr></tbody></table></div>
+<p><strong>响应 <code>data</code></strong>：与 §4.4 相同，另含 <code>iccid</code>。</p>
+<p><strong>示例响应</strong></p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
+  "data": {
+    "orderNo": "XE17884956816778866A4A70E",
+    "clientOrderNo": "m1n-C4-DATA-rn-1788494789993",
+    "iccid": "89000000000000000571",
+    "productCode": "XP563E64913D5D5E0B8DBC925F",
+    "orderStatus": "ACCEPTED",
+    "accepted": true,
+    "replayed": false
+  },
+  "code": 200, "msg": "ok", "t": 1788495681690
+}</code></pre></figure>
+<ul><li>续订单有<strong>独立于开卡单的 <code>orderNo</code></strong>，<code>iccid</code> 保持不变。</li><li>幂等语义与开卡完全相同（同键同内容 → <code>replayed:true</code>；同键异内容 → <code>409</code>）。</li><li>不可续时 → <code>409 RENEW_NOT_ALLOWED</code>。</li></ul>
+<p><strong>Node.js —— 完整续订流程</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>async function renew(client, { iccid, productCode, clientOrderNo, externalUserId }) {
+  // 1) 资格必须实时查，不能用缓存 —— 证据有新鲜期，且刷新时机随电信运营商的数据返回波动
+  const check = await checkRenewable(client, iccid, productCode)
+  if (!check.allowed) {
+    const err = new Error(`不可续订: ${check.reasons.join(',')}`)
+    err.reasons = check.reasons
+    err.retryable = check.retryable
+    throw err
+  }
+
+  // 2) 下单（受理）
+  const data = await client.invoke('/openapi/v1/order/renew', {
+    iccid,
+    productCode,
+    idempotencyKey: `renew-${clientOrderNo}`,
+    clientOrderNo,
+    externalUserId
+  })
+
+  // 3) 等履约。ICCID 必须不变 —— 变了说明发的是新卡，属异常
+  const done = await waitForFulfilled(client, clientOrderNo)
+  if (done.iccid !== iccid) throw new Error(`续订后 ICCID 变了: ${iccid} -&gt; ${done.iccid}`)
+  return { orderNo: data.orderNo, iccid: done.iccid }
+}</code></pre></figure>
+<p><strong>Java</strong></p>
+<figure class="code" data-lang="java"><button class="copy" type="button">复制</button><pre><code>public String renew(XpinEsimClient client, String iccid, String productCode,
+                    String clientOrderNo, String externalUserId) throws Exception {
+    // 1) 资格实时查，不缓存 —— 证据有新鲜期，且刷新时机随电信运营商的数据返回波动
+    RenewCheck check = checkRenewable(client, iccid, productCode);
+    if (!check.allowed()) {
+        throw new IllegalStateException("不可续订: " + String.join(",", check.reasons()));
+    }
+    // 2) 受理
+    JsonNode data = client.invoke("/openapi/v1/order/renew", Map.of(
+            "iccid", iccid,
+            "productCode", productCode,
+            "idempotencyKey", "renew-" + clientOrderNo,
+            "clientOrderNo", clientOrderNo,
+            "externalUserId", externalUserId));
+    // 3) 等履约，ICCID 必须不变
+    JsonNode done = waitForFulfilled(client, clientOrderNo, 20 * 60 * 1000L, 5_000);
+    if (!iccid.equals(done.get("iccid").asText())) {
+        throw new IllegalStateException("续订后 ICCID 变了");
+    }
+    return data.get("orderNo").asText();
+}</code></pre></figure>
+<hr>
+<h3 id="49-卡档案-iccidprofile">4.9 卡档案 <code>/iccid/profile</code><a class="anchor" href="#49-卡档案-iccidprofile">#</a></h3>
+<p>一次拿到这张卡的全部投影：交付物、profile 状态、续订证据、用量。</p>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[10, 32]</code></td></tr></tbody></table></div>
+<p><strong>响应 <code>data</code></strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td>卡号</td></tr><tr><td><code>externalUserId</code></td><td>string|null</td><td>绑定的终端用户</td></tr><tr><td><code>cardType</code></td><td>string</td><td>卡型</td></tr><tr><td><code>delivery.activationCode</code></td><td>string</td><td><strong>激活码</strong>，形如 <code>LPA:1$&lt;smdp&gt;$&lt;matchingId&gt;</code></td></tr><tr><td><code>delivery.latestActivationTime</code></td><td>string|null</td><td>最晚激活时间</td></tr><tr><td><code>delivery.imsi</code> / <code>delivery.msisdn</code></td><td>string|null</td><td>IMSI / MSISDN</td></tr><tr><td><code>profile.status</code></td><td>string</td><td><code>UNKNOWN</code> / <code>ENABLED</code> / <code>RELEASED</code> / <code>DISABLED</code> 等</td></tr><tr><td><code>profile.statusTime</code></td><td>string</td><td>状态时间（ISO-8601）</td></tr><tr><td><code>profile.changeVersion</code></td><td>number</td><td>状态变更版本，<strong>单调递增</strong>，可用于丢序检测</td></tr><tr><td><code>renewal.renewable</code></td><td>boolean|null</td><td>电信运营商给出的可续订性；<code>null</code> = 未同步</td></tr><tr><td><code>renewal.expirationTime</code></td><td>string|null</td><td>续订截止时间。<strong>开卡履约完成即可读到</strong>，不必等后续刷新</td></tr><tr><td><code>renewal.activePackages</code></td><td>number</td><td>这张卡当前占用的套餐槽位数（<strong>含尚未履约的在途订单</strong>，见下方警告）</td></tr><tr><td><code>renewal.maxConcurrentPackages</code></td><td>number|null</td><td>并发上限</td></tr><tr><td><code>renewal.evidenceFresh</code></td><td>boolean</td><td>续订证据是否新鲜。新鲜期与刷新时机随电信运营商的数据返回波动</td></tr><tr><td><code>renewal.evidenceSyncedAt</code></td><td>string|null</td><td>证据同步时刻。它是<strong>卡型能力</strong>的刷新时刻，同一卡型的多张卡上取值相同，与 <code>usage.observedAt</code> 不是一回事</td></tr><tr><td><code>usage</code></td><td>object|null</td><td>用量；<code>null</code> 见 §4.10</td></tr><tr><td><code>packageStatus</code></td><td>string</td><td><code>CREATED</code> / <code>NOT_ACTIVATED</code> / <code>IN_USE</code> / <code>EXPIRED</code> 等</td></tr><tr><td><code>packageEndTime</code></td><td>string|null</td><td>套餐结束时间</td></tr></tbody></table></div>
+<p><strong>示例响应</strong></p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
+  "data": {
+    "iccid": "89000000000000000442",
+    "externalUserId": "your-user-0442",
+    "cardType": "ep1",
+    "delivery": {
+      "activationCode": "LPA:1$smdp-a.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE",
+      "latestActivationTime": "2026-12-04T12:53:54.000Z",
+      "imsi": "460000000000442",
+      "msisdn": "850000000000442"
+    },
+    "profile": { "status": "ENABLED", "statusTime": "2026-09-05T13:00:21.079Z", "changeVersion": 1 },
+    "renewal": {
+      "renewable": true, "expirationTime": "2026-12-07T12:53:53.000Z",
+      "activePackages": 1, "maxConcurrentPackages": 99,
+      "evidenceFresh": true, "evidenceSyncedAt": "2026-09-05T13:04:45.813Z"
+    },
+    "usage": {
+      "orderNo": "XE1788612831173B352E275F4",
+      "dataTotalBytes": null, "dataUsedBytes": 0, "dataRemainBytes": null,
+      "observedUnit": "MB", "observedAt": "2026-09-05T13:29:24.791Z"
+    },
+    "packageStatus": "NOT_ACTIVATED",
+    "packageEndTime": "2026-09-08T12:53:54.000Z"
+  },
+  "code": 200, "msg": "ok", "t": 1788615660098
+}</code></pre></figure>
+<blockquote class="note warn"><p>🔴 <strong><code>renewal.activePackages</code> 不是"已生效的套餐数"</strong>：它把<strong>尚未履约的在途订单</strong>也计算在内，
+所以一笔刚提交、还没出结果的续订单同样会把它 +1。<strong>不能用它判断"续充成功了没"</strong>。
+判据永远是<strong>续订单自己的 <code>orderStatus === 'FULFILLED'</code></strong>。</p></blockquote>
+<blockquote class="note"><p><strong>不同卡型走不同的 SM-DP+</strong>（例如 <code>ep1</code> 与 <code>C4</code> 的 SM-DP+ 域名并不相同）。
+不要对激活码里的域名做任何硬编码假设，整串原样交给终端用户。</p></blockquote>
+<p><strong>Node.js / Java</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>const p = await client.invoke('/openapi/v1/iccid/profile', { iccid })
+const qrPayload = p.delivery.activationCode   // 整串生成二维码给用户</code></pre></figure>
+<figure class="code" data-lang="java"><button class="copy" type="button">复制</button><pre><code>JsonNode p = client.invoke("/openapi/v1/iccid/profile", Map.of("iccid", iccid));
+String qrPayload = p.get("delivery").get("activationCode").asText();</code></pre></figure>
+<hr>
+<h3 id="410-用量查询-orderusage">4.10 用量查询 <code>/order/usage</code><a class="anchor" href="#410-用量查询-orderusage">#</a></h3>
+<p><strong>请求</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[10, 32]</code></td></tr></tbody></table></div>
+<p><strong>响应 <code>data</code></strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td>回显</td></tr><tr><td><code>usage</code></td><td>object|null</td><td>用量投影，字段见下</td></tr></tbody></table></div>
+<p><strong><code>usage</code> 对象</strong></p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>orderNo</code></td><td>string</td><td>这组数字属于<strong>哪一张订单</strong>。见下面的量程说明</td></tr><tr><td><code>dataTotalBytes</code></td><td>number|null</td><td>套餐总量，<strong>整数字节</strong></td></tr><tr><td><code>dataUsedBytes</code></td><td>number|null</td><td>已用量，<strong>整数字节</strong></td></tr><tr><td><code>dataRemainBytes</code></td><td>number|null</td><td>剩余量，<strong>整数字节</strong></td></tr><tr><td><code>observedUnit</code></td><td>string|null</td><td>这组数字换算前的单位，仅作证据。<strong>它不是上面三个字段的单位</strong> —— 那永远是字节</td></tr><tr><td><code>observedAt</code></td><td>string</td><td>这次读数的观测时刻（ISO-8601）</td></tr></tbody></table></div>
+<blockquote class="note"><p><strong>三个数值字段是整数字节，字段名自带单位。</strong> 不要按 <code>observedUnit</code> 去二次换算。</p></blockquote>
+<p><strong>示例响应</strong></p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
+  "data": {
+    "iccid": "89000000000000000430",
+    "usage": {
+      "orderNo": "XE1788614425833E413E81C10",
+      "dataTotalBytes": null,
+      "dataUsedBytes": 0,
+      "dataRemainBytes": null,
+      "observedUnit": "MB",
+      "observedAt": "2026-09-05T13:29:24.791Z"
+    }
+  },
+  "code": 200, "msg": "ok", "t": 1788431716876
+}</code></pre></figure>
+<blockquote class="note"><p><strong>不限量套餐没有总量。</strong> <code>products/list</code> 里 <code>dataLimited: "N"</code> 的套餐，
+<code>dataTotalBytes</code> 与 <code>dataRemainBytes</code> 恒为 <code>null</code>，只有 <code>dataUsedBytes</code> 是数字。
+这不是"取数失败"，是这类套餐本来就没有这个概念 —— 不要把它当异常重试。</p></blockquote>
+<blockquote class="note warn"><p>🔴 <strong>这是 <code>orderNo</code> 那一单的用量，不是这张卡的合计。</strong> 一张卡上可以同时有多个套餐
+（见 <code>cardType</code> 的 <code>maxConcurrentPackages</code>），而这里返回的是<strong>最新那一单</strong>的读数。
+<code>orderNo</code> 就是说明这件事的字段。只读 <code>dataRemainBytes</code> 的调用方在多套餐卡上会得到一个
+<strong>偏小的数</strong> —— 它是最新那一单还剩多少，不是这张卡还能用多少。</p></blockquote>
+<blockquote class="note"><p><strong><code>usage: null</code> 有两种成因，靠 <code>cardType</code> 的 <code>capability.supportUsageQuery</code> 区分</strong>：</p>
+<ul><li><code>supportUsageQuery: false</code> → 这个卡型<strong>本来就查不到用量</strong>，永远是 <code>null</code>，不要重试。</li><li><code>supportUsageQuery: true</code> 但 <code>usage</code> 为 <code>null</code> → 还没有样本，稍后再查。</li></ul></blockquote>
+<blockquote class="note"><p><strong>读数是周期性刷新的</strong>，不是每次调用都实时回源。<code>observedAt</code> 就是这次读数的时刻；
+两次调用之间它可能不变，那表示期间没有新样本，不是接口失败。</p></blockquote>
+<p><strong>负例</strong>：卡不存在 → <code>404 CARD_NOT_FOUND</code>。</p>
+<p><code>/iccid/profile</code> 的 <code>usage</code> 与本接口返回的是<strong>同一个投影</strong>，字段与取值完全一致，
+按哪条取都行。</p>
+<hr>
+<h2 id="5-业务流程与状态机">5. 业务流程与状态机<a class="anchor" href="#5-业务流程与状态机">#</a></h2>
+<h3 id="51-订单状态机">5.1 订单状态机<a class="anchor" href="#51-订单状态机">#</a></h3>
+<figure class="code"><button class="copy" type="button">复制</button><pre><code>ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
+   │              │               │                   │
+   │              │               └──► RECONCILING ───┘
+   │              │                        │
+   └──► RETRY_PENDING ──► SUBMITTING       │
+                  │                        │
+                  └────────► FAILED ◄──────┘</code></pre></figure>
+<div class="tw"><table><thead><tr><th>状态</th><th>含义</th><th>你该做什么</th></tr></thead><tbody><tr><td><code>ACCEPTED</code></td><td>平台已受理，尚未提交电信运营商</td><td>继续等</td></tr><tr><td><code>SUBMITTING</code></td><td>正在提交电信运营商</td><td>继续等</td></tr><tr><td><code>PROVIDER_ACCEPTED</code></td><td>电信运营商已受理，等履约回调</td><td>继续等；<strong>长时间不动是平台侧或电信运营商侧的问题，不是你的参数问题</strong></td></tr><tr><td><code>RECONCILING</code></td><td>提交/对账阶段异常，正在核对</td><td>继续等，超时联系平台</td></tr><tr><td><code>RETRY_PENDING</code></td><td>等待重试</td><td>继续等</td></tr><tr><td><strong><code>FULFILLED</code></strong></td><td><strong>已履约，<code>iccid</code> 可用</strong></td><td>取激活码交付用户</td></tr><tr><td><strong><code>FAILED</code></strong></td><td><strong>终态：这一单不会再出卡</strong></td><td><strong>停止轮询</strong>。这一单不会自愈，需要出卡就重新下一单（用<strong>新的</strong> <code>idempotencyKey</code> 与 <code>clientOrderNo</code>）。原因需联系平台核查</td></tr></tbody></table></div>
+<blockquote class="note warn"><p>🔴 <strong>轮询必须同时判 <code>FAILED</code>。</strong> 只等 <code>FULFILLED</code> 的循环会在失败单上一直转到超时，
+而那一单永远不会变。<code>FULFILLED</code> 与 <code>FAILED</code> 都是<strong>终态</strong>，收到任一个就停。</p></blockquote>
+<p><strong>时延</strong>：开卡与续订的 <code>ACCEPTED → FULFILLED</code> 时长根据电信运营商的数据返回，可能在 1～15 分钟左右波动。
+明显超出该区间仍未 <code>FULFILLED</code> 也未 <code>FAILED</code> 时需与平台核查，<strong>不要靠重复下单绕过</strong>
+（会建出多张卡）。</p>
+<h3 id="52-开卡完整流程">5.2 开卡完整流程<a class="anchor" href="#52-开卡完整流程">#</a></h3>
+<figure class="code"><button class="copy" type="button">复制</button><pre><code>1. products/list           取 productCode
+2. order/create            → ACCEPTED + orderNo
+3. 二选一：
+   a. 轮询 order/query 到终态（FULFILLED 或 FAILED）
+   b. 等 ORDER_OPEN_RESULT 回调（推荐，见 §6；失败的单不发事件，所以回调路仍需超时兜底）
+4. iccid/profile           取 delivery.activationCode
+5. 把整串激活码生成二维码交付终端用户</code></pre></figure>
+<h3 id="53-续订完整流程">5.3 续订完整流程<a class="anchor" href="#53-续订完整流程">#</a></h3>
+<figure class="code"><button class="copy" type="button">复制</button><pre><code>1. iccid/renew             实时查资格（不要缓存！）
+2. allowed === true 才继续，否则按 reasons 分类提示用户
+3. order/renew             → ACCEPTED + 新的 orderNo（iccid 不变）
+4. 轮询 order/query 到 FULFILLED，或等 ORDER_RENEW_RESULT 回调
+5. 断言 iccid 未变</code></pre></figure>
+<blockquote class="note warn"><p>⚠️ <strong>续订资格有时间窗</strong>：新卡建成后，平台需要先同步到电信运营商侧的续订证据；该证据也有新鲜期。
+同步时机与新鲜期根据电信运营商的数据返回，可能在 1～15 分钟左右波动。窗口外查资格会得到 <code>RENEWABILITY_STALE</code>。
+因此<strong>必须在用户点击的那一刻实时查</strong>，并对 <code>RENEWABILITY_STALE</code> 做"稍后再试"的友好提示。</p></blockquote>
+<hr>
+<h2 id="6-回调通知">6. 回调通知<a class="anchor" href="#6-回调通知">#</a></h2>
+<p>平台在事件发生时主动 <code>POST</code> 到你的回调地址。<strong>这项能力需要先向平台方申请开通</strong>，
+申请时提供你的回调接收地址，并说明需要订阅哪些事件（不指定则默认订阅全部）。</p>
+<blockquote class="note"><p><strong>事件只在入队那一刻按配置判定</strong>：开通之前受理的订单<strong>不会补发</strong>，开通后要下新单才有事件。</p></blockquote>
+<h3 id="61-事件类型">6.1 事件类型<a class="anchor" href="#61-事件类型">#</a></h3>
+<div class="tw"><table><thead><tr><th><code>eventType</code></th><th>何时发</th><th><code>data</code> 字段</th></tr></thead><tbody><tr><td><code>ORDER_OPEN_RESULT</code></td><td>开卡订单落 <code>FULFILLED</code> 时，每单一次</td><td><code>orderNo</code> <code>clientOrderNo</code> <code>idempotencyKey</code> <code>iccid</code> <code>imsi</code> <code>msisdn</code> <code>activationCode</code> <code>productCode</code> <code>orderStatus</code></td></tr><tr><td><code>ORDER_RENEW_RESULT</code></td><td>续订单落 <code>FULFILLED</code> 时</td><td><strong>同上</strong>（<code>activationCode</code> 是该卡<strong>原有</strong>的激活码，不变）</td></tr><tr><td><code>STATUS_CHANGED</code></td><td>卡的 profile 状态真的变化时</td><td><code>orderNo</code> <code>iccid</code> <code>entityType</code>(恒 <code>PROFILE</code>) <code>previousStatus</code> <code>currentStatus</code> <code>changedAt</code> <code>changeVersion</code></td></tr></tbody></table></div>
+<h3 id="62-请求形状">6.2 请求形状<a class="anchor" href="#62-请求形状">#</a></h3>
+<p><code>POST</code> 到你的 <code>callback_url</code>，<code>Content-Type: application/json</code>，<strong>10 秒超时</strong>。</p>
+<p>请求头：</p>
+<div class="tw"><table><thead><tr><th>头</th><th>值</th></tr></thead><tbody><tr><td><code>x-event-id</code></td><td>与 body 的 <code>eventId</code> <strong>完全相同</strong>（可只读头做幂等）</td></tr><tr><td><code>x-sign</code></td><td>签名，HMAC-SHA256 十六进制小写。<strong>签名只在这个头里，body 里没有 <code>sign</code> 字段</strong></td></tr></tbody></table></div>
+<p>信封字段：</p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>code</code></td><td><strong>string</strong></td><td>恒为 <code>"0000"</code>（<strong>字符串</strong>，不是数字）</td></tr><tr><td><code>msg</code></td><td>string</td><td><code>success</code></td></tr><tr><td><code>eventId</code></td><td>string</td><td><code>sha256("&lt;orderNo&gt;:&lt;eventType&gt;:&lt;version&gt;")</code> 的前 48 位十六进制。<strong>确定性、重投不变</strong></td></tr><tr><td><code>eventType</code></td><td>string</td><td>见 §6.1</td></tr><tr><td><code>data</code></td><td>object</td><td>事件数据</td></tr><tr><td><code>timestamp</code></td><td>string</td><td>本次投递尝试的 ISO-8601 时刻，<strong>重投会变</strong></td></tr><tr><td><code>nonce</code></td><td>string</td><td>每次投递重新生成的 UUID，<strong>重投会变</strong></td></tr><tr><td><code>businessType</code></td><td>string</td><td>恒为 <code>ESIM</code></td></tr></tbody></table></div>
+<p><strong>示例报文</strong>（三类各一）</p>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>// ORDER_OPEN_RESULT
+{"msg":"success","code":"0000","data":{"imsi":"460000000000433","iccid":"89000000000000000433","msisdn":"850000000000433","orderNo":"XE1788489809764F48C390102","orderStatus":"FULFILLED","productCode":"XP205032025ED92397E2AE461C","clientOrderNo":"m1whA-1788489808349","activationCode":"LPA:1$smdp-a.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE","idempotencyKey":"m1whA-idem-1788489808349"},"eventId":"145b1ba79790575ae1fa22a5b172fb2fc6687a27de71d584","eventType":"ORDER_OPEN_RESULT","timestamp":"2026-09-04T02:43:37.180Z","nonce":"b2106d10-f164-4c89-84d9-4c7887dc7d03","businessType":"ESIM"}</code></pre></figure>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>// ORDER_RENEW_RESULT
+{"msg":"success","code":"0000","data":{"imsi":"460000000000574","iccid":"89000000000000000574","msisdn":"850000000000574","orderNo":"XE1788505564505CF4DE8D310","orderStatus":"FULFILLED","productCode":"XP563E64913D5D5E0B8DBC925F","clientOrderNo":"m1n-C4-DATA-rn-1788504527118","activationCode":"LPA:1$smdp-b.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE","idempotencyKey":"m1n-C4-DATA-rnidem-1788504527118"},"eventId":"881c95a391b04045a10b5f91ebecb3512bbb8b99c70584f9","eventType":"ORDER_RENEW_RESULT","timestamp":"2026-09-04T07:06:22.502Z","nonce":"66677339-0820-4926-86aa-53fe1c5bc248","businessType":"ESIM"}</code></pre></figure>
+<figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>// STATUS_CHANGED
+{"msg":"success","code":"0000","data":{"iccid":"89000000000000000433","orderNo":"XE1788489809764F48C390102","changedAt":"2026-09-04T02:49:39.026Z","entityType":"PROFILE","changeVersion":1,"currentStatus":"ENABLED","previousStatus":"UNKNOWN"},"eventId":"56e045be3d6c736f968e19c690dd01fc6be016055fcc32bf","eventType":"STATUS_CHANGED","timestamp":"2026-09-04T02:49:43.548Z","nonce":"e154774a-636d-4ee3-b2a4-4b007db57a97","businessType":"ESIM"}</code></pre></figure>
+<blockquote class="note warn"><p>🔴 <strong>不要假设键序。</strong> 当前键序为 <code>msg, code, data, eventId, eventType, timestamp, nonce, businessType</code>，
+但它<strong>不是契约的一部分</strong>，给 <code>data</code> 加一个短字段就可能整体重排。</p>
+<p>键序与验签<strong>无关</strong>，随便它怎么排。</p></blockquote>
+<h3 id="63-验签">6.3 验签<a class="anchor" href="#63-验签">#</a></h3>
+<p>与入站<strong>同一套规则</strong>（2.1 的四条规则），所以你只需实现一次。
+两点要注意：</p>
+<ol><li><strong><code>sign</code> 不在 body 里</strong>，只在 <code>x-sign</code> 头；</li><li>被签的不是报文字节，而是从<strong>解析后的数据</strong>拼出的规范串。键序、空白、转义、用哪个 JSON 库，全都不影响结果。你<strong>不需要</strong>拿到原始字节。</li></ol>
+<p>验签 = 解析 body → 加上 <code>"sigAlg": "xpin.esim.webhook.kv1"</code> → 按四条规则算基串 →
+HMAC-SHA256 → 与 <code>x-sign</code> 常数时间比对。</p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>// canonicalize() 与 2.5 里那份逐字相同 —— 入站出站共用，写一次
+function verifyKv1(parsedBody, signHeader, appSecret) {
+  const base = canonicalize({ ...parsedBody, sigAlg: 'xpin.esim.webhook.kv1' })
+  const expected = crypto.createHmac('sha256', appSecret).update(base, 'utf8').digest('hex')
+  if (typeof signHeader !== 'string' || signHeader.length !== expected.length) return false
+  return crypto.timingSafeEqual(Buffer.from(signHeader), Buffer.from(expected))
+}</code></pre></figure>
+<figure class="code" data-lang="python"><button class="copy" type="button">复制</button><pre><code>import hashlib, hmac
+# canonicalize() 与 2.5 那份逐字相同 —— 入站出站共用，写一次
+def verify_kv1(parsed_body, sign_header, app_secret):
+    base = canonicalize({**parsed_body, 'sigAlg': 'xpin.esim.webhook.kv1'})
+    expected = hmac.new(app_secret.encode(), base.encode('utf-8'), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, sign_header or '')</code></pre></figure>
+<p><code>express.json()</code> / <code>@RequestBody Map</code> / <code>request.json</code> 都可以放心用 —— 拿解析后的对象就够了。</p>
+<p><strong>接收端骨架（Express）</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>const express = require('express')
+const app = express()
+
+// 可以直接用 express.json()：验签不需要原始字节。
+app.use('/xpin/webhook', express.json({ limit: '1mb' }))
+
+app.post('/xpin/webhook', async (req, res) =&gt; {
+  const eventId = req.get('x-event-id')
+  if (!verifyKv1(req.body, req.get('x-sign'), APP_SECRET)) {
+    // 验不过就不要回 0000 —— 回了我们会认为已送达，这条事件不再重投。
+    return res.json({ code: '9999', msg: 'bad signature' })
+  }
+  // 幂等：同一 eventId 只处理一次。重投是契约，不是异常。
+  if (!(await markProcessedIfNew(eventId))) return res.json({ code: '0000', msg: 'duplicate' })
+  await handle(req.body)
+  res.json({ code: '0000', msg: 'success' })
+})</code></pre></figure>
+<blockquote class="note"><p><strong>两个提示</strong></p>
+<ol><li><strong>ACK 判据是响应体 <code>code === "0000"</code> 加 HTTP 2xx，两者都要</strong>。任何其它组合都按失败 处理并重投（间隔约 5 秒，见 6.4 的上限）。所以处理失败时<strong>不要</strong>回 <code>0000</code>。</li><li><strong>幂等存储必须跨进程生效</strong>（唯一索引表或 Redis <code>SETNX</code>）。我们的重投可能落到你集群 里的另一个实例上，进程内的 <code>Set</code> 挡不住。<code>x-event-id</code> 头与 body 的 <code>eventId</code> 恒等， 用哪个都行 —— 但要注意<strong>头不在签名覆盖范围内</strong>，所以以 body 里的 <code>eventId</code> 为准更稳。</li></ol></blockquote>
+<hr>
+<h3 id="64-ack-与重投">6.4 ACK 与重投<a class="anchor" href="#64-ack-与重投">#</a></h3>
+<div class="tw"><table><thead><tr><th>项</th><th>值</th></tr></thead><tbody><tr><td>送达判定</td><td><strong>HTTP 2xx 且响应体 <code>code === "0000"</code>（字符串）</strong></td></tr><tr><td>失败情形</td><td>非 2xx、响应超时、<code>code</code> 不是 <code>"0000"</code>、响应体过大</td></tr><tr><td>重投间隔</td><td><strong>约 5 秒</strong></td></tr><tr><td>最多重投</td><td>计划内多次（约 2 小时内），超出后不再重投</td></tr><tr><td>重投时</td><td><code>eventId</code> 与 <code>data</code> <strong>不变</strong>；<code>timestamp</code> / <code>nonce</code> / <code>sign</code> <strong>每次重新生成</strong></td></tr><tr><td>ACK 之后</td><td><strong>立即停止重投</strong></td></tr></tbody></table></div>
+<blockquote class="note warn"><p>🔴 <strong>幂等键只能是 <code>eventId</code>（或头里的 <code>x-event-id</code>）</strong>，不能用 <code>sign</code>、<code>nonce</code> 或 <code>timestamp</code>——它们每次投递都会变。</p>
+<p>🔴 <strong><code>"0000"</code> 是字符串，同步接口的 <code>200</code> 是数字，两套码本。</strong> 回 <code>{"code":200}</code> 或 <code>{"code":0}</code>
+都会被判为失败，导致同一事件在约两小时内被反复重投。这是最容易写错、且不会立刻报错的一个坑。</p></blockquote>
+<blockquote class="note"><p><strong>密钥轮换注意</strong>：平台用你凭证<strong>当前</strong>的 <code>app_secret</code> 对回调签名，且不会回落到旧密钥。
+轮换期间已在投递中的事件可能验签失败，<strong>请与平台方约定轮换时间窗</strong>，避开有事件在途的时段。</p></blockquote>
+<hr></main>
+</div>
+
+<script>
+document.querySelectorAll('.copy').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var text = btn.parentNode.querySelector('code').innerText
+    var done = function () {
+      btn.textContent = '已复制'
+      btn.classList.add('done')
+      setTimeout(function () { btn.textContent = '复制'; btn.classList.remove('done') }, 1400)
+    }
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done) ; return }
+    var ta = document.createElement('textarea')
+    ta.value = text; document.body.appendChild(ta); ta.select()
+    document.execCommand('copy'); document.body.removeChild(ta); done()
+  })
+})
+</script>
+</body>
+</html>

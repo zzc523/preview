@@ -28,7 +28,12 @@
    - [4.8 续订下单 `/order/renew`](#48-续订下单-orderrenew)
    - [4.9 卡档案 `/iccid/profile`](#49-卡档案-iccidprofile)
    - [4.10 用量查询 `/order/usage`](#410-用量查询-orderusage)
+   - [4.11 退款申请 `/order/refund`](#411-退款申请-orderrefund)
 5. [业务流程与状态机](#5-业务流程与状态机)
+   - [5.1 订单状态机](#51-订单状态机)
+   - [5.2 开卡完整流程](#52-开卡完整流程)
+   - [5.3 续订完整流程](#53-续订完整流程)
+   - [5.4 退款完整流程](#54-退款完整流程)
 6. [回调通知](#6-回调通知)
 
 ---
@@ -158,9 +163,9 @@ apiKey=9:s:ak_demo&body.idempotencyKey=11:s:idem_0001&body.productCode=9:s:XP_DE
 ### 2.2 nonce
 
 ⚠️ **`x-nonce` 请用真随机值**，不要用时间戳、也不要用 body 的摘要。
-基串各段之间没有标签，而 nonce 的字符集是这两者的超集 —— 拿它们当 nonce 会让"基串
-拼错顺序"这类实现缺陷在联调期**完全隐身**，等你哪天改成随机 nonce 才集体失败，那时
-所有人都会去怀疑刚改的 nonce。
+基串各段之间没有标签，而 nonce 的字符集是这两者的超集 —— 用时间戳或摘要当 nonce 时，
+基串拼接顺序即使写错也可能在联调期照样通过，换成随机 nonce 后才会暴露。真随机值可以
+让这类问题在第一次联调就被发现。
 
 ### 2.3 认证检查顺序
 
@@ -195,7 +200,7 @@ apiKey=9:s:ak_demo&body.idempotencyKey=11:s:idem_0001&body.productCode=9:s:XP_DE
 | scope | 覆盖接口 |
 |---|---|
 | `esim.read` | `products/list` `products/detail` `cardType` `order/query` `order/list` `iccid/profile` `order/usage` `iccid/renew` |
-| `esim.write` | `order/create` `order/renew` |
+| `esim.write` | `order/create` `order/renew` `order/refund` |
 
 缺 `esim.write` 调写接口 → `403 SCOPE_FORBIDDEN`（在签名校验**之后**判定，所以它确实是权限问题，不是签名问题）。
 
@@ -325,7 +330,7 @@ function signInbound(secret, { apiKey, method, path, timestamp, nonce, body }) {
 与发送用的字符串逐字节相同。
 
 其它语言：Go / Java / PHP / .NET 都能在几十行内写完（只用到排序、UTF-8 字节长度、
-HMAC-SHA256 三样）。**写完请先跑 [2.6](#26-自检向量) 那张自检向量表**，全过再联调。⚠️ 两个语言特有的坑：
+HMAC-SHA256 三样）。**写完请先跑 [2.6](#26-自检向量) 那张自检向量表**，全过再联调。⚠️ 两个语言特有的注意点：
 PHP 要注意 `json_decode` 默认给关联数组、布尔要先于整数判断（PHP/Python 的 `bool` 是
 `int` 的子类型，不先判会把 `true` 编码成 `i:1`）；Go 注意 `map` 遍历是随机序，必须显式排序。
 
@@ -382,10 +387,31 @@ PHP 要注意 `json_decode` 默认给关联数组、布尔要先于整数判断�
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 同 `idempotencyKey` 但请求内容不同 | 换新的幂等键 |
 | `409` | `CLIENT_ORDER_NO_REUSED` | `clientOrderNo` 已被别的订单占用 | 换新的业务单号 |
 | `409` | `RENEW_NOT_ALLOWED` | 这张卡此刻不可续订 | 先调 `iccid/renew` 看 `reasons` |
+| `409` | `ORDER_NOT_REFUNDABLE` | 这一单现在不能退（未履约 / 已退款 / 早于退款功能上线） | 查 `/order/query` 看当前状态。**改参数改不出来**，见 §4.11 |
+| `409` | `REFUND_ALREADY_IN_PROGRESS` | 这一单已有一张在途退款单 | 等 `ORDER_REFUND_RESULT` 出结论后再发起，见 §4.11 |
+| `402` | `BALANCE_LIMIT_REACHED` | **预付费余额不足**：本单扣完会跌破你的透支额度，整单被拒、一分钱不扣 | 充值。**不要重试**，见下方 ⚠️ |
+| `503` | `BALANCE_ACCOUNT_NOT_FOUND` | 平台还没给你建余额账户（运营漏配） | 联系平台。建好后重试即可 |
+| `503` | `CURRENCY_MISMATCH` | 商品币种与你的账户币种不一致（平台配置问题） | 联系平台，**改请求改不出来** |
 | `413` | `REQUEST_ENTITY_TOO_LARGE` | 请求体超过 256KB | 拆小 |
 | `415` | `CONTENT_TYPE_MUST_BE_JSON` | `Content-Type` 不是 `application/json` | 改头 |
 | `429` | `QPS_LIMITED` | 超过凭证每秒请求上限 | 退避重试 |
+| `406` | `[controller error]` | **服务端未预料的异常**，`msg` 固定是这一串、不携带原因 | 见下方 ⚠️ |
 | `503` | `OPENAPI_AUTH_UNAVAILABLE` / `PLATFORM_NOT_ENABLED` | 服务端依赖不可用 | 退避重试并联系平台 |
+
+> ⚠️ **`402` 请不要重试。**
+>
+> 你的账户在平台上是**预付费**的：`/order/create` 与 `/order/renew` 在受理时就按结算价扣款，
+> 余额扣完会跌破额度时整单被拒、一分钱不扣。充值之前重试是同一个结果，且每次都占一次 QPS 配额。
+>
+> - 收到 `402`：停止对这一单重试，转人工或转充值流程。
+> - 收到 `503`：联系平台，处理完成后原样重试即可。
+>
+> 三个资金相关的码里，只有 `402` 需要你侧采取动作。
+
+> ⚠️ **`406` 的处置：退避重试，连续出现请联系平台。**
+>
+> `msg` 固定是 `[controller error]`。它不是参数问题（那是 `400`）、不是签名问题（`401`）、
+> 也不是余额问题（`402`）。联系平台时请带上 `clientOrderNo` 与大致时间。
 
 **跨租户隔离**：查不到与"不属于你"返回**同一个** `404`，平台不会告诉你"这个单存在但不是你的"。
 所以 `404` 不能用来探测他人数据是否存在。
@@ -647,6 +673,11 @@ JsonNode detail = client.invoke("/openapi/v1/products/detail",
 | `accepted` | boolean | 恒为 `true` |
 | `replayed` | boolean | `true` = 这是一次幂等重放，没有新建单 |
 
+> ⚠️ **受理即扣款。** 平台在返回 `ACCEPTED` 的同一个事务里就按该商品的结算价从你的预付费余额扣了钱，不是等履约才扣。后续订单落 `FAILED`（不会出卡）或 `REFUNDED`（退款确认）时自动退回，中间态不动钱。
+>
+> 余额不足以致本单会跌破额度时，**整单被拒、一分钱不扣**，返回 `402 BALANCE_LIMIT_REACHED`。
+> **收到这个码请不要重试**，先完成充值，见 [§3](#3-错误码)。
+
 **示例响应**
 
 ```json
@@ -735,7 +766,7 @@ public String createOrder(XpinEsimClient client, String productCode,
 | `orderStatus` | string | 见 §5 状态机 |
 | `iccid` | string\|null | **只有履约后才有值** |
 | `profileStatus` | string\|null | 卡的 profile 状态 |
-| `product` | object | 下单时刻的**商品快照**（含 `settlementPrice` 结算价） |
+| `product` | object | 下单时刻的**商品快照**。⚠️ 其中 `retailPrice` 与 `settlementPrice` **在本接口上恒为 `"0"`**，不是快照里的真实金额，见下方说明 |
 
 **示例响应**（履约中）
 
@@ -755,13 +786,19 @@ public String createOrder(XpinEsimClient client, String productCode,
       "volume": "0", "dataLimited": "N", "validity": 3, "expireDay": 90,
       "cardType": "ep1", "productType": "DAYPASS",
       "mccList": ["276", "232"],
-      "retailPrice": "0", "settlementPrice": null, "currency": "USD",
+      "retailPrice": "0", "settlementPrice": "0", "currency": "USD",
       "configVersion": 1
     }
   },
   "code": 200, "msg": "ok", "t": 1788431709839
 }
 ```
+
+> ⚠️ **`product.retailPrice` 与 `product.settlementPrice` 在本接口上恒为 `"0"`。**
+>
+> 这两个字段在订单投影上**不携带金额**，`/order/list` 的商品快照同理。
+>
+> **要按订单算钱，请用 `productCode` 回 `/products/list` 或 `/products/detail` 取 `retailPrice`**（那两个接口返回的是真实零售价）。订单响应里的这两个字段不用于对账。
 
 **Node.js —— 轮询到出卡**
 
@@ -1262,6 +1299,47 @@ String qrPayload = p.get("delivery").get("activationCode").asText();
 
 ---
 
+### 4.11 退款申请 `/order/refund`
+
+对一张**已履约**的订单发起退款申请。scope `esim.write`。
+
+⚠️ **这个接口只受理，不动钱。** 它落一张退款单并返回 `REQUESTED`；金额要等平台向电信运营商核实到退款确实发生之后才退回你的预付费余额，那个确认由平台的巡检做出，**延迟以分钟计**。结论通过 `ORDER_REFUND_RESULT` 回调推给你（§6.1），也可以轮询 `/order/query` 看 `orderStatus` 是否变成 `REFUNDED`。
+
+**入参**
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `clientOrderNo` | string | 是 | 你的业务单号，精确匹配。**不引入第二种订单号** |
+| `idempotencyKey` | string | 是 | 8–96 字符。与 `/order/create` 同族的重放保护 |
+| `reason` | string | 否 | 1–512 字符。退款原因，会原样回传到 `ORDER_REFUND_RESULT` 的 `reason` |
+
+**响应**
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `refundNo` | string | 平台退款单号，后续沟通用它 |
+| `orderNo` | string | 被退的平台订单号 |
+| `clientOrderNo` | string | 回显你传的业务单号 |
+| `refundStatus` | string | 受理成功恒为 `"REQUESTED"` |
+| `amount` | string | 退款金额，**恒等于该单的结算金额**（本期只支持全额退） |
+| `currency` | string | |
+| `accepted` | boolean | 恒为 `true` |
+| `replayed` | boolean | `true` = 这是一次重放，没有新建退款单 |
+
+**拒绝**
+
+| HTTP | `msg` | 含义与处置 |
+|---|---|---|
+| 404 | `ORDER_NOT_FOUND` | 你名下没有这个 `clientOrderNo` |
+| 409 | `ORDER_NOT_REFUNDABLE` | 这一单现在不能退：未履约（钱本来就没扣或已经退了）、已退款、或它早于预付费余额上线。查 `/order/query` 看当前状态 —— **改参数改不出来** |
+| 409 | `REFUND_ALREADY_IN_PROGRESS` | 这一单已有一张在途退款单。等它出结论（`ORDER_REFUND_RESULT`）之后才能再发起 |
+| 409 | `IDEMPOTENCY_KEY_REUSED` | 同一个 `idempotencyKey` 之前用过、但内容不同（`reason` 也算内容） |
+| 400 | `ORDER_INPUT_INVALID` | 缺 `clientOrderNo` 或 `idempotencyKey` |
+
+**幂等语义**：同一个 `idempotencyKey` + 同样的内容重发 → 返回同一张退款单 + `replayed: true`，**不会退两次钱**。一张订单可以有多张历史退款单（第一次被拒之后可以再申请），但**同时只能有一张在途**。
+
+⚠️ **没有"撤销退款申请"的接口。** 一张 `REQUESTED` 的单只有两个出口：平台确认（`CONFIRMED`）或平台拒绝（`REJECTED`）。改主意了请联系平台。
+
 ## 5. 业务流程与状态机
 
 ### 5.1 订单状态机
@@ -1285,9 +1363,14 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
 | `RETRY_PENDING` | 等待重试 | 继续等 |
 | **`FULFILLED`** | **已履约，`iccid` 可用** | 取激活码交付用户 |
 | **`FAILED`** | **终态：这一单不会再出卡** | **停止轮询**。这一单不会自愈，需要出卡就重新下一单（用**新的** `idempotencyKey` 与 `clientOrderNo`）。原因需联系平台核查 |
+| **`REFUNDED`** | **终态：这一单已退款**（你提交的退款申请被确认，见 §4.11） | 停止轮询。卡在电信运营商侧已废弃，激活码不再可用 |
 
 > 🔴 **轮询必须同时判 `FAILED`。** 只等 `FULFILLED` 的循环会在失败单上一直转到超时，
 > 而那一单永远不会变。`FULFILLED` 与 `FAILED` 都是**终态**，收到任一个就停。
+>
+> ⚠️ **`REFUNDED` 只出现在你自己提交过退款申请的订单上**（§4.11），不使用退款接口的接入方
+> 不会看到它。按契约你的状态解析**不应因遇到未知取值而报错** —— 请把它当作与 `FAILED`
+> 同族的终态处理。
 
 **时延**：开卡与续订的 `ACCEPTED → FULFILLED` 时长根据电信运营商的数据返回，可能在 1～15 分钟左右波动。
 明显超出该区间仍未 `FULFILLED` 也未 `FAILED` 时需与平台核查，**不要靠重复下单绕过**
@@ -1319,6 +1402,28 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
 > 同步时机与新鲜期根据电信运营商的数据返回，可能在 1～15 分钟左右波动。窗口外查资格会得到 `RENEWABILITY_STALE`。
 > 因此**必须在用户点击的那一刻实时查**，并对 `RENEWABILITY_STALE` 做"稍后再试"的友好提示。
 
+### 5.4 退款完整流程
+
+```
+1. order/query             确认这一单是 FULFILLED（只有已履约的单能退）
+2. order/refund            → REQUESTED + refundNo（此时钱还没退）
+3. 二选一：
+   a. 等 ORDER_REFUND_RESULT 回调（推荐，见 §6；确认与拒绝都会发）
+   b. 轮询 order/query 看 orderStatus 是否变 REFUNDED
+      注意：拒绝不改变订单状态，所以这条路只能识别"已确认"，需配合超时
+4. refundStatus === "CONFIRMED" → 金额已退回预付费余额，卡已废弃
+   refundStatus === "REJECTED"  → 不退，卡仍有效，reason 是原因
+```
+
+> ⚠️ **确认是异步的，延迟以分钟计。** 平台要先向电信运营商核实退款确实发生，才把钱退回你的余额；
+> 这个核实由平台的巡检做出，不是你调接口的那一刻。所以 `/order/refund` 返回 `REQUESTED` 之后，
+> **不要立刻去查余额并断言已经涨回来**。
+>
+> ⚠️ **两种结论的可见性不同，选轮询时请注意。** 确认（`CONFIRMED`）会把 `orderStatus` 变为
+> `REFUNDED`；拒绝（`REJECTED`）**不改变订单状态**。因此轮询 `/order/query` 只能识别"已确认"
+> 这一种结论 —— **推荐走 `ORDER_REFUND_RESULT` 回调**，它对两种结论都会送达；确需轮询的请设置
+> 超时，超时后联系平台确认结论。
+
 ---
 
 ## 6. 回调通知
@@ -1335,6 +1440,16 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
 | `ORDER_OPEN_RESULT` | 开卡订单落 `FULFILLED` 时，每单一次 | `orderNo` `clientOrderNo` `idempotencyKey` `iccid` `imsi` `msisdn` `activationCode` `productCode` `orderStatus` |
 | `ORDER_RENEW_RESULT` | 续订单落 `FULFILLED` 时 | **同上**（`activationCode` 是该卡**原有**的激活码，不变） |
 | `STATUS_CHANGED` | 卡的 profile 状态真的变化时 | `orderNo` `iccid` `entityType`(恒 `PROFILE`) `previousStatus` `currentStatus` `changedAt` `changeVersion` |
+| `ORDER_REFUND_RESULT` | 你提交的退款申请**有了结论**时（确认或拒绝），每张退款单一次 | `orderNo` `clientOrderNo` `refundNo` `idempotencyKey` `refundStatus` `orderStatus` `amount` `currency` `reason` |
+
+⚠️ **`ORDER_REFUND_RESULT` 对两种结论都会送达，请两种都处理。** `refundStatus: "REJECTED"` 是退款流程一个**成功完成的结论**（平台判定不退），不是投递失败：收到它即可停止等待，`reason` 里是原因。
+
+| `refundStatus` | `orderStatus` | `reason` | 含义 |
+|---|---|---|---|
+| `"CONFIRMED"` | `"REFUNDED"` | `null` | 退款已确认，金额已退回你的预付费余额 |
+| `"REJECTED"` | `"FULFILLED"` | 拒绝原因（字符串） | 平台判定不退，订单状态**没有变化**，卡仍然有效 |
+
+⚠️ **去重请按 `eventId`。** 一张退款单只会收到一次 `ORDER_REFUND_RESULT`（`CONFIRMED` 与 `REJECTED` 都是终态），但同一张**订单**可以收到多次——第一次被拒之后可以再次申请，那是另一张退款单、另一个 `refundNo`，`eventId` 也不同。按 `orderNo` 去重会把后续退款的结论一并滤掉。
 
 ### 6.2 请求形状
 
@@ -1360,7 +1475,7 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
 | `nonce` | string | 每次投递重新生成的 UUID，**重投会变** |
 | `businessType` | string | 恒为 `ESIM` |
 
-**示例报文**（三类各一）
+**示例报文**（四类各一）
 
 ```json
 // ORDER_OPEN_RESULT
@@ -1375,6 +1490,16 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED
 ```json
 // STATUS_CHANGED
 {"msg":"success","code":"0000","data":{"iccid":"89000000000000000433","orderNo":"XE1788489809764F48C390102","changedAt":"2026-09-04T02:49:39.026Z","entityType":"PROFILE","changeVersion":1,"currentStatus":"ENABLED","previousStatus":"UNKNOWN"},"eventId":"56e045be3d6c736f968e19c690dd01fc6be016055fcc32bf","eventType":"STATUS_CHANGED","timestamp":"2026-09-04T02:49:43.548Z","nonce":"e154774a-636d-4ee3-b2a4-4b007db57a97","businessType":"ESIM"}
+```
+
+```json
+// ORDER_REFUND_RESULT —— 确认（reason 为 null）
+{"msg":"success","code":"0000","data":{"orderNo":"XE1788489809764F48C390102","clientOrderNo":"m1whA-1788489808349","refundNo":"XR1788692301447A31B7C0D28","idempotencyKey":"m1whA-refund-1788692300112","refundStatus":"CONFIRMED","orderStatus":"REFUNDED","amount":"3.20","currency":"USD","reason":null},"eventId":"991536ed1ff784d8d2c026c24f0e1f2ebc20f1b5fd93ba74","eventType":"ORDER_REFUND_RESULT","timestamp":"2026-09-13T09:21:44.006Z","nonce":"5f2a1c93-70e8-4a1d-9b6e-2c81d4f0a7b3","businessType":"ESIM"}
+```
+
+```json
+// ORDER_REFUND_RESULT —— 拒绝（orderStatus 不变，reason 是原因）
+{"msg":"success","code":"0000","data":{"orderNo":"XE1788505564505CF4DE8D310","clientOrderNo":"m1n-C4-DATA-rn-1788504527118","refundNo":"XR17886931125503F9E82A146","idempotencyKey":"m1n-refund-1788693111204","refundStatus":"REJECTED","orderStatus":"FULFILLED","amount":"5.00","currency":"USD","reason":"upstream declined: package already consumed"},"eventId":"a665fa8d571364599d7e4f168e36d3fa268d7da998cfb946","eventType":"ORDER_REFUND_RESULT","timestamp":"2026-09-13T09:38:02.771Z","nonce":"c0913ba7-1d55-4e0a-8f37-6ab2e59d4c10","businessType":"ESIM"}
 ```
 
 > 🔴 **不要假设键序。** 当前键序为 `msg, code, data, eventId, eventType, timestamp, nonce, businessType`，
@@ -1460,7 +1585,7 @@ app.post('/xpin/webhook', async (req, res) => {
 > 🔴 **幂等键只能是 `eventId`（或头里的 `x-event-id`）**，不能用 `sign`、`nonce` 或 `timestamp`——它们每次投递都会变。
 >
 > 🔴 **`"0000"` 是字符串，同步接口的 `200` 是数字，两套码本。** 回 `{"code":200}` 或 `{"code":0}`
-> 都会被判为失败，导致同一事件在约两小时内被反复重投。这是最容易写错、且不会立刻报错的一个坑。
+> 都会被判为失败，导致同一事件在约两小时内被反复重投。请务必按字符串 `"0000"` 应答。
 
 > **密钥轮换注意**：平台用你凭证**当前**的 `app_secret` 对回调签名，且不会回落到旧密钥。
 > 轮换期间已在投递中的事件可能验签失败，**请与平台方约定轮换时间窗**，避开有事件在途的时段。

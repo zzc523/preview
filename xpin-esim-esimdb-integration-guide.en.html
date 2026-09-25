@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>XPIN eSIM OpenAPI Integration Guide (eSIMDB Channel)</title>
+    <style>
+      :root {
+        --bg: #f5f7fa;
+        --panel: #ffffff;
+        --ink: #1d2733;
+        --muted: #657487;
+        --line: #dfe5ec;
+        --brand: #1f6feb;
+        --brand-dark: #164f9f;
+        --amber: #b96b00;
+        --red: #c93d36;
+        --amber-soft: #fff8ec;
+        --red-soft: #fff2f0;
+        --radius: 14px;
+        --maxw: 1180px;
+        --toc: 250px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        font-size: 15px;
+        line-height: 1.78;
+        -webkit-font-smoothing: antialiased;
+      }
+      header {
+        background: linear-gradient(135deg, #14346f, #1f6feb 62%, #42a5f5);
+        color: #fff;
+        padding: 52px 24px 40px;
+      }
+      header .in {
+        max-width: var(--maxw);
+        margin: 0 auto;
+      }
+      .tag {
+        display: inline-block;
+        padding: 4px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.34);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.14);
+        font-size: 12px;
+        letter-spacing: 0.5px;
+      }
+      header h1 {
+        max-width: 900px;
+        margin: 16px 0 8px;
+        font-size: 32px;
+        line-height: 1.25;
+      }
+      header p {
+        max-width: 900px;
+        margin: 0;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 14px;
+      }
+
+      .shell {
+        max-width: var(--maxw);
+        margin: 0 auto;
+        padding: 26px 22px 90px;
+        display: grid;
+        grid-template-columns: var(--toc) minmax(0, 1fr);
+        gap: 26px;
+        align-items: start;
+      }
+      nav.toc {
+        position: sticky;
+        top: 18px;
+        max-height: calc(100vh - 36px);
+        overflow: auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 14px 12px;
+        font-size: 13px;
+      }
+      nav.toc a {
+        display: block;
+        padding: 3px 8px;
+        border-radius: 6px;
+        color: #3b4a5c;
+        text-decoration: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      nav.toc a:hover {
+        background: #eef3f9;
+        color: var(--brand);
+      }
+      nav.toc a.l3 {
+        padding-left: 20px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      main {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 8px 30px 40px;
+        box-shadow: 0 1px 2px rgba(16, 30, 54, 0.04);
+        min-width: 0;
+      }
+
+      h2 {
+        margin: 34px 0 12px;
+        padding-top: 12px;
+        font-size: 23px;
+        line-height: 1.35;
+        border-top: 1px solid var(--line);
+      }
+      h2:first-of-type {
+        border-top: none;
+      }
+      h3 {
+        margin: 26px 0 8px;
+        font-size: 17.5px;
+        color: #22344a;
+      }
+      h4 {
+        margin: 20px 0 6px;
+        font-size: 15.5px;
+        color: #33475f;
+      }
+      .anchor {
+        margin-left: 8px;
+        color: #c6d2e0;
+        text-decoration: none;
+        font-weight: 400;
+        opacity: 0;
+        transition: opacity 0.12s;
+      }
+      h2:hover .anchor,
+      h3:hover .anchor,
+      h4:hover .anchor {
+        opacity: 1;
+      }
+      p {
+        margin: 10px 0;
+      }
+      ul,
+      ol {
+        margin: 10px 0;
+        padding-left: 24px;
+      }
+      li {
+        margin: 5px 0;
+      }
+      hr {
+        margin: 26px 0;
+        border: none;
+        border-top: 1px solid var(--line);
+      }
+      strong {
+        font-weight: 650;
+        color: #12253c;
+      }
+      a {
+        color: var(--brand);
+      }
+      a:hover {
+        color: var(--brand-dark);
+      }
+
+      code {
+        padding: 1.5px 5px;
+        border-radius: 5px;
+        background: #eef3f8;
+        color: #22405f;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.8px;
+        word-break: break-word;
+      }
+      .tw {
+        overflow-x: auto;
+        margin: 14px 0;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid var(--line);
+        background: #fff;
+        font-size: 13.4px;
+      }
+      th,
+      td {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--line);
+        border-right: 1px solid #edf1f6;
+        text-align: left;
+        vertical-align: top;
+      }
+      th:last-child,
+      td:last-child {
+        border-right: none;
+      }
+      th {
+        background: #f0f4f9;
+        color: #22344a;
+        font-weight: 650;
+        white-space: nowrap;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      tbody tr:nth-child(even) {
+        background: #fafcfe;
+      }
+      td code {
+        background: #f2f6fa;
+      }
+      /* The first column of field tables holds field names / error codes; breaking them makes them unreadable.
+         On narrow screens the table scrolls horizontally instead (.tw). */
+      td:first-child code {
+        white-space: nowrap;
+      }
+
+      figure.code {
+        position: relative;
+        margin: 14px 0;
+      }
+      figure.code::before {
+        content: attr(data-lang);
+        position: absolute;
+        top: 0;
+        right: 0;
+        padding: 2px 9px;
+        border-radius: 0 10px 0 8px;
+        background: #243449;
+        color: #8fa6c2;
+        font-size: 11px;
+        letter-spacing: 0.4px;
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+      }
+      figure.code pre {
+        margin: 0;
+        padding: 15px 17px;
+        border-radius: 10px;
+        background: #16202e;
+        overflow-x: auto;
+      }
+      figure.code code {
+        padding: 0;
+        background: none;
+        color: #dbe6f3;
+        font-size: 12.9px;
+        line-height: 1.62;
+        white-space: pre;
+        word-break: normal;
+      }
+      .copy {
+        position: absolute;
+        top: 6px;
+        right: 64px;
+        padding: 3px 10px;
+        border: 1px solid #3a4d66;
+        border-radius: 6px;
+        background: #243449;
+        color: #9fb6d1;
+        font-size: 11.5px;
+        cursor: pointer;
+        opacity: 0;
+        transition: opacity 0.12s;
+      }
+      figure.code:hover .copy {
+        opacity: 1;
+      }
+      .copy:hover {
+        color: #fff;
+        border-color: #5b7a9c;
+      }
+      .copy.done {
+        color: #7fd7a6;
+        border-color: #2f6b4d;
+      }
+
+      blockquote.note {
+        margin: 14px 0;
+        padding: 11px 16px;
+        border-left: 3px solid #b9cbe2;
+        border-radius: 0 8px 8px 0;
+        background: #f4f8fc;
+        color: #2c3d52;
+      }
+      blockquote.warn {
+        border-left-color: var(--amber);
+        background: var(--amber-soft);
+      }
+      blockquote.note > :first-child {
+        margin-top: 0;
+      }
+      blockquote.note > :last-child {
+        margin-bottom: 0;
+      }
+      blockquote.note table {
+        font-size: 13px;
+      }
+
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+        nav.toc {
+          position: static;
+          max-height: none;
+        }
+        main {
+          padding: 8px 18px 32px;
+        }
+      }
+      @media print {
+        body {
+          background: #fff;
+        }
+        header {
+          background: #14346f !important;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        nav.toc,
+        .copy {
+          display: none;
+        }
+        .shell {
+          display: block;
+          padding: 0;
+        }
+        main {
+          border: none;
+          box-shadow: none;
+          padding: 0;
+        }
+        figure.code pre {
+          background: #f4f6f9;
+          border: 1px solid var(--line);
+        }
+        /* Paper has no horizontal scroll: wrap very long single lines (base strings, one-line samples),
+           otherwise they get cut off. */
+        figure.code code {
+          color: #1d2733;
+          white-space: pre-wrap;
+          word-break: break-all;
+        }
+        figure.code::before {
+          display: none;
+        }
+        h2,
+        h3 {
+          break-after: avoid;
+        }
+        table,
+        figure.code,
+        blockquote {
+          break-inside: avoid;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="in">
+        <span class="tag">eSIMDB Channel Integration Guide</span>
+        <h1>XPIN eSIM OpenAPI Integration Guide (eSIMDB Channel)</h1>
+        <p>This guide is a single self-contained file with no external resources. It can be read offline and printed.</p>
+      </div>
+    </header>
+
+    <div class="shell">
+      <nav class="toc">
+        <a class="l2" href="#contents">Contents</a><a class="l2" href="#1-overview">1. Overview</a
+        ><a class="l2" href="#2-basics">2. Basics</a
+        ><a class="l2" href="#3-authentication-and-signing">3. Authentication and Signing</a
+        ><a class="l3" href="#31-signature-algorithm-xpin-kv1">3.1 Signature Algorithm XPIN-KV1</a
+        ><a class="l3" href="#32-nonce">3.2 nonce</a
+        ><a class="l3" href="#33-authentication-check-sequence">3.3 Authentication Check Sequence</a
+        ><a class="l3" href="#34-signing-clients">3.4 Signing Clients</a
+        ><a class="l3" href="#35-self-test-vectors">3.5 Self-Test Vectors</a
+        ><a class="l2" href="#4-endpoints">4. Endpoints</a
+        ><a class="l3" href="#41-product-list-productslist">4.1 Product List <code>/products/list</code></a
+        ><a class="l3" href="#42-product-detail-productsdetail">4.2 Product Detail <code>/products/detail</code></a
+        ><a class="l2" href="#5-plan-object-dataplan">5. Plan Object DataPlan</a
+        ><a class="l3" href="#51-fields">5.1 Fields</a><a class="l3" href="#52-value-rules">5.2 Value Rules</a
+        ><a class="l3" href="#53-fields-not-returned">5.3 Fields Not Returned</a
+        ><a class="l3" href="#54-examples">5.4 Examples</a><a class="l2" href="#6-error-codes">6. Error Codes</a
+        ><a class="l3" href="#61-handling-non-200-responses">6.1 Handling Non-200 Responses</a>
+      </nav>
+      <main>
+        <blockquote class="note">
+          <p><strong>Document version: v1</strong> (2026-09-24)</p>
+          <p>
+            OpenAPI integration guide for the <strong>eSIMDB</strong> channel, covering authentication and signing, and
+            the product endpoints. Plan objects follow the <code>DataPlan</code> structure of eSIMDB Provider API
+            <strong>v1.0.2</strong>. All response samples are real responses from the sandbox environment.
+          </p>
+          <p>If this guide and the running service disagree, <strong>the service is authoritative</strong>.</p>
+        </blockquote>
+        <hr />
+        <h2 id="contents">Contents<a class="anchor" href="#contents">#</a></h2>
+        <ol>
+          <li><a href="#1-overview">Overview</a></li>
+        </ol>
+        <ol start="2">
+          <li><a href="#2-basics">Basics</a></li>
+          <li><a href="#3-authentication-and-signing">Authentication and Signing</a></li>
+        </ol>
+        <ul>
+          <li><a href="#31-signature-algorithm-xpin-kv1">3.1 Signature Algorithm XPIN-KV1</a></li>
+          <li><a href="#32-nonce">3.2 nonce</a></li>
+          <li><a href="#33-authentication-check-sequence">3.3 Authentication Check Sequence</a></li>
+          <li><a href="#34-signing-clients">3.4 Signing Clients</a></li>
+          <li><a href="#35-self-test-vectors">3.5 Self-Test Vectors</a></li>
+        </ul>
+        <ol start="4">
+          <li><a href="#4-endpoints">Endpoints</a></li>
+        </ol>
+        <ul>
+          <li><a href="#41-product-list-productslist">4.1 Product List <code>/products/list</code></a></li>
+          <li><a href="#42-product-detail-productsdetail">4.2 Product Detail <code>/products/detail</code></a></li>
+        </ul>
+        <ol start="5">
+          <li><a href="#5-plan-object-dataplan">Plan Object DataPlan</a></li>
+        </ol>
+        <ul>
+          <li><a href="#51-fields">5.1 Fields</a></li>
+          <li><a href="#52-value-rules">5.2 Value Rules</a></li>
+          <li><a href="#53-fields-not-returned">5.3 Fields Not Returned</a></li>
+          <li><a href="#54-examples">5.4 Examples</a></li>
+        </ul>
+        <ol start="6">
+          <li><a href="#6-error-codes">Error Codes</a></li>
+        </ol>
+        <ul>
+          <li><a href="#61-handling-non-200-responses">6.1 Handling Non-200 Responses</a></li>
+        </ul>
+        <hr />
+
+        <h2 id="1-overview">1. Overview<a class="anchor" href="#1-overview">#</a></h2>
+        <p>
+          With the two endpoints in this guide you can fetch the on-sale plans <strong>published to you</strong>. Plan
+          objects use the <code>DataPlan</code> structure.
+        </p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Endpoints</td>
+                <td>
+                  <code>/openapi/v1/products/list</code> (product list), <code>/openapi/v1/products/detail</code>
+                  (product detail); see <a href="#4-endpoints">§4</a>
+                </td>
+              </tr>
+              <tr>
+                <td>How consumers buy</td>
+                <td>Every plan carries a <code>link</code> to its purchase page, where the consumer completes the purchase</td>
+              </tr>
+              <tr>
+                <td>Data structure</td>
+                <td>
+                  <code>DataPlan</code> of eSIMDB Provider API v1.0.2; the fields are described in
+                  <a href="#5-plan-object-dataplan">§5</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <hr />
+
+        <h2 id="2-basics">2. Basics<a class="anchor" href="#2-basics">#</a></h2>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Base URL (sandbox)</td>
+                <td><code>https://sandboxapi.xpin.network</code></td>
+              </tr>
+              <tr>
+                <td>Base URL (production)</td>
+                <td><code>https://openapi.xpin.network</code></td>
+              </tr>
+              <tr>
+                <td>Protocol</td>
+                <td><code>POST</code> for everything, <code>Content-Type: application/json</code></td>
+              </tr>
+              <tr>
+                <td>Charset</td>
+                <td>UTF-8</td>
+              </tr>
+              <tr>
+                <td><strong>Success check</strong></td>
+                <td><strong>Read the <code>code</code> field in the response body, not the HTTP status</strong></td>
+              </tr>
+              <tr>
+                <td>Credentials</td>
+                <td>
+                  <code>app_key</code> / <code>app_secret</code> issued by the platform (obtain them from the
+                  platform). Sandbox credentials only work in the sandbox environment
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>Every business response from the platform is <code>HTTP 200</code></strong>, with this body:</p>
+        <figure class="code" data-lang="json">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>{ "data": {...}, "code": 200, "msg": "ok", "t": 1790242641577 }</code></pre>
+        </figure>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>data</code></td>
+                <td>object</td>
+                <td>Business data. <code>{}</code> on failure</td>
+              </tr>
+              <tr>
+                <td><code>code</code></td>
+                <td>number</td>
+                <td><strong>Business code</strong>. Only <code>200</code> means success</td>
+              </tr>
+              <tr>
+                <td><code>msg</code></td>
+                <td>string</td>
+                <td><code>ok</code> on success; an error code or a field-level message on failure</td>
+              </tr>
+              <tr>
+                <td><code>t</code></td>
+                <td>number</td>
+                <td>
+                  Server timestamp in milliseconds. ⚠️ A few server-error responses (<code>406</code>) omit it; do
+                  not treat it as always present
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <blockquote class="note warn">
+          <p>
+            🔴 <strong>Checking a response takes two steps, not one.</strong> If the path prefix is wrong, you used
+            <code>http://</code>, or the connection breaks mid-request, the request never reaches the business layer:
+            you get a <strong>real HTTP status code</strong>, and the body <strong>may not be JSON</strong>.
+          </p>
+          <figure class="code">
+            <button class="copy" type="button">Copy</button>
+            <pre><code>Step 1  HTTP status != 200  -&gt;  The request never reached the business layer. The body may not be JSON; do not parse it. See §6.1.
+Step 2  HTTP status == 200  -&gt;  A platform response. Parse the JSON and check the body's `code`.</code></pre>
+          </figure>
+          <p>
+            Always assert <code>body.code === 200</code>. Asserting <code>res.status === 200</code> treats every
+            business failure as a success.
+          </p>
+        </blockquote>
+        <p>
+          Requests on port 80 are redirected to HTTPS with a <code>301</code>, and <strong>a 301 does not preserve the
+          POST body</strong> — use <code>https://</code> directly.
+        </p>
+        <hr />
+
+        <h2 id="3-authentication-and-signing">
+          3. Authentication and Signing<a class="anchor" href="#3-authentication-and-signing">#</a>
+        </h2>
+        <p>Every request carries four headers:</p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Header</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>x-api-key</code></td>
+                <td>Your <code>app_key</code></td>
+              </tr>
+              <tr>
+                <td><code>x-timestamp</code></td>
+                <td>
+                  Timestamp in <strong>milliseconds</strong> (13 digits); must be within <strong>5 minutes</strong> of
+                  the server clock (either direction)
+                </td>
+              </tr>
+              <tr>
+                <td><code>x-nonce</code></td>
+                <td>
+                  Random string matching <code>^[A-Za-z0-9._:-]{8,128}$</code>; <strong>the same nonce can be used
+                  only once per merchant within 10 minutes</strong> (see <a href="#32-nonce">3.2</a>)
+                </td>
+              </tr>
+              <tr>
+                <td><code>x-sign</code></td>
+                <td>HMAC-SHA256 as <strong>lowercase</strong> hex; see 3.1</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="31-signature-algorithm-xpin-kv1">
+          3.1 Signature Algorithm XPIN-KV1<a class="anchor" href="#31-signature-algorithm-xpin-kv1">#</a>
+        </h3>
+        <p>
+          What gets signed is the <strong>parsed data</strong>, not the raw bytes of the message — so you can send the
+          body with any JSON library, key order or indentation, and you do <strong>not</strong> need to control the
+          exact bytes your HTTP client sends. The signed object always has these seven fields:
+        </p>
+        <figure class="code" data-lang="jsonc">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>{
+  "sigAlg":    "xpin.esim.openapi.kv1",     // literal
+  "apiKey":    "&lt;value of x-api-key&gt;",
+  "method":    "POST",
+  "path":      "/openapi/v1/products/list", // path only, **no query string**;
+                                            // normalized: repeated slashes collapsed, trailing slash removed, %XX not decoded
+  "timestamp": "&lt;value of x-timestamp&gt;",    // as a string
+  "nonce":     "&lt;value of x-nonce&gt;",
+  "body":      { ... }                      // the request body itself
+}</code></pre>
+        </figure>
+        <p>
+          Build the base string from it with the four rules below, then compute
+          <code>hex(HMAC_SHA256(app_secret, base))</code>.
+        </p>
+        <p><strong>R1 Flatten</strong> — recursively expand into a list of "path → scalar" pairs:</p>
+        <ul>
+          <li>
+            Nested objects: join path segments with <code>.</code>. <code>{"data":{"code":"X"}}</code> → path
+            <code>data.code</code>
+          </li>
+          <li>Arrays: the index is a segment. <code>{"tags":["a","b"]}</code> → <code>tags.0</code>, <code>tags.1</code></li>
+          <li>
+            An <strong>empty object</strong> yields one entry <code>path → o:</code>, and an <strong>empty
+            array</strong> yields one entry <code>path → a:</code>. Without this marker, <code>{"a":{}}</code> and
+            <code>{}</code> would produce the same base string
+          </li>
+          <li>
+            Keys must match <code>^[A-Za-z][A-Za-z0-9_]*$</code>. <strong>Reject</strong> any key that does not; do not
+            try to escape it
+          </li>
+        </ul>
+        <p><strong>R2 Value encoding</strong> (with type tags):</p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Value</th>
+                <th>Encoding</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>String</td>
+                <td><code>s:</code> + raw text (UTF-8, <strong>no characters escaped</strong>)</td>
+              </tr>
+              <tr>
+                <td>Integer</td>
+                <td><code>i:</code> + decimal, no leading zeros, <code>-0</code> written as <code>0</code></td>
+              </tr>
+              <tr>
+                <td>Boolean</td>
+                <td><code>b:true</code> / <code>b:false</code></td>
+              </tr>
+              <tr>
+                <td><code>null</code></td>
+                <td><code>n:</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>Numbers must be integers with an absolute value ≤ 2⁵³−1</strong> (<code>2</code> and
+          <code>2.0</code> are both treated as integers). Decimals, out-of-range integers, <code>NaN</code> and
+          <code>Infinity</code> are <strong>always rejected — do not try to encode them</strong>. Request bodies for
+          this channel only contain <code>pageNo</code>, <code>pageSize</code> and <code>productCode</code>, so normal
+          use never hits this rule. There are also two structural limits: nesting depth 8 and 512 leaves in total;
+          exceeding them yields <code>CANONICAL_TOO_DEEP</code> and <code>CANONICAL_TOO_LARGE</code> respectively (both
+          <code>400</code>).
+        </p>
+        <p><strong>R3 Literal for each entry</strong> (length-prefixed):</p>
+        <figure class="code">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>path + "=" + &lt;UTF-8 byte length of the encoded value&gt; + ":" + encoded value</code></pre>
+        </figure>
+        <p>
+          ⚠️ The length is the byte count of the <strong>whole encoded value</strong>, <strong>including the
+          two-character type tag <code>s:</code> / <code>i:</code></strong>. <code>"ak_demo"</code> encodes to
+          <code>s:ak_demo</code>, whose length is <strong>9</strong>, not 7 — this is the most common implementation
+          mistake.
+        </p>
+        <p>
+          <strong>R4 Sort and join</strong> — sort ascending by the <strong>UTF-8 bytes of the full path</strong> and
+          join with <code>&amp;</code>.
+        </p>
+        <p><strong>A complete example</strong>, applying all four rules:</p>
+        <figure class="code" data-lang="jsonc">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>// Request: POST /openapi/v1/products/list
+// x-api-key: ak_demo   x-timestamp: 1788400000000   x-nonce: n_demo0001
+// body:
+{ "pageNo": 1, "pageSize": 100 }</code></pre>
+        </figure>
+        <p>After flattening, encoding, length-prefixing and sorting by path, the signed object becomes:</p>
+        <figure class="code">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>apiKey=9:s:ak_demo&amp;body.pageNo=3:i:1&amp;body.pageSize=5:i:100&amp;method=6:s:POST&amp;nonce=12:s:n_demo0001&amp;path=27:s:/openapi/v1/products/list&amp;sigAlg=23:s:xpin.esim.openapi.kv1&amp;timestamp=15:s:1788400000000</code></pre>
+        </figure>
+        <p>
+          Computing <code>HMAC_SHA256(app_secret, base)</code> over this string and taking lowercase hex gives
+          <code>x-sign</code>. With <code>app_secret = demo_secret</code> the result is:
+        </p>
+        <figure class="code">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>ee1c7d507eedf6257f7db7f79a9cff469ab528be64bd9c609e83a6b06dcde996</code></pre>
+        </figure>
+        <p>More self-test vectors are in <a href="#35-self-test-vectors">3.5</a>.</p>
+
+        <h3 id="32-nonce">3.2 nonce<a class="anchor" href="#32-nonce">#</a></h3>
+        <p>
+          ⚠️ <strong>Use a truly random value for <code>x-nonce</code></strong> — not a timestamp, and not a digest of
+          the body. If the nonce equals the <code>timestamp</code>, a client that <strong>swaps</strong> the two
+          arguments by mistake cannot be caught by the signature.
+        </p>
+        <p>
+          <strong>Deduplication key and window</strong>: nonces are deduplicated per environment + merchant + nonce and
+          remembered for 10 minutes. Random nonces satisfy this naturally; you do not need to maintain a pool.
+        </p>
+
+        <h3 id="33-authentication-check-sequence">
+          3.3 Authentication Check Sequence<a class="anchor" href="#33-authentication-check-sequence">#</a>
+        </h3>
+        <p>When several conditions fail at once, you only see the <strong>first one hit</strong>:</p>
+        <figure class="code">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>1. All four signature headers present ...... 401 AUTH_HEADERS_MISSING
+2. nonce format ............................ 401 NONCE_INVALID
+3. Timestamp within the window ............. 401 TIMESTAMP_INVALID
+4. app_key exists and is enabled ........... 401 APP_KEY_INVALID
+5. Credential not expired .................. 401 CREDENTIAL_EXPIRED
+6. Source IP on the allowlist .............. 403 IP_NOT_ALLOWED
+7. Within the QPS limit .................... 429 QPS_LIMITED
+8. Payload can be canonicalized ............ 400 CANONICAL_*
+9. Signature is correct .................... 401 SIGNATURE_INVALID
+10. Credential authorized for the endpoint . 403 SCOPE_FORBIDDEN
+11. nonce not used before .................. 401 NONCE_REPLAYED</code></pre>
+        </figure>
+        <p>
+          Step 8 is <strong>deliberately separate from <code>SIGNATURE_INVALID</code></strong>: it means the payload
+          contains a value that cannot be signed, not that your key is wrong. If you see <code>CANONICAL_*</code>,
+          check the payload, not the key.
+        </p>
+        <blockquote class="note">
+          <p>
+            <strong>Quota</strong>: <code>/products/list</code> and <code>/products/detail</code>
+            <strong>together</strong> allow at most <code>qpsLimit</code> requests per second, configured by the
+            platform for your account. Exceeding it returns <code>429 QPS_LIMITED</code>; back off and retry. When
+            syncing the full catalog, page through serially rather than in parallel.
+          </p>
+        </blockquote>
+        <p>Two properties follow from this sequence and are useful for troubleshooting:</p>
+        <ul>
+          <li>
+            <strong>A nonce is consumed only when the request would otherwise succeed</strong> (step 11 is last). So
+            retrying with a bad signature always returns <code>SIGNATURE_INVALID</code>, and <strong>your own retries
+            never turn into <code>NONCE_REPLAYED</code></strong>.
+          </li>
+          <li>
+            <strong>Parameter validation happens before authentication.</strong> A missing required field gives you
+            <code>400 xxx required</code>, not <code>401</code>.
+          </li>
+        </ul>
+
+        <h3 id="34-signing-clients">3.4 Signing Clients<a class="anchor" href="#34-signing-clients">#</a></h3>
+        <p>
+          Both implementations are complete — copy them as they are. Apart from the HTTP library they need no
+          third-party packages. The rules are in 3.1.
+        </p>
+        <p><strong>Python</strong></p>
+        <figure class="code" data-lang="python">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>import hashlib, hmac, re, secrets, time, requests
+
+KEY_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*$')
+
+def _encode(v, path):
+    if v is None:                        return 'n:'
+    if isinstance(v, bool):              return 'b:true' if v else 'b:false'   # must be checked before int
+    if isinstance(v, str):               return 's:' + v
+    if isinstance(v, int):
+        if abs(v) &gt; 2**53 - 1:           raise ValueError(f'{path}: only safe integers can be signed')
+        return 'i:' + str(v)
+    raise ValueError(f'{path}: unsupported type {type(v).__name__}')
+
+def _flatten(v, path, out):
+    if isinstance(v, list):
+        if not v:                        out.append((path, 'a:')); return
+        for i, item in enumerate(v):     _flatten(item, f'{path}.{i}', out)
+    elif isinstance(v, dict):
+        if not v:                        out.append((path, 'o:')); return
+        for k, item in v.items():
+            if not KEY_RE.match(k):      raise ValueError(f'invalid key: {k}')
+            _flatten(item, f'{path}.{k}' if path else k, out)
+    else:
+        out.append((path, _encode(v, path)))
+
+def canonicalize(root):
+    leaves = []
+    _flatten(root, '', leaves)
+    leaves.sort(key=lambda kv: kv[0].encode('utf-8'))
+    return '&amp;'.join(f'{p}={len(e.encode("utf-8"))}:{e}' for p, e in leaves)
+
+def _norm_path(p):
+    c = re.sub(r'/{2,}', '/', str(p))
+    return c[:-1] if len(c) &gt; 1 and c.endswith('/') else c
+
+def sign_inbound(secret, api_key, method, path, timestamp, nonce, body):
+    base = canonicalize({
+        'sigAlg': 'xpin.esim.openapi.kv1', 'apiKey': api_key,
+        'method': str(method).upper(), 'path': _norm_path(path),
+        'timestamp': str(timestamp), 'nonce': str(nonce), 'body': body or {},
+    })
+    return hmac.new(secret.encode(), base.encode('utf-8'), hashlib.sha256).hexdigest()
+
+APP_KEY, APP_SECRET = 'ak_xxx', 'sk_xxx'
+BASE = 'https://sandboxapi.xpin.network'
+
+def call(path, body):
+    ts, nonce = str(int(time.time() * 1000)), 'n_' + secrets.token_hex(8)
+    sign = sign_inbound(APP_SECRET, APP_KEY, 'POST', path, ts, nonce, body)
+    # json=body is fine: the signature does not depend on the exact bytes sent,
+    # so however requests serializes the body, verification still passes.
+    return requests.post(BASE + path, json=body, headers={
+        'x-api-key': APP_KEY, 'x-timestamp': ts, 'x-nonce': nonce, 'x-sign': sign,
+    })</code></pre>
+        </figure>
+        <p><strong>Node.js</strong> (about 50 lines, no dependencies)</p>
+        <figure class="code" data-lang="js">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>const crypto = require('crypto')
+const KEY = /^[A-Za-z][A-Za-z0-9_]*$/
+
+function encode(v, path) {
+  if (v === null) return 'n:'
+  if (typeof v === 'string') return `s:${v}`
+  if (typeof v === 'boolean') return `b:${v}`
+  if (typeof v === 'number') {
+    if (!Number.isSafeInteger(v)) throw new Error(`${path}: only safe integers can be signed`)
+    return `i:${Object.is(v, -0) ? '0' : String(v)}`
+  }
+  throw new Error(`${path}: unsupported type ${typeof v}`)
+}
+
+function flatten(v, path, out) {
+  if (Array.isArray(v)) {
+    if (!v.length) return out.push([path, 'a:'])
+    return v.forEach((item, i) =&gt; flatten(item, `${path}.${i}`, out))
+  }
+  if (v !== null &amp;&amp; typeof v === 'object') {
+    const keys = Object.keys(v)
+    if (!keys.length) return out.push([path, 'o:'])
+    return keys.forEach((k) =&gt; {
+      if (!KEY.test(k)) throw new Error(`invalid key: ${k}`)
+      flatten(v[k], path ? `${path}.${k}` : k, out)
+    })
+  }
+  out.push([path, encode(v, path)])
+}
+
+function canonicalize(root) {
+  const leaves = []
+  flatten(root, '', leaves)
+  leaves.sort((a, b) =&gt; Buffer.compare(Buffer.from(a[0]), Buffer.from(b[0])))
+  return leaves.map(([p, e]) =&gt; `${p}=${Buffer.byteLength(e)}:${e}`).join('&amp;')
+}
+
+const normalizePath = (p) =&gt; {
+  const c = String(p).replace(/\/{2,}/g, '/')
+  return c.length &gt; 1 &amp;&amp; c.endsWith('/') ? c.slice(0, -1) : c
+}
+
+function signInbound(secret, { apiKey, method, path, timestamp, nonce, body }) {
+  const base = canonicalize({
+    sigAlg: 'xpin.esim.openapi.kv1',
+    apiKey,
+    method: method.toUpperCase(),
+    path: normalizePath(path),
+    timestamp: String(timestamp),
+    nonce: String(nonce),
+    body: body || {}
+  })
+  return crypto.createHmac('sha256', secret).update(base, 'utf8').digest('hex')
+}</code></pre>
+        </figure>
+        <p>
+          Always send <code>Content-Type</code>, or the request is rejected with
+          <code>415 CONTENT_TYPE_MUST_BE_JSON</code> before authentication. A complete call-and-paging example is in
+          <a href="#41-product-list-productslist">§4.1</a>.
+        </p>
+        <p>
+          Other languages: Go / Java / PHP / .NET can each be written in a few dozen lines (all you need is sorting,
+          UTF-8 byte length and HMAC-SHA256). <strong>After writing it, run the self-test vectors in
+          <a href="#35-self-test-vectors">3.5</a> first</strong>, and start integration testing only once they all
+          pass. ⚠️ In PHP and Python, <code>bool</code> is a subtype of <code>int</code>, so check booleans before
+          integers; in Go, <code>map</code> iteration order is random, so sort explicitly.
+        </p>
+
+        <h3 id="35-self-test-vectors">3.5 Self-Test Vectors<a class="anchor" href="#35-self-test-vectors">#</a></h3>
+        <p>
+          The vectors below use <code>app_secret = demo_secret</code>, <code>x-api-key = ak_demo</code>,
+          <code>x-timestamp = 1788400000000</code>, <code>x-nonce = n_demo0001</code> and <code>method = POST</code>.
+          <strong>Make the whole table pass before integration testing</strong> — it saves most of the back-and-forth
+          when signatures do not match.
+        </p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Purpose</th>
+                <th><code>path</code></th>
+                <th><code>body</code></th>
+                <th>Expected <code>x-sign</code></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td>Minimal: empty body</td>
+                <td><code>/openapi/v1/products/list</code></td>
+                <td><code>{}</code></td>
+                <td><code>3eb1cdb9b139d2de36df73bcae880b72c4b6e408d6c22b8ce9727735b9ee6c75</code></td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td>Paging request (the example in <a href="#31-signature-algorithm-xpin-kv1">3.1</a>)</td>
+                <td><code>/openapi/v1/products/list</code></td>
+                <td><code>{"pageNo":1,"pageSize":100}</code></td>
+                <td><code>ee1c7d507eedf6257f7db7f79a9cff469ab528be64bd9c609e83a6b06dcde996</code></td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td>Three scalar types + null</td>
+                <td><code>/openapi/v1/products/list</code></td>
+                <td><code>{"a":"x","b":1,"c":true,"d":null}</code></td>
+                <td><code>a0568da5de523339dd9030410b2fac87e6f06d5fd4785cd5f5e24870ce997fde</code></td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td>String 1 and integer 1 sign differently</td>
+                <td><code>/openapi/v1/products/list</code></td>
+                <td><code>{"v":"1"}</code></td>
+                <td><code>31f9ec6d8e2098fbdf3d4c749d8c9bc5296479a0db3907196ba5e5d48e6bab89</code></td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td>(Control) integer 1</td>
+                <td><code>/openapi/v1/products/list</code></td>
+                <td><code>{"v":1}</code></td>
+                <td><code>15a7330e47ebc988b3772f69ca452800125f7b56592372722d5b87d5425a9688</code></td>
+              </tr>
+              <tr>
+                <td>6</td>
+                <td>Nesting and arrays</td>
+                <td><code>/openapi/v1/products/list</code></td>
+                <td><code>{"data":{"code":"X"},"tags":["a","b"]}</code></td>
+                <td><code>459e7510804d51ecc42ddd629bd81a2d76e077e3c9de6a22a40b4d3257a45a3a</code></td>
+              </tr>
+              <tr>
+                <td>7</td>
+                <td>An empty object and an empty array leave a mark</td>
+                <td><code>/openapi/v1/products/list</code></td>
+                <td><code>{"o":{},"a":[]}</code></td>
+                <td><code>2628471b9872c77f1f84391657cf02e8770e06a686024ac20e94ef6cbb40b629</code></td>
+              </tr>
+              <tr>
+                <td>8</td>
+                <td>(Control) both absent</td>
+                <td><code>/openapi/v1/products/list</code></td>
+                <td><code>{}</code></td>
+                <td><code>3eb1cdb9b139d2de36df73bcae880b72c4b6e408d6c22b8ce9727735b9ee6c75</code></td>
+              </tr>
+              <tr>
+                <td>9</td>
+                <td>&amp; = : inside a value do not collide with field separators</td>
+                <td><code>/openapi/v1/products/detail</code></td>
+                <td><code>{"productCode":"1&amp;b=s:2"}</code></td>
+                <td><code>53d75dfee5e896542f119468669b567fc843e5f8ddb124bbeb272ea657d7c7d5</code></td>
+              </tr>
+              <tr>
+                <td>10</td>
+                <td>Non-ASCII text is signed as-is, not escaped</td>
+                <td><code>/openapi/v1/products/detail</code></td>
+                <td><code>{"productCode":"套餐-中文"}</code></td>
+                <td><code>a7d86f5a2ea0a0e83d36f6112766360afabb08df407de15543600ef8cf2542d5</code></td>
+              </tr>
+              <tr>
+                <td>11</td>
+                <td>Path normalization: repeated and trailing slashes</td>
+                <td><code>/openapi/v1//products//detail/</code></td>
+                <td><code>{"productCode":"XP_DEMO"}</code></td>
+                <td><code>63655a08ff52c78dd0942219cdfab9df4072fcc25d9784f1fcef6e488603f13e</code></td>
+              </tr>
+              <tr>
+                <td>12</td>
+                <td>(Control) already-normalized path</td>
+                <td><code>/openapi/v1/products/detail</code></td>
+                <td><code>{"productCode":"XP_DEMO"}</code></td>
+                <td><code>63655a08ff52c78dd0942219cdfab9df4072fcc25d9784f1fcef6e488603f13e</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <blockquote class="note">
+          <p>
+            Rows 4 and 5, and rows 7 and 8, are <strong>control pairs</strong>: they are correct only if the two
+            signatures differ. Rows 11 and 12 are the reverse: they test path normalization, so the two signatures must
+            be <strong>identical</strong>.
+          </p>
+        </blockquote>
+        <hr />
+
+        <h2 id="4-endpoints">4. Endpoints<a class="anchor" href="#4-endpoints">#</a></h2>
+        <blockquote class="note">
+          <p>
+            All paths are prefixed with <code>/openapi/v1</code>. All response samples below are real responses from
+            the sandbox environment.
+          </p>
+        </blockquote>
+
+        <h3 id="41-product-list-productslist">
+          4.1 Product List <code>/products/list</code><a class="anchor" href="#41-product-list-productslist">#</a>
+        </h3>
+        <p>
+          Fetches the on-sale plans <strong>published to you</strong>. This is the only endpoint you need to sync the
+          catalog.
+        </p>
+        <p><strong>Request</strong></p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Required</th>
+                <th>Constraints</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>pageNo</code></td>
+                <td>number</td>
+                <td>No</td>
+                <td><code>[1, 100000]</code>, default <code>1</code></td>
+                <td>Page number. Out-of-range values return <code>400 pageNo Range error</code></td>
+              </tr>
+              <tr>
+                <td><code>pageSize</code></td>
+                <td>number</td>
+                <td>No</td>
+                <td><code>[1, 100]</code>, default <code>20</code></td>
+                <td>Items per page. <code>100</code> is recommended for full syncs</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>Response <code>data</code></strong></p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>pageNo</code> / <code>pageSize</code></td>
+                <td>number</td>
+                <td>
+                  The page number / page size <strong>actually applied</strong>. The platform normalizes out-of-range
+                  or fractional inputs, so these may differ from what you sent
+                </td>
+              </tr>
+              <tr>
+                <td><code>hasMore</code></td>
+                <td>boolean</td>
+                <td>Whether there is another page (the stop condition for paging)</td>
+              </tr>
+              <tr>
+                <td><code>list</code></td>
+                <td>array</td>
+                <td>Array of plans; each element is a <code>DataPlan</code>, see <a href="#5-plan-object-dataplan">§5</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <blockquote class="note warn">
+          <p>
+            ⚠️ <strong>Page by <code>hasMore</code>, not by the number of items on the page</strong>: a page's
+            <code>list</code> may contain fewer than <code>pageSize</code> items while more data follows.
+          </p>
+        </blockquote>
+        <p><strong>Example</strong> (<code>{"pageNo":1,"pageSize":1}</code>)</p>
+        <figure class="code" data-lang="json">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>{
+  "data": {
+    "pageNo": 1,
+    "pageSize": 1,
+    "hasMore": true,
+    "list": [
+      {
+        "planName": "North America 90D 50GB",
+        "validity": 90,
+        "dataCap": 51200,
+        "dataUnit": "MB",
+        "prices": { "USD": 87.9 },
+        "link": "https://www.xpin.network/product?productCode=B-103-ES-AU-T-C4-CTM-90D%2F90D-50GB",
+        "capacityInfo": "50GB high-speed data, stop when used up",
+        "coverages": ["CA", "MX", "US"],
+        "subscription": false,
+        "promoEnabled": false
+      }
+    ]
+  },
+  "code": 200,
+  "msg": "ok",
+  "t": 1790242641577
+}</code></pre>
+        </figure>
+
+        <p>
+          <strong>Fetching all plans</strong> (Node.js 18 or later, built-in <code>fetch</code>;
+          <code>signInbound</code> is the implementation from <a href="#34-signing-clients">§3.4</a>)
+        </p>
+        <figure class="code" data-lang="js">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>const crypto = require('crypto')
+
+const BASE = 'https://sandboxapi.xpin.network'
+const APP_KEY = process.env.XPIN_APP_KEY
+const APP_SECRET = process.env.XPIN_APP_SECRET
+
+async function call(path, body) {
+  const timestamp = String(Date.now())
+  const nonce = `n_${crypto.randomBytes(12).toString('hex')}`
+  const sign = signInbound(APP_SECRET, { apiKey: APP_KEY, method: 'POST', path, timestamp, nonce, body })
+  const res = await fetch(BASE + path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': APP_KEY, 'x-timestamp': timestamp, 'x-nonce': nonce, 'x-sign': sign },
+    body: JSON.stringify(body)
+  })
+  // Check the HTTP status first, then parse the JSON (§6.1)
+  if (res.status !== 200) throw new Error(`transport ${res.status}`)
+  const payload = await res.json()
+  if (payload.code !== 200) throw new Error(`api ${payload.code} ${payload.msg}`)
+  return payload.data
+}
+
+// Page through serially until hasMore is false
+async function listAllPlans() {
+  const plans = []
+  for (let pageNo = 1; ; pageNo += 1) {
+    const data = await call('/openapi/v1/products/list', { pageNo, pageSize: 100 })
+    plans.push(...data.list)
+    if (!data.hasMore) return plans
+  }
+}</code></pre>
+        </figure>
+
+        <h3 id="42-product-detail-productsdetail">
+          4.2 Product Detail <code>/products/detail</code><a class="anchor" href="#42-product-detail-productsdetail">#</a>
+        </h3>
+        <p><strong>Request</strong></p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Required</th>
+                <th>Constraints</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>productCode</code></td>
+                <td>string</td>
+                <td><strong>Yes</strong></td>
+                <td>Length <code>[1, 160]</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>Response <code>data</code></strong>: a single <code>DataPlan</code>, with the same structure as the
+          list elements.
+        </p>
+        <figure class="code" data-lang="json">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>{
+  "data": {
+    "planName": "North America 90D 50GB",
+    "validity": 90,
+    "dataCap": 51200,
+    "dataUnit": "MB",
+    "prices": { "USD": 87.9 },
+    "link": "https://www.xpin.network/product?productCode=B-103-ES-AU-T-C4-CTM-90D%2F90D-50GB",
+    "capacityInfo": "50GB high-speed data, stop when used up",
+    "coverages": ["CA", "MX", "US"],
+    "subscription": false,
+    "promoEnabled": false
+  },
+  "code": 200,
+  "msg": "ok",
+  "t": 1790242642092
+}</code></pre>
+        </figure>
+        <p>
+          If the product does not exist or does not belong to you, the response is <code>code: 404</code>,
+          <code>msg: PRODUCT_NOT_FOUND</code>, <code>data: {}</code>.
+        </p>
+        <blockquote class="note">
+          <p>
+            ℹ️ Plan objects do not include a product code. To look up a single plan, get its product code from the
+            platform; <strong>to fetch all plans, use the list endpoint</strong>.
+          </p>
+        </blockquote>
+        <hr />
+
+        <h2 id="5-plan-object-dataplan">5. Plan Object DataPlan<a class="anchor" href="#5-plan-object-dataplan">#</a></h2>
+        <p>
+          Field names, types and enums all match the <code>DataPlan</code> of eSIMDB Provider API v1.0.2, and the five
+          required fields (<code>validity</code>, <code>dataCap</code>, <code>dataUnit</code>, <code>prices</code>,
+          <code>coverages</code>) are present on every plan object.
+        </p>
+
+        <h3 id="51-fields">5.1 Fields<a class="anchor" href="#51-fields">#</a></h3>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>When present</th>
+                <th>DataPlan spec</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>planName</code></td>
+                <td>string</td>
+                <td>Always</td>
+                <td>Optional</td>
+                <td>Plan name, truncated beyond 100 characters</td>
+              </tr>
+              <tr>
+                <td><code>validity</code></td>
+                <td>integer</td>
+                <td>Always</td>
+                <td><strong>Required</strong></td>
+                <td>Plan duration in days</td>
+              </tr>
+              <tr>
+                <td><code>dataCap</code></td>
+                <td>integer</td>
+                <td>Always</td>
+                <td><strong>Required</strong></td>
+                <td>
+                  High-speed data allowance; for daily plans, the allowance <strong>per day</strong>. See
+                  <a href="#52-value-rules">§5.2</a>
+                </td>
+              </tr>
+              <tr>
+                <td><code>dataUnit</code></td>
+                <td>string</td>
+                <td>Always</td>
+                <td><strong>Required</strong></td>
+                <td><code>MB</code> or <code>GB</code></td>
+              </tr>
+              <tr>
+                <td><code>dataCapPer</code></td>
+                <td>string</td>
+                <td>Daily plans only</td>
+                <td>Optional</td>
+                <td>
+                  Always <code>day</code>. Not returned for total-allowance plans, meaning the allowance does not reset
+                  per period
+                </td>
+              </tr>
+              <tr>
+                <td><code>reducedSpeed</code></td>
+                <td>integer</td>
+                <td>Only plans throttled after the allowance</td>
+                <td>Optional</td>
+                <td>
+                  Speed limit after the high-speed allowance is used up, in kbps. Absent means the connection is cut off
+                  when the allowance is used up
+                </td>
+              </tr>
+              <tr>
+                <td><code>prices</code></td>
+                <td>object</td>
+                <td>Always</td>
+                <td><strong>Required</strong></td>
+                <td>
+                  Price. Keys are ISO 4217 currency codes; values are <strong>JSON numbers</strong> (not strings).
+                  Currently only <code>USD</code>
+                </td>
+              </tr>
+              <tr>
+                <td><code>link</code></td>
+                <td>string</td>
+                <td>When a purchase page is configured</td>
+                <td>Optional</td>
+                <td>
+                  URL of this plan's page on the purchase platform. Already URL-encoded; <strong>use it as-is — do not
+                  parse or rebuild it</strong>
+                </td>
+              </tr>
+              <tr>
+                <td><code>capacityInfo</code></td>
+                <td>string</td>
+                <td>When there is a note</td>
+                <td>Optional</td>
+                <td>Note on the data rules, e.g. <code>50GB high-speed data, stop when used up</code></td>
+              </tr>
+              <tr>
+                <td><code>coverages</code></td>
+                <td>array</td>
+                <td>Always</td>
+                <td><strong>Required</strong></td>
+                <td>Covered countries, ISO 3166-1 alpha-2. The two forms are described in <a href="#52-value-rules">§5.2</a></td>
+              </tr>
+              <tr>
+                <td><code>subscription</code></td>
+                <td>boolean</td>
+                <td>Always</td>
+                <td>Optional</td>
+                <td>Always <code>false</code>: the platform has no auto-renewing plans</td>
+              </tr>
+              <tr>
+                <td><code>promoEnabled</code></td>
+                <td>boolean</td>
+                <td>Always</td>
+                <td>Optional</td>
+                <td>
+                  Always <code>false</code>: the platform does not accept promo codes. DataPlan defaults this field to
+                  <code>true</code>, so it is stated explicitly
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="52-value-rules">5.2 Value Rules<a class="anchor" href="#52-value-rules">#</a></h3>
+        <h4 id="data-allowance">
+          Data allowance: <code>dataCap</code> / <code>dataUnit</code> / <code>dataCapPer</code
+          ><a class="anchor" href="#data-allowance">#</a>
+        </h4>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Plan</th>
+                <th><code>dataCap</code></th>
+                <th><code>dataUnit</code></th>
+                <th><code>dataCapPer</code></th>
+                <th>Example</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Total-allowance plan</td>
+                <td>High-speed data for the whole validity period</td>
+                <td>Always <code>MB</code></td>
+                <td>Not returned</td>
+                <td>50GB plan → <code>51200</code> / <code>MB</code></td>
+              </tr>
+              <tr>
+                <td>Daily plan</td>
+                <td>High-speed data per day</td>
+                <td><code>GB</code> or <code>MB</code></td>
+                <td><code>day</code></td>
+                <td>2GB per day → <code>2</code> / <code>GB</code> / <code>day</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ul>
+          <li>
+            <strong>Total-allowance plans are given in MB, not converted to GB</strong>: <code>dataCap</code> must be an
+            integer, and 1536MB is 1.5GB, so rounding would overstate or understate the allowance by half a gigabyte.
+          </li>
+          <li>
+            <strong><code>dataCap</code> is never <code>0</code></strong>: in DataPlan, <code>0</code> means truly
+            unlimited, and no plan in the current catalog is. Daily plans marketed as <code>Unlimited</code> are "N GB of
+            high-speed data per day, then throttled"; they are returned as in the table above, with the throttled speed
+            in <code>reducedSpeed</code>.
+          </li>
+        </ul>
+        <h4 id="throttling">Throttling: <code>reducedSpeed</code><a class="anchor" href="#throttling">#</a></h4>
+        <ul>
+          <li>
+            Daily plans: once the day's high-speed allowance is used up, the speed drops to this rate in kbps (for
+            example <code>512</code>); high speed resumes the next day.
+          </li>
+          <li>
+            Total-allowance plans: the connection is cut off when the allowance is used up, and this field is
+            <strong>not returned</strong>. In DataPlan, its default <code>null</code> means exactly that: cut off when
+            used up.
+          </li>
+        </ul>
+        <h4 id="coverage">Coverage: <code>coverages</code><a class="anchor" href="#coverage">#</a></h4>
+        <p>
+          <code>DataPlan</code> allows two forms, and each plan uses one of them. Both appear in responses, so <strong>support both</strong>:
+        </p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Form</th>
+                <th>When used</th>
+                <th>Example</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Array of country codes</td>
+                <td>
+                  Always for multi-country plans; also for single-country plans without reliable operator information
+                </td>
+                <td><code>["CA", "MX", "US"]</code></td>
+              </tr>
+              <tr>
+                <td>Array of objects</td>
+                <td>Single-country plans whose operators can be confirmed</td>
+                <td><code>[{"code": "ID", "networks": [{"name": "Telkomsel"}, {"name": "XL"}]}]</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          In the object form, <code>networks</code> only has <code>name</code> and <strong>no
+          <code>types</code></strong> (3G/4G/5G): the platform has no network-technology data and does not make one up.
+        </p>
+        <h4 id="other-fields">Other fields<a class="anchor" href="#other-fields">#</a></h4>
+        <ul>
+          <li><code>prices</code>: the price, as a JSON number. All plans currently use a single currency, <code>USD</code>.</li>
+          <li>
+            <code>link</code>: the product-code part is already URL-encoded (for example <code>/</code> becomes
+            <code>%2F</code>); use it as the redirect URL as-is. Plans without a configured purchase page do not return
+            <code>link</code> — the platform never returns a link that does not open.
+          </li>
+          <li><code>planName</code>: the plan's public name, truncated beyond 100 characters.</li>
+        </ul>
+
+        <h3 id="53-fields-not-returned">5.3 Fields Not Returned<a class="anchor" href="#53-fields-not-returned">#</a></h3>
+        <p>
+          The platform does not return the other <code>DataPlan</code> fields; <strong>read them by their
+          defaults</strong>:
+        </p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Default</th>
+                <th>Meaning for plans in this channel</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>hasAds</code> / <code>payAsYouGo</code> / <code>newUserOnly</code></td>
+                <td><code>false</code></td>
+                <td>No ads, not pay-as-you-go, not limited to new users</td>
+              </tr>
+              <tr>
+                <td><code>maxSpeed</code></td>
+                <td><code>null</code></td>
+                <td>No speed limit within the high-speed allowance</td>
+              </tr>
+              <tr>
+                <td><code>canTopUp</code> / <code>eKYC</code> / <code>tethering</code></td>
+                <td><code>null</code></td>
+                <td>Unknown: the platform has no data for these</td>
+              </tr>
+              <tr>
+                <td><code>telephony</code> / <code>internetBreakouts</code> / <code>subscriptionPeriod</code></td>
+                <td><code>null</code> / none</td>
+                <td>Unknown: the platform has no data for these</td>
+              </tr>
+              <tr>
+                <td><code>priceInfo</code> / <code>validityInfo</code> / <code>additionalInfo</code></td>
+                <td>None</td>
+                <td>No additional notes</td>
+              </tr>
+              <tr>
+                <td><code>activationInfo</code></td>
+                <td>—</td>
+                <td>Deprecated in <code>DataPlan</code>; not returned</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 id="54-examples">5.4 Examples<a class="anchor" href="#54-examples">#</a></h3>
+        <p>
+          <strong>Total-allowance plan</strong>: 50GB in total over 90 days, cut off when used up, so there is no
+          <code>dataCapPer</code> or <code>reducedSpeed</code>.
+        </p>
+        <figure class="code" data-lang="json">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>{
+  "planName": "North America 90D 50GB",
+  "validity": 90,
+  "dataCap": 51200,
+  "dataUnit": "MB",
+  "prices": { "USD": 87.9 },
+  "link": "https://www.xpin.network/product?productCode=B-103-ES-AU-T-C4-CTM-90D%2F90D-50GB",
+  "capacityInfo": "50GB high-speed data, stop when used up",
+  "coverages": ["CA", "MX", "US"],
+  "subscription": false,
+  "promoEnabled": false
+}</code></pre>
+        </figure>
+        <p><strong>Daily plan</strong>: 5 days, 2GB of high-speed data per day, then throttled to 512kbps.</p>
+        <figure class="code" data-lang="json">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>{
+  "planName": "Africa  Unlimited 5 Days",
+  "validity": 5,
+  "dataCap": 2,
+  "dataUnit": "GB",
+  "dataCapPer": "day",
+  "reducedSpeed": 512,
+  "prices": { "USD": 29.9 },
+  "link": "https://www.xpin.network/product?productCode=D-111-ES-AU-C4-D-CTM-5D%2F365D-Unlimited",
+  "capacityInfo": "Unlimited",
+  "coverages": ["CD", "CI", "CM", "DZ", "EG", "GH", "KE", "LR", "MA", "MG", "MZ", "SC", "TN", "TZ", "ZA", "ZM"],
+  "subscription": false,
+  "promoEnabled": false
+}</code></pre>
+        </figure>
+        <hr />
+
+        <h2 id="6-error-codes">6. Error Codes<a class="anchor" href="#6-error-codes">#</a></h2>
+        <p>
+          The table below lists the business codes the two endpoints in <a href="#4-endpoints">§4</a> can return. All
+          of them arrive as <code>HTTP 200</code> with the JSON envelope; the error code is in the body's
+          <code>code</code>.
+        </p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th><code>code</code></th>
+                <th><code>msg</code></th>
+                <th>Meaning</th>
+                <th>What to do</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>200</code></td>
+                <td><code>ok</code></td>
+                <td>Success</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td><code>400</code></td>
+                <td>
+                  <code>&lt;field&gt; required</code> / <code>&lt;field&gt; length error [a-b]</code> /
+                  <code>&lt;field&gt; Range error</code> / <code>&lt;field&gt; Type error, ...</code>
+                </td>
+                <td>Parameter validation failed (<strong>free text, not a stable error code</strong>)</td>
+                <td>
+                  Fix the parameters. Match on <code>code===400</code> plus the field name as a substring; do not match
+                  <code>msg</code> exactly
+                </td>
+              </tr>
+              <tr>
+                <td><code>400</code></td>
+                <td><code>REQUEST_BODY_NOT_JSON</code> / <code>REQUEST_BODY_MUST_BE_OBJECT</code></td>
+                <td>The body is not JSON, or is JSON but not an object</td>
+                <td>Check the serialization</td>
+              </tr>
+              <tr>
+                <td><code>400</code></td>
+                <td><code>CANONICAL_*</code></td>
+                <td>
+                  The payload contains a value that cannot be signed (decimal, out-of-range integer, invalid key,
+                  nesting too deep)
+                </td>
+                <td><strong>Check the payload, not the key</strong></td>
+              </tr>
+              <tr>
+                <td><code>401</code></td>
+                <td><code>AUTH_HEADERS_MISSING</code></td>
+                <td>One of the four signature headers is missing</td>
+                <td>Add the header</td>
+              </tr>
+              <tr>
+                <td><code>401</code></td>
+                <td><code>NONCE_INVALID</code></td>
+                <td>Bad nonce format</td>
+                <td>Use <code>^[A-Za-z0-9._:-]{8,128}$</code></td>
+              </tr>
+              <tr>
+                <td><code>401</code></td>
+                <td><code>TIMESTAMP_INVALID</code></td>
+                <td>The timestamp is not a number or is off by more than 5 minutes</td>
+                <td><strong>Sync your clock</strong>; make sure you use milliseconds</td>
+              </tr>
+              <tr>
+                <td><code>401</code></td>
+                <td><code>APP_KEY_INVALID</code></td>
+                <td>The app_key does not exist, is disabled, or does not match the environment</td>
+                <td>Check the credential and the Base URL (sandbox credentials only work in the sandbox environment)</td>
+              </tr>
+              <tr>
+                <td><code>401</code></td>
+                <td><code>CREDENTIAL_EXPIRED</code></td>
+                <td>The credential has expired</td>
+                <td>Ask the platform to rotate it</td>
+              </tr>
+              <tr>
+                <td><code>401</code></td>
+                <td><code>SIGNATURE_INVALID</code></td>
+                <td>Signature mismatch</td>
+                <td>
+                  Run the self-test vectors in <a href="#35-self-test-vectors">3.5</a> first; once they all pass, debug
+                  the integration
+                </td>
+              </tr>
+              <tr>
+                <td><code>401</code></td>
+                <td><code>NONCE_REPLAYED</code></td>
+                <td>The nonce has already been used</td>
+                <td>Use a new nonce for every request</td>
+              </tr>
+              <tr>
+                <td><code>403</code></td>
+                <td><code>SCOPE_FORBIDDEN</code></td>
+                <td>The credential is not authorized for this endpoint</td>
+                <td>Ask the platform to check the credential's permissions</td>
+              </tr>
+              <tr>
+                <td><code>403</code></td>
+                <td><code>IP_NOT_ALLOWED</code></td>
+                <td>The source IP is not on the allowlist</td>
+                <td>Ask the platform to add the IP</td>
+              </tr>
+              <tr>
+                <td><code>404</code></td>
+                <td><code>PRODUCT_NOT_FOUND</code></td>
+                <td>The product does not exist or does not belong to you</td>
+                <td>Check the <code>productCode</code></td>
+              </tr>
+              <tr>
+                <td><code>404</code></td>
+                <td>—</td>
+                <td>Misspelled path (correct prefix, wrong path name). <code>msg</code> is not a stable error code</td>
+                <td>Check the path name</td>
+              </tr>
+              <tr>
+                <td><code>413</code></td>
+                <td><code>REQUEST_ENTITY_TOO_LARGE</code></td>
+                <td>The request body exceeds 256KB</td>
+                <td>Check the request body</td>
+              </tr>
+              <tr>
+                <td><code>415</code></td>
+                <td><code>CONTENT_TYPE_MUST_BE_JSON</code></td>
+                <td><code>Content-Type</code> is not <code>application/json</code></td>
+                <td>Fix the header</td>
+              </tr>
+              <tr>
+                <td><code>429</code></td>
+                <td><code>QPS_LIMITED</code></td>
+                <td>Over the per-second request limit</td>
+                <td>Back off and retry; page through serially for full syncs</td>
+              </tr>
+              <tr>
+                <td><code>406</code></td>
+                <td><code>[controller error]</code></td>
+                <td>Server error; <code>msg</code> is a fixed string and carries no reason</td>
+                <td>Back off and retry; contact the platform if it persists</td>
+              </tr>
+              <tr>
+                <td><code>501</code></td>
+                <td><code>FEATURE_NOT_IMPLEMENTED</code></td>
+                <td>The requested endpoint is not available</td>
+                <td>Check the path; the available endpoints are listed in <a href="#4-endpoints">§4</a></td>
+              </tr>
+              <tr>
+                <td><code>503</code></td>
+                <td>
+                  A platform-side reason code, e.g. <code>OPENAPI_AUTH_UNAVAILABLE</code>,
+                  <code>PLATFORM_NOT_ENABLED</code>
+                </td>
+                <td>A platform-side dependency or configuration problem, unrelated to your request</td>
+                <td>Back off and retry, and pass the <code>msg</code> to the platform</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          <strong>Tenant isolation</strong>: "not found" and "not yours" return <strong>the same</strong>
+          <code>404</code>; the platform never tells you that a product exists but belongs to someone else.
+        </p>
+
+        <h3 id="61-handling-non-200-responses">
+          6.1 Handling Non-200 Responses<a class="anchor" href="#61-handling-non-200-responses">#</a>
+        </h3>
+        <p>
+          Some responses <strong>never reach the business layer</strong>. They carry a real HTTP status code, and the
+          body <strong>may not be JSON</strong>:
+        </p>
+        <div class="tw">
+          <table>
+            <thead>
+              <tr>
+                <th>You see</th>
+                <th>Usually because</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>301</code> + non-JSON</td>
+                <td>
+                  You used <code>http://</code>. <strong>A 301 does not preserve the POST body</strong>; use
+                  <code>https://</code> directly
+                </td>
+              </tr>
+              <tr>
+                <td><code>404</code> + non-JSON</td>
+                <td>The <strong>path prefix</strong> is wrong (the correct prefix is <code>/openapi/v1</code>)</td>
+              </tr>
+              <tr>
+                <td><code>429</code></td>
+                <td>Abnormal request rate — back off and retry, and check your client for retry storms or loops</td>
+              </tr>
+              <tr>
+                <td><code>5xx</code> / connection dropped</td>
+                <td>Transport-layer or server error</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>Always check the status code first, then the JSON</strong>:</p>
+        <figure class="code" data-lang="js">
+          <button class="copy" type="button">Copy</button>
+          <pre><code>const res = await fetch(url, init)
+
+// Step 1: check the HTTP status first. Do not JSON.parse before this.
+if (res.status !== 200) {
+  // ⚠️ The body here may not be JSON; parsing it would throw.
+  // Only 429 and 5xx are worth retrying with backoff; the rest (301/404) mean the configuration
+  // or the request itself is wrong, and retrying gives the same result.
+  if (res.status === 429 || res.status &gt;= 500) throw new RetryableError(`transport ${res.status}`)
+  throw new TransportError(`transport ${res.status}`)
+}
+
+// Step 2: only HTTP 200 is a platform response; parse it now.
+const body = await res.json()
+if (body.code === 429) throw new RetryableError('QPS_LIMITED')     // platform quota; back off and retry
+if (body.code !== 200) throw new ApiError(body.code, body.msg)
+return body.data</code></pre>
+        </figure>
+        <blockquote class="note warn">
+          <p>
+            ⚠️ <strong>Do not treat every non-200 as retryable.</strong> Resending a <code>404</code> (wrong path) forever
+            as a retryable error is one of the most common self-inflicted failures.
+          </p>
+        </blockquote>
+        <hr />
+      </main>
+    </div>
+
+    <script>
+      document.querySelectorAll('.copy').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var text = btn.parentNode.querySelector('code').innerText
+          var done = function () {
+            btn.textContent = 'Copied'
+            btn.classList.add('done')
+            setTimeout(function () {
+              btn.textContent = 'Copy'
+              btn.classList.remove('done')
+            }, 1400)
+          }
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(done)
+            return
+          }
+          var ta = document.createElement('textarea')
+          ta.value = text
+          document.body.appendChild(ta)
+          ta.select()
+          document.execCommand('copy')
+          document.body.removeChild(ta)
+          done()
+        })
+      })
+    </script>
+  </body>
+</html>

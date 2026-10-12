@@ -1,6 +1,6 @@
 # XPIN eSIM 分销商 OpenAPI 接入说明
 
-> **文档版本：beta**（2026-09-16）
+> **文档版本：beta**（2026-10-09）
 >
 > 面向下游分销商的接入文档，覆盖认证、目录、开卡、幂等、履约、ICCID、续订、回调八条链路。
 > 文中的响应样本取自接口的真实返回，其中 ICCID、IMSI、MSISDN、激活码已做脱敏。
@@ -29,10 +29,11 @@
    - [4.5 订单查询 `/order/query`](#45-订单查询-orderquery)
    - [4.6 订单列表 `/order/list`](#46-订单列表-orderlist)
    - [4.7 续订资格判定 `/iccid/renew`](#47-续订资格判定-iccidrenew)
-   - [4.8 续订下单 `/order/renew`](#48-续订下单-orderrenew)
-   - [4.9 卡档案 `/iccid/profile`](#49-卡档案-iccidprofile)
-   - [4.10 用量查询 `/order/usage`](#410-用量查询-orderusage)
-   - [4.11 退款申请 `/order/refund`](#411-退款申请-orderrefund)
+   - [4.8 可续订商品 `/iccid/renewProducts`](#48-可续订商品-iccidrenewproducts)
+   - [4.9 续订下单 `/order/renew`](#49-续订下单-orderrenew)
+   - [4.10 卡档案 `/iccid/profile`](#410-卡档案-iccidprofile)
+   - [4.11 用量查询 `/order/usage`](#411-用量查询-orderusage)
+   - [4.12 退款申请 `/order/refund`](#412-退款申请-orderrefund)
 5. [业务流程与状态机](#5-业务流程与状态机)
    - [5.1 订单状态机](#51-订单状态机)
    - [5.2 开卡完整流程](#52-开卡完整流程)
@@ -43,6 +44,11 @@
    - [6.2 请求形状](#62-请求形状)
    - [6.3 验签](#63-验签)
    - [6.4 ACK 与重投](#64-ack-与重投)
+7. [沙盒专用：状态模拟 `/sandbox/card/status`](#7-沙盒专用状态模拟-sandboxcardstatus)
+   - [7.1 可以设成哪些状态](#71-可以设成哪些状态)
+   - [7.2 调用与返回](#72-调用与返回)
+   - [7.3 拒绝](#73-拒绝)
+   - [7.4 用它验证回调链路](#74-用它验证回调链路)
 
 ---
 
@@ -240,7 +246,7 @@ apiKey=9:s:ak_demo&body.idempotencyKey=11:s:idem_0001&body.productCode=9:s:XP_DE
 > |---|---|
 > | 独立一份 | `/products/list`、`/products/detail`（两者**共用**这一份） |
 > | 独立一份 | `/order/list` |
-> | 共用一份 | 其余全部，含 `/order/query`、`/iccid/profile`、`/order/usage`、`/iccid/renew` |
+> | 共用一份 | 其余全部，含 `/order/query`、`/iccid/profile`、`/order/usage`、`/iccid/renew`、`/iccid/renewProducts` |
 >
 > 也就是说：商品目录的全量同步不会影响你的订单查询，反之亦然；两者都影响不到下单。
 > 超限时返回的都是 `429 QPS_LIMITED`，**不区分是哪一份** —— 退避重试即可。
@@ -255,7 +261,7 @@ apiKey=9:s:ak_demo&body.idempotencyKey=11:s:idem_0001&body.productCode=9:s:XP_DE
 
 | scope | 覆盖接口 |
 |---|---|
-| `esim.read` | `products/list` `products/detail` `cardType` `order/query` `order/list` `iccid/profile` `order/usage` `iccid/renew` |
+| `esim.read` | `products/list` `products/detail` `cardType` `order/query` `order/list` `iccid/profile` `order/usage` `iccid/renew` `iccid/renewProducts` |
 | `esim.write` | `order/create` `order/renew` `order/refund` |
 
 缺 `esim.write` 调写接口 → `403 SCOPE_FORBIDDEN`（在签名校验**之后**判定，所以它确实是权限问题，不是签名问题）。
@@ -450,15 +456,12 @@ PHP 要注意 `json_decode` 默认给关联数组、布尔要先于整数判断�
 | `404` | `PRODUCT_NOT_AVAILABLE` | 下单时商品不可售/不存在 | 同上 |
 | `404` | `ORDER_NOT_FOUND` | 订单不存在或不属于你 | 检查 `clientOrderNo` |
 | `404` | `CARD_NOT_FOUND` | 卡不存在或不属于你 | 检查 `iccid` |
-| `404` | — | 路径拼写错误（前缀对、路径名错）。`msg` 不是稳定错误码，不要对它做断言 | 核对路径名 |
-
-> ⚠️ **前缀本身写错时看到的不是上面这一行。** 那种情况请求根本不会进到业务层，你拿到的是
-> 一个真实的 `HTTP 404` + 非 JSON 响应体 —— 按 [§3.1](#31-非-200-的响应怎么处理) 的第 1 步处理。
+| `404` | — | 路径拼写错误（前缀对、路径名错）。`msg` 不是稳定错误码，不要对它做断言。⚠️ **前缀本身写错是另一回事**，见 [§3.1](#31-非-200-的响应怎么处理) | 核对路径名 |
 | `409` | `IDEMPOTENCY_KEY_REUSED` | 同 `idempotencyKey` 但请求内容不同 | 换新的幂等键 |
 | `409` | `CLIENT_ORDER_NO_REUSED` | `clientOrderNo` 已被别的订单占用 | 换新的业务单号 |
 | `409` | `RENEW_NOT_ALLOWED` | 这张卡此刻不可续订 | 先调 `iccid/renew` 看 `reasons` |
-| `409` | `ORDER_NOT_REFUNDABLE` | 这一单现在不能退：未履约、已退款、或不具备可退款的计价信息 | 查 `/order/query` 看当前状态。**改参数改不出来**，见 §4.11 |
-| `409` | `REFUND_ALREADY_IN_PROGRESS` | 这一单已有一张在途退款单 | 等 `ORDER_REFUND_RESULT` 出结论后再发起，见 §4.11 |
+| `409` | `ORDER_NOT_REFUNDABLE` | 这一单现在不能退：未履约、已退款、或不具备可退款的计价信息 | 查 `/order/query` 看当前状态。**改参数改不出来**，见 §4.12 |
+| `409` | `REFUND_ALREADY_IN_PROGRESS` | 这一单已有一张在途退款单 | 等 `ORDER_REFUND_RESULT` 出结论后再发起，见 §4.12 |
 | `402` | `BALANCE_LIMIT_REACHED` | **预付费余额不足**：本单扣完会跌破你的透支额度，整单被拒、一分钱不扣 | 充值。**不要重试**，见下方 ⚠️ |
 | `503` | `BALANCE_ACCOUNT_NOT_FOUND` | 余额账户尚未就绪 | 联系平台开通后重试 |
 | `503` | `CURRENCY_MISMATCH` | 账户币种与商品币种不一致 | 联系平台核对，**改请求改不出来** |
@@ -466,7 +469,6 @@ PHP 要注意 `json_decode` 默认给关联数组、布尔要先于整数判断�
 | `415` | `CONTENT_TYPE_MUST_BE_JSON` | `Content-Type` 不是 `application/json` | 改头 |
 | `429` | `QPS_LIMITED` | 超过该商户每秒请求上限。**下单接口不受此限**，配额口径见 [§2.3](#23-认证检查顺序) | 退避重试 |
 | `406` | `[controller error]` | 服务端异常。`msg` 为固定字符串 `[controller error]`，不携带原因 | 见下方 ⚠️ |
-| `422` | `PRODUCT_NOT_RENDERABLE` | 该商品对你确实存在且在售，但缺字段、渲染不成你的商品结构 | **联系平台**。改请求改不出来，发布状态也是正常的 |
 | `501` | `FEATURE_NOT_IMPLEMENTED` | 你调用了一个本文档未列出的路径 | 只调用 §4 列出的接口 |
 | `503` | `OPENAPI_AUTH_UNAVAILABLE` / `PLATFORM_NOT_ENABLED` / `PRODUCT_ADAPTER_UNKNOWN` | 平台侧依赖或配置问题，与你的请求无关 | 退避重试并联系平台 |
 
@@ -501,12 +503,15 @@ PHP 要注意 `json_decode` 默认给关联数组、布尔要先于整数判断�
 
 | 你会看到 | 通常是因为 |
 |---|---|
-| `404` + 非 JSON | 路径前缀写错（正确前缀是 `/openapi/v1`） |
-| `301` | 用了 `http://`。**301 不保留 POST body**，直接用 `https://` |
-| `405` | 路径对但 HTTP 方法不对（本 API 全部是 `POST`） |
-| `413` / `415` | 请求体过大、或 `Content-Type` 不是 `application/json` |
+| `301` + 非 JSON | 用了 `http://`。**301 不保留 POST body**，直接用 `https://` |
+| `404` + 非 JSON | **路径前缀**写错（正确前缀是 `/openapi/v1`） |
 | `429` | 请求频率异常 —— 退避重试，并检查客户端有没有重试风暴或死循环 |
 | `5xx` / 连接中断 | 传输层或服务端异常 |
+
+> ℹ️ **注意区分**：只有**前缀**写错才会落到上表的 `404`。前缀正确、只是路径名拼错时，
+> 请求已经进到业务层，你拿到的是 `HTTP 200` + `code: 404` 的正常信封。
+> 同样地，HTTP 方法用错（`405`）、`Content-Type` 不对（`415`）、请求体过大（`413`）
+> **也都是 `HTTP 200` + 对应的 `code`**，不在上表之列。
 
 **判定顺序必须是先状态码、后 JSON**：
 
@@ -563,35 +568,84 @@ return body.data
 
 **商品对象**
 
-> 🔴 **商品的字段结构按贵方的账号配置决定，本节给出的是默认结构。**
-> 平台支持多种商品结构，不同结构的**字段名与字段集都不同**（例如流量额度在另一种结构里
-> 不叫 `volume`、覆盖范围不叫 `mccList`）。贵方拿到的是哪一种，以**实际调用的返回为准** ——
-> 请在联调时先打一次 `/products/list` 核对，不要按本表硬编码。
->
-> 同一个账号在 `/products/list`、`/products/detail`、`/order/query`、`/order/list` 上
-> 看到的是**同一种结构**，所以核对一次即可。若返回的字段与本表对不上，请联系平台确认
-> 贵方配置的是哪种结构并索取对应字段表。
+同一个商品在 `/products/list`、`/products/detail`、`/order/query`、`/order/list` 上是
+**同一份结构**，字段名、字段集、键序一致。
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `productCode` | string | 对外商品码，下单用它 |
 | `productName` | string\|null | 商品名 |
 | `tagName` | string\|null | 分组标签，如 `Europe` |
-| `volume` | string\|null | 流量额度（字符串数值），单位 MB；不限量为 `"0.000000"` |
+| `volume` | string\|null | 流量额度（字符串形式的十进制数），**单位 MB**。不限量套餐为 `"0.000000"` |
 | `dataLimited` | string | `Y` 限量 / `N` 不限量 |
 | `validity` | number\|null | 套餐天数 |
 | `expireDay` | number\|null | 卡有效期天数（从开卡起算） |
-| `cardType` | string | 卡型标识。取值由平台目录决定，**请勿枚举或硬编码** |
+| `cardType` | string | 卡型标识，如 `eo1` / `ep1` / `ep3` / `C4`。取值由平台目录决定，**请勿枚举或硬编码** |
 | `productType` | string\|null | 形态：`DATA_PACKAGE` 流量包 / `DAYPASS` 日包；无法归类时为 `null` |
-| `mccList` | string[]\|null | 覆盖国家的 MCC 列表 |
-| `attributes` | object\|null | 扩展属性 |
-| `settlementPrice` | string | 本结构下为 `"0"`，不携带金额 |
-| `retailPrice` | string | 本结构下为 `"0"`，不携带金额 |
+| `mccList` | string[]\|null | 覆盖网络的 MCC 列表 |
+| `attributes` | object\|null | 展示用扩展属性，**见下方专节** |
+| `settlementPrice` | string\|null | 该商品对贵方的**结算单价**。部分账号配置为不披露金额，此时恒为 `"0"`；订单快照里可能为 `null`（早期受理的订单未冻结该字段） |
+| `retailPrice` | string | 平台不披露零售价，恒为 `"0"` |
 | `currency` | string\|null | 币种，如 `USD` |
 | `configVersion` | number | 商品配置的**发布代次**：平台每次发布该商品都会递增，**即使内容未变**。可用于判断"需要重新拉取"，不能用于判断"内容确实变了" |
 
-> ⚠️ **除 `productCode` / `dataLimited` / `cardType` / `configVersion` 外，其余字段均可能为 `null`** ——
-> 平台不为未知值编造默认值。请按可空解析。
+> ⚠️ **`attributes` 与 `settlementPrice` 会出现 `null`**（前者见下节，后者见上表）。
+> 其余字段在目录侧对应的列都允许为空，平台**不为未知值编造默认值** ——
+> 请一律按可空解析，不要假设某个字段一定有值。
+
+> ℹ️ **`volume` 的单位是 MB**，与 `/order/usage` 的字节口径换算关系为
+> `dataTotalBytes = volume × 1024 × 1024`（例："CIS 1GB 365D" 的 `volume` 是
+> `"1024.000000"`，对应 `dataTotalBytes` 为 `1073741824`）。
+>
+> `dataLimited: "N"` 的不限量套餐没有总量概念，`volume` 为 `"0.000000"` ——
+> 那是"没有额度上限"，不是"额度为零"。
+
+> ℹ️ **需要不同的商品字段结构？** 上表是默认结构。若贵方的系统需要其它字段组织方式
+> （不同的字段名、额外的派生字段、或把覆盖范围/价格按贵方口径重排），
+> **可联系平台方定制** —— 平台以适配器的方式为渠道单独提供，不影响本文档描述的默认结构。
+
+#### `attributes` 里有什么
+
+`attributes` 是商品的**展示用**扩展属性块，由平台目录**原样返回**，**整块可能为 `null`**。
+
+> 🔴 **除 `speedRule` 外，平台不解释这个块里的任何键。** 这些键不参与下单、续订、用量或任何业务判定，
+> 平台也不校验它们的键名与取值。因此：
+>
+> - **键集不是契约**，不同商品可以不同，也可能随目录维护而增减，恕不另行通知；
+> - **请按可选字段读取**，取不到就不展示；
+> - **不要基于它做业务判定**，也不要对它做强类型解析。
+
+当前沙盒目录里，`attributes` 只有两种形态：**`null`**，或**只含一个 `speedRule` 键**。
+`speedRule` 出现在不限量（`dataLimited: "N"`）的日包上，描述"高速额度用完后限速"的规则：
+
+```json
+{
+  "speedRule": {
+    "period": "daily",
+    "throttle": {
+      "unit": "Kbps",
+      "value": 512
+    },
+    "highSpeed": {
+      "unit": "GB",
+      "value": 2
+    }
+  }
+}
+```
+
+`speedRule` 是唯一的例外：**它出现时，结构已在发布时按下表校验过**，不合下表的规则发布不上去。
+它本身仍可能不出现，所以请照样按可选字段读取；出现时可以按下表解析。
+
+| 路径 | 取值 |
+|---|---|
+| `speedRule.period` | `"daily"`：高速额度每天重置；`"total"`：整个有效期共用一份额度。**与 `productType` 无关**：日包上也可能是 `"total"`，总量包上也可能是 `"daily"`，额度周期以这个字段为准 |
+| `speedRule.highSpeed.value` / `.unit` | 大于 0 的数值 + `"MB"` 或 `"GB"`，如 `2` + `"GB"` —— 每个周期的高速额度 |
+| `speedRule.throttle` | `null`：高速额度用完即断网；或 `{ "value", "unit" }`：大于 0 的数值 + `"Kbps"` 或 `"Mbps"`，如 `512` + `"Kbps"` —— 超出后的限速值 |
+
+> ⚠️ `speedRule` 里的 `unit` 是这个块自带的单位标注，**与商品对象顶层 `volume` 的 MB 口径无关**，
+> 两者不要混用。单位区分大小写（`MB` 是兆字节，`Kbps` 是千比特每秒）。
+> `speedRule` 同样**不参与**下单、续订与用量判定，它只描述套餐的限速规则。
 
 **示例响应**（截取一条）
 
@@ -600,31 +654,84 @@ return body.data
   "data": {
     "list": [
       {
-        "productCode": "XP205032025ED92397E2AE461C",
-        "productName": "Europe Unlimited 3 Days",
-        "tagName": "Europe",
-        "volume": "0.000000",
-        "dataLimited": "N",
-        "validity": 3,
-        "expireDay": 90,
-        "cardType": "ep1",
-        "productType": "DAYPASS",
-        "mccList": ["276", "232", "206", "218", "248"],
+        "productCode": "XP01791078F286D359D6790456",
+        "productName": "CIS 1GB 365D",
+        "tagName": "CIS",
+        "volume": "1024.000000",
+        "dataLimited": "Y",
+        "validity": 365,
+        "expireDay": 365,
+        "cardType": "eo1",
+        "productType": "DATA_PACKAGE",
+        "mccList": [
+          "282",
+          "401",
+          "255",
+          "283",
+          "437",
+          "434",
+          "257",
+          "436",
+          "259",
+          "250",
+          "400"
+        ],
         "attributes": null,
-        "settlementPrice": "0",
+        "settlementPrice": "0.700000",
         "retailPrice": "0",
         "currency": "USD",
-        "configVersion": 1
+        "configVersion": 9
+      },
+      {
+        "productCode": "XP0909F3C1C8A9D7F97456F799",
+        "productName": "CIS 7D Unlimited",
+        "tagName": "CIS",
+        "volume": "0.000000",
+        "dataLimited": "N",
+        "validity": 7,
+        "expireDay": 365,
+        "cardType": "eo1",
+        "productType": "DAYPASS",
+        "mccList": [
+          "282",
+          "401",
+          "255",
+          "283",
+          "437",
+          "434",
+          "257",
+          "436",
+          "259",
+          "250",
+          "400"
+        ],
+        "attributes": {
+          "speedRule": {
+            "period": "daily",
+            "throttle": {
+              "unit": "Kbps",
+              "value": 512
+            },
+            "highSpeed": {
+              "unit": "GB",
+              "value": 2
+            }
+          }
+        },
+        "settlementPrice": "0.800000",
+        "retailPrice": "0",
+        "currency": "USD",
+        "configVersion": 9
       }
     ],
-    "hasMore": false,
+    "hasMore": true,
     "pageNo": 1,
-    "pageSize": 20,
+    "pageSize": 2,
     "language": "en"
   },
   "code": 200,
   "msg": "ok",
-  "t": 1788431706435
+  "t": 1789554466998
 }
 ```
 
@@ -694,27 +801,53 @@ public List<JsonNode> listAllProducts(XpinEsimClient client) throws Exception {
 {
   "data": {
     "language": "en",
-    "productCode": "XP205032025ED92397E2AE461C",
-    "productName": "Europe Unlimited 3 Days",
-    "tagName": "Europe",
+    "productCode": "XP0909F3C1C8A9D7F97456F799",
+    "productName": "CIS 7D Unlimited",
+    "tagName": "CIS",
     "volume": "0.000000",
     "dataLimited": "N",
-    "validity": 3,
-    "expireDay": 90,
-    "cardType": "ep1",
+    "validity": 7,
+    "expireDay": 365,
+    "cardType": "eo1",
     "productType": "DAYPASS",
-    "mccList": ["276", "232", "206"],
-    "attributes": null,
-    "settlementPrice": "0",
+    "mccList": [
+      "282",
+      "401",
+      "255",
+      "283",
+      "437",
+      "434",
+      "257",
+      "436",
+      "259",
+      "250",
+      "400"
+    ],
+    "attributes": {
+      "speedRule": {
+        "period": "daily",
+        "throttle": {
+          "unit": "Kbps",
+          "value": 512
+        },
+        "highSpeed": {
+          "unit": "GB",
+          "value": 2
+        }
+      }
+    },
+    "settlementPrice": "0.800000",
     "retailPrice": "0",
     "currency": "USD",
-    "configVersion": 1
+    "configVersion": 9
   },
-  "code": 200, "msg": "ok", "t": 1788431706435
+  "code": 200,
+  "msg": "ok",
+  "t": 1789554467197
 }
 ```
 
-**负例**：不存在的码 → `404 PRODUCT_NOT_FOUND`；商品存在且在售但渲染不成贵方的商品结构 → `422 PRODUCT_NOT_RENDERABLE`（联系平台，改请求改不出来）。
+**负例**：不存在的码 → `404 PRODUCT_NOT_FOUND`。
 
 **Node.js / Java**
 
@@ -758,18 +891,20 @@ JsonNode detail = client.invoke("/openapi/v1/products/detail",
 ```json
 {
   "data": {
-    "productCode": "XP205032025ED92397E2AE461C",
-    "cardType": "ep1",
-    "productType": "DAYPASS",
+    "productCode": "XP01791078F286D359D6790456",
+    "cardType": "eo1",
+    "productType": "DATA_PACKAGE",
     "capability": {
       "renewable": true,
       "supportUsageQuery": false,
       "maxRenewCount": 99,
       "timeZone": "UTC+0",
-      "observedAt": "2026-09-03T10:22:40.620Z"
+      "observedAt": "2026-09-16T10:18:45.929Z"
     }
   },
-  "code": 200, "msg": "ok", "t": 1788431706780
+  "code": 200,
+  "msg": "ok",
+  "t": 1789554467370
 }
 ```
 
@@ -834,14 +969,16 @@ JsonNode detail = client.invoke("/openapi/v1/products/detail",
 ```json
 {
   "data": {
-    "orderNo": "XE1788431707121E04989EE4D",
-    "clientOrderNo": "m1lc-1788431700325-1",
-    "productCode": "XP205032025ED92397E2AE461C",
+    "orderNo": "XE17895552107334DAD5D0C9D",
+    "clientOrderNo": "docverify-1789555210461",
+    "productCode": "XP6EE2B3DABB39D0D1A121446C",
     "orderStatus": "ACCEPTED",
     "accepted": true,
     "replayed": false
   },
-  "code": 200, "msg": "ok", "t": 1788431707137
+  "code": 200,
+  "msg": "ok",
+  "t": 1789555210748
 }
 ```
 
@@ -930,7 +1067,7 @@ public String createOrder(XpinEsimClient client, String productCode,
 | `packageStartTime` | string\|null | 套餐可用窗口的**起点** |
 | `packageEndTime` | string\|null | 套餐可用窗口的**终点** |
 | `latestActivationTime` | string\|null | 套餐的**激活期限**：过了这个时刻仍未激活，套餐作废 |
-| `product` | object | 下单时刻的**商品快照**，按贵方配置的商品结构适配器渲染，字段集与 §4.1 的商品对象相同。见下方说明 |
+| `product` | object | 下单时刻的**商品快照**，字段集与 §4.1 的商品对象相同。见下方说明 |
 
 > **这四个时刻怎么用**
 >
@@ -939,51 +1076,78 @@ public String createOrder(XpinEsimClient client, String productCode,
 > - `fulfilledAt` 是**平台**的动作时刻；其余三个来自**供应商**，两类不同源，跨源比较时刻差没有意义。
 > - 四个都是**订单**维度。一张卡续订多次就有多个套餐窗口，各属各的订单 —— 要按卡看请用 `/order/list` 的 `iccid` 选择器取全部订单。`/iccid/profile` 上的同名字段取的是当前**主导订单**的值，多套餐时只代表其中一张。
 > - 老订单（本次改造之前履约的）这四个字段可能为 `null`。**字段一定在**，值可能没有。
+> - ⚠️ **刚落 `FULFILLED` 的那一瞬间，这几个时刻可能还是 `null`，待运营商数据通知后才会补齐。**
+>   实测：订单刚变成 `FULFILLED` 时 `packageStartTime` / `packageEndTime` 读到的是 `null`，
+>   随后才出现取值；`profileStatus` 同理，履约瞬间为 `null`。
+>   所以**收到履约回调后立刻回查，拿到 `null` 是正常的** —— 不要据此判定失败，稍后重试即可。
 
 **示例响应**（履约中）
 
 ```json
 {
   "data": {
-    "orderNo": "XE1788431707121E04989EE4D",
-    "clientOrderNo": "m1lc-1788431700325-1",
-    "externalUserId": "m1lc-user-1788431700325",
-    "productCode": "XP205032025ED92397E2AE461C",
-    "orderStatus": "PROVIDER_ACCEPTED",
-    "iccid": null,
-    "profileStatus": null,
-    "fulfilledAt": null,
-    "packageStartTime": null,
-    "packageEndTime": null,
-    "latestActivationTime": null,
+    "orderNo": "XE1788864310025C4C7895AE2",
+    "clientOrderNo": "ev-t25-1788864309531",
+    "externalUserId": null,
+    "productCode": "XP01791078F286D359D6790456",
+    "orderStatus": "FULFILLED",
+    "iccid": "89000000000000000134",
+    "profileStatus": "ENABLED",
+    "fulfilledAt": "2026-09-08T10:46:30.537Z",
+    "packageStartTime": "2026-09-08T10:45:16.000Z",
+    "packageEndTime": "2027-09-08T10:45:15.000Z",
+    "latestActivationTime": "2027-09-08T10:45:15.000Z",
     "product": {
-      "productCode": "XP205032025ED92397E2AE461C",
-      "productName": "Europe Unlimited 3 Days",
-      "tagName": "Europe",
-      "volume": "0.000000", "dataLimited": "N", "validity": 3, "expireDay": 90,
-      "cardType": "ep1", "productType": "DAYPASS",
-      "mccList": ["276", "232"],
+      "productCode": "XP01791078F286D359D6790456",
+      "productName": "CIS 1GB 365D",
+      "tagName": "CIS",
+      "volume": "1024.000000",
+      "dataLimited": "Y",
+      "validity": 365,
+      "expireDay": 365,
+      "cardType": "eo1",
+      "productType": "DATA_PACKAGE",
+      "mccList": [
+        "282",
+        "401",
+        "255",
+        "283",
+        "437",
+        "434",
+        "257",
+        "436",
+        "259",
+        "250",
+        "400"
+      ],
       "attributes": null,
-      "settlementPrice": "0", "retailPrice": "0", "currency": "USD",
-      "configVersion": 1
+      "settlementPrice": null,
+      "retailPrice": "0",
+      "currency": "USD",
+      "configVersion": 4
     }
   },
-  "code": 200, "msg": "ok", "t": 1788431709839
+  "code": 200,
+  "msg": "ok",
+  "t": 1789554467731
 }
 ```
 
-> ⚠️ **价格字段不用于对账。** 在贵方当前的商品结构下，`product.retailPrice` 与
-> `product.settlementPrice` 不携带金额（`/products/list`、`/products/detail`、
-> `/order/list` 同理）。结算金额以平台与贵方的商务约定为准。
+> ⚠️ **价格字段不用于对账。** `product.retailPrice` 与 `product.settlementPrice`
+> 不携带金额（`/products/list`、`/products/detail`、`/order/list` 同理）。
+> 结算金额以平台与贵方的商务约定为准。
 
-> ℹ️ **`product` 块的结构随贵方的商品结构适配器变化**，与 §4.1 / §4.2 是同一套规则 ——
-> 贵方在商品目录上看到的是哪种结构，订单里就是哪种。
->
-> 字段集与 §4.1 的**商品对象**相同。⚠️ 与 `/products/detail` 的差别只有一个：
+> ℹ️ 字段集与 §4.1 的**商品对象**相同。⚠️ 与 `/products/detail` 的差别只有一个：
 > 那个接口的 `data` 额外带一个信封字段 `language`，订单里的 `product` 块**没有**它 ——
 > 两边共用同一个反序列化类型时请注意这一项。
 >
-> ⚠️ **老订单可能有字段为 `null`。** `product` 块取自受理那一刻冻结的快照，而快照在 2026-09-15 之前不含 `attributes` / `countryCodeList` / `sourceRawData` 三项——那些订单上由它们派生的字段恒为 `null`（例如非默认结构里的 `coverages`）。这是旧数据的兼容显示，**不表示该商品没有覆盖国家**；`null` 是"未知"，与空数组含义不同。此前受理的订单无法补齐：快照按定义是冻结的，回填会把"当时的事实"改写成"现在的事实"。
+> ⚠️ **订单里的 `product` 是受理那一刻的冻结快照，可能与商品目录的现值不同。**
+> 早期受理的订单，快照里没有冻结全部字段，因此 `attributes` 与 `settlementPrice`
+> 在这些订单上会是 `null`，而同一个商品在 `/products/detail` 上可能是有值的；
+> `configVersion` 也会停留在受理当时的代次。
+>
+> 这里的 `null` 含义是**"当时没有记录"**，不是"该商品没有这一项"。
+> 快照按定义不可回填 —— 回填会把"当时的事实"改写成"现在的事实"。
 >
 > 不论渲染结果如何，**订单本身总是查得到**：商品块的字段可能为 `null`，但 `/order/query` 与 `/order/list` 不会因此失败。
 
@@ -1071,24 +1235,96 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
   "data": {
     "list": [
       {
-        "orderNo": "XE1788431707121E04989EE4D",
-        "clientOrderNo": "m1lc-1788431700325-1",
-        "externalUserId": "m1lc-user-1788431700325",
-        "productCode": "XP205032025ED92397E2AE461C",
+        "orderNo": "XE1788864310025C4C7895AE2",
+        "clientOrderNo": "ev-t25-1788864309531",
+        "externalUserId": null,
+        "productCode": "XP01791078F286D359D6790456",
         "orderStatus": "FULFILLED",
-        "iccid": "89000000000000000430",
-        "profileStatus": null,
-        "fulfilledAt": "2026-03-01T08:15:30.123Z",
-        "packageStartTime": "2026-03-02T09:20:40.000Z",
-        "packageEndTime": "2026-03-09T09:20:40.000Z",
-        "latestActivationTime": "2026-06-01T00:00:00.000Z",
-        "product": { "...": "同 order/query 的商品快照" }
+        "iccid": "89000000000000000134",
+        "profileStatus": "ENABLED",
+        "fulfilledAt": "2026-09-08T10:46:30.537Z",
+        "packageStartTime": "2026-09-08T10:45:16.000Z",
+        "packageEndTime": "2027-09-08T10:45:15.000Z",
+        "latestActivationTime": "2027-09-08T10:45:15.000Z",
+        "product": {
+          "productCode": "XP01791078F286D359D6790456",
+          "productName": "CIS 1GB 365D",
+          "tagName": "CIS",
+          "volume": "1024.000000",
+          "dataLimited": "Y",
+          "validity": 365,
+          "expireDay": 365,
+          "cardType": "eo1",
+          "productType": "DATA_PACKAGE",
+          "mccList": [
+            "282",
+            "401",
+            "255",
+            "283",
+            "437",
+            "434",
+            "257",
+            "436",
+            "259",
+            "250",
+            "400"
+          ],
+          "attributes": null,
+          "settlementPrice": null,
+          "retailPrice": "0",
+          "currency": "USD",
+          "configVersion": 4
+        }
+      },
+      {
+        "orderNo": "XE178876992006393150AC788",
+        "clientOrderNo": "ken-webhook3-1788769918662",
+        "externalUserId": null,
+        "productCode": "XP01791078F286D359D6790456",
+        "orderStatus": "FULFILLED",
+        "iccid": "89000000000000000131",
+        "profileStatus": "ENABLED",
+        "fulfilledAt": "2026-09-07T08:32:08.482Z",
+        "packageStartTime": "2026-09-07T08:32:03.000Z",
+        "packageEndTime": "2027-09-07T08:32:02.000Z",
+        "latestActivationTime": "2027-09-07T08:32:02.000Z",
+        "product": {
+          "productCode": "XP01791078F286D359D6790456",
+          "productName": "CIS 1GB 365D",
+          "tagName": "CIS",
+          "volume": "1024.000000",
+          "dataLimited": "Y",
+          "validity": 365,
+          "expireDay": 365,
+          "cardType": "eo1",
+          "productType": "DATA_PACKAGE",
+          "mccList": [
+            "282",
+            "401",
+            "255",
+            "283",
+            "437",
+            "434",
+            "257",
+            "436",
+            "259",
+            "250",
+            "400"
+          ],
+          "attributes": null,
+          "settlementPrice": null,
+          "retailPrice": "0",
+          "currency": "USD",
+          "configVersion": 2
+        }
       }
     ],
     "hasMore": false,
     "nextPageToken": null
   },
-  "code": 200, "msg": "ok", "t": 1788431720198
+  "code": 200,
+  "msg": "ok",
+  "t": 1789554467544
 }
 ```
 
@@ -1137,6 +1373,7 @@ public List<JsonNode> listOrdersByUser(XpinEsimClient client, String externalUse
 ### 4.7 续订资格判定 `/iccid/renew`
 
 **只读接口，不产生订单。** 续订按钮的可用性**只能**由它决定。
+要一次列出这张卡能续的全部商品，用 [§4.8](#48-可续订商品-iccidrenewproducts) —— 它对每个商品的结论就是本接口的结论。
 
 **请求**
 
@@ -1160,11 +1397,11 @@ public List<JsonNode> listOrdersByUser(XpinEsimClient client, String externalUse
 
 ```json
 // 可续
-{"data":{"allowed":true,"reasons":[],"iccid":"89000000000000000571","productCode":"XP563E64913D5D5E0B8DBC925F"},
+{"data":{"allowed":true,"reasons":[],"iccid":"89000000000000000134","productCode":"XP01791078F286D359D6790456"},
  "code":200,"msg":"ok","t":1788495680855}
 
 // 不可续
-{"data":{"allowed":false,"reasons":["DAYPASS_IN_FORCE"],"iccid":"89000000000000000435","productCode":"XP205032025ED92397E2AE461C"},
+{"data":{"allowed":false,"reasons":["DAYPASS_IN_FORCE"],"iccid":"89000000000000000435","productCode":"XP0909F3C1C8A9D7F97456F799"},
  "code":200,"msg":"ok","t":1788505549000}
 ```
 
@@ -1182,7 +1419,6 @@ public List<JsonNode> listOrdersByUser(XpinEsimClient client, String externalUse
 | `EXTERNAL_USER_ID_CONFLICT` | 传入的 `externalUserId` 与卡上绑定的不一致 | ❌ 终局（改传对的） |
 | **`RENEWABILITY_PENDING_SYNC`** | 平台还没同步到这张卡的可续订性 | 🔄 **稍后重试** |
 | **`RENEW_WINDOW_PENDING_SYNC`** | 续订窗口尚未同步 | 🔄 **稍后重试** |
-| **`RENEWABILITY_STALE`** | 同步过但证据已过期 | 🔄 **稍后重试** |
 | **`DAYPASS_IN_FORCE`** | 日包在用期间整张卡不可续（用流量包续也不行） | 🔄 日包结束后解除 |
 | **`DAYPASS_REQUIRES_EMPTY_CARD`** | 日包要求卡上没有占用中的套餐 | 🔄 卡上现有套餐全部结束后解除 |
 | **`SERIAL_RULE_SLOT_OCCUPIED`** | 该卡型要求串行续订，卡上已有占用中的套餐 | 🔄 该套餐结束后解除 |
@@ -1219,7 +1455,7 @@ public List<JsonNode> listOrdersByUser(XpinEsimClient client, String externalUse
 ```js
 // 上表标 🔄 的那一档。其余分档不要塞进来：⚠️ 那一档要换商品，不是原样重试。
 const RETRYABLE = new Set([
-  'RENEWABILITY_PENDING_SYNC', 'RENEW_WINDOW_PENDING_SYNC', 'RENEWABILITY_STALE',
+  'RENEWABILITY_PENDING_SYNC', 'RENEW_WINDOW_PENDING_SYNC',
   'DAYPASS_IN_FORCE', 'DAYPASS_REQUIRES_EMPTY_CARD', 'SERIAL_RULE_SLOT_OCCUPIED',
   'CONCURRENT_ORDER_LIMIT_REACHED', 'CARD_CAPABILITY_UNKNOWN'
 ])
@@ -1273,7 +1509,95 @@ public RenewCheck checkRenewable(XpinEsimClient client, String iccid, String pro
 
 ---
 
-### 4.8 续订下单 `/order/renew`
+### 4.8 可续订商品 `/iccid/renewProducts`
+
+**只读接口，不产生订单。** 一次拿到这张卡**此刻能续的全部商品**，用来渲染"选择续订套餐"的页面。
+
+**请求**
+
+| 字段 | 类型 | 必填 | 约束 |
+|---|---|---|---|
+| `iccid` | string | **是** | 长度 `[10, 32]` |
+
+**响应 `data`**：与 `/products/list`（[§4.1](#41-商品列表-productslist)）**同一份结构**，全部结果作为一页返回。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `list` | array | 此刻能续的商品，商品对象与 §4.1 **逐字段相同**，按 `productCode` 排序。一个都不能续时为 `[]` |
+| `hasMore` | boolean | 恒为 `false`：本接口不分页 |
+| `pageNo` | number | 恒为 `1` |
+| `pageSize` | number | 本次返回的商品数，即 `list` 的条数（可能为 `0`） |
+| `language` | string | 同 §4.1，当前恒为 `en` |
+
+| 情况 | 返回 |
+|---|---|
+| 卡在，有能续的商品 | `200`，`list` 为这些商品 |
+| 卡在，一个都不能续 | `200`，`list: []` |
+| 卡不存在或不属于你 | `404 CARD_NOT_FOUND`（与 `/iccid/profile` 相同） |
+
+**列表里是哪些商品**
+
+- **候选**：发布给你、当前可下单的在售商品里，与这张卡**卡型相同**的那些。续订永不换卡型，别的卡型的商品不会出现。
+- **结论与 §4.7 同源**：一个候选商品出现在列表里，当且仅当 `/iccid/renew` 对它返回 `allowed: true`。两个接口不会给出相反的答案。
+- **不返回原因**：某个商品为什么不在列表里，用 §4.7 对它查 `reasons`。
+
+**示例响应**
+
+```json
+// 卡上有流量包在用、卡型规则为"日包独占"：只能续流量包
+{"data":{"list":[{"productCode":"XP2D6285459B2CB858B2E52390","productName":"Europe 365D 5GB","tagName":"Europe",
+  "volume":"5120.000000","dataLimited":"Y","validity":365,"expireDay":365,"cardType":"ep3","productType":"DATA_PACKAGE",
+  "mccList":["276","232","206","218","248","219","244","280","230","238","284","262","216","295","247","222","202","208","272","278","270","268","259","226","294","242","204","246","214","231","293","220","228","240","255","234","235","274"],
+  "attributes":null,"settlementPrice":"0.600000","retailPrice":"0","currency":"USD","configVersion":1}],
+  "hasMore":false,"pageNo":1,"pageSize":1,"language":"en"},"code":200,"msg":"ok","t":1791543582196}
+
+// 一个都不能续（例：卡上的日包还在用）
+{"data":{"list":[],"hasMore":false,"pageNo":1,"pageSize":0,"language":"en"},"code":200,"msg":"ok","t":1791543582983}
+
+// 卡不存在或不属于你
+{"data":{},"code":404,"msg":"CARD_NOT_FOUND","t":1791543583688}
+```
+
+> 🔴 **列表里有，不等于一定下得了单。** 边界与 §4.7 的预检相同：受理时还会扣你的预付费余额
+> （`402 BALANCE_LIMIT_REACHED`）；本接口**不收 `externalUserId`**，看不出你下单时要传的终端用户
+> 与卡上绑定的是否一致（`EXTERNAL_USER_ID_CONFLICT`）；查询与下单之间，卡上的套餐也可能变化。
+> 下单侧照样要处理 `409 RENEW_NOT_ALLOWED` 与 `402`。
+>
+> 🔴 **不要缓存。** 卡上每多一张单、每结束一张单，答案都会变。请在用户打开续订页的那一刻查。
+>
+> ℹ️ **与 §4.7 怎么配合**：列出"能续哪些"用本接口；用户想续某个商品却不能续、需要告诉他原因时，
+> 用 §4.7 对那个商品查 `reasons`。新卡刚建成、续订信息还没同步的那段时间，本接口返回空列表，
+> §4.7 给出的是"稍后重试"类的 reason。
+>
+> ℹ️ 本接口占用**共用配额**（[§2.3](#23-认证检查顺序)），不在下单接口的免限之列。
+
+**Node.js**
+
+```js
+// 渲染"选择续订套餐"页：列表里每一项的 productCode 都可以直接拿去 /order/renew。
+// 卡不存在或不属于你时，invoke 按 404 CARD_NOT_FOUND 抛错。
+async function renewOptions(client, iccid) {
+  const d = await client.invoke('/openapi/v1/iccid/renewProducts', { iccid })
+  // [] = 此刻一个都不能续。要告诉用户原因，对他想续的商品调 /iccid/renew 看 reasons。
+  return d.list
+}
+```
+
+**Java**
+
+```java
+// 卡不存在或不属于你时，invoke 按 404 CARD_NOT_FOUND 抛错。
+public List<JsonNode> renewOptions(XpinEsimClient client, String iccid) throws Exception {
+    JsonNode d = client.invoke("/openapi/v1/iccid/renewProducts", Map.of("iccid", iccid));
+    List<JsonNode> products = new ArrayList<>();
+    d.get("list").forEach(products::add);   // 空列表 = 此刻一个都不能续
+    return products;
+}
+```
+
+---
+
+### 4.9 续订下单 `/order/renew`
 
 **需要 `esim.write` scope。** 给**已有的卡**追加套餐，**不换卡、不换激活码**。
 
@@ -1294,15 +1618,17 @@ public RenewCheck checkRenewable(XpinEsimClient client, String iccid, String pro
 ```json
 {
   "data": {
-    "orderNo": "XE17884956816778866A4A70E",
-    "clientOrderNo": "m1n-C4-DATA-rn-1788494789993",
-    "iccid": "89000000000000000571",
-    "productCode": "XP563E64913D5D5E0B8DBC925F",
+    "orderNo": "XE17895552527309526B1A7E1",
+    "clientOrderNo": "docrenew-1789555252454",
+    "iccid": "89000000000000000712",
+    "productCode": "XP6EE2B3DABB39D0D1A121446C",
     "orderStatus": "ACCEPTED",
     "accepted": true,
     "replayed": false
   },
-  "code": 200, "msg": "ok", "t": 1788495681690
+  "code": 200,
+  "msg": "ok",
+  "t": 1789555252743
 }
 ```
 
@@ -1374,7 +1700,7 @@ public String renew(XpinEsimClient client, String iccid, String productCode,
 
 ---
 
-### 4.9 卡档案 `/iccid/profile`
+### 4.10 卡档案 `/iccid/profile`
 
 一次拿到这张卡的全部投影：交付物、profile 状态、续订证据、用量。
 
@@ -1392,8 +1718,8 @@ public String renew(XpinEsimClient client, String iccid, String productCode,
 | `externalUserId` | string\|null | 绑定的终端用户 |
 | `cardType` | string\|null | 卡型 |
 | `delivery.activationCode` | string\|null | **激活码**，形如 `LPA:1$<smdp>$<matchingId>` |
-| `delivery.installTime` | string\|null | 这张 profile 被装到设备上的时刻。同一张卡可被多次安装，该值是**当前报告值**。⚠️ 见下方说明 |
 | `delivery.latestActivationTime` | string\|null | 套餐的**激活期限**：过了这个时刻仍未激活，套餐作废 |
+| `delivery.installTime` | string\|null | 这张 profile 被装到设备上的时刻。同一张卡可被多次安装，该值是**当前报告值**。⚠️ 见下方说明 |
 | `delivery.imsi` / `delivery.msisdn` | string\|null | IMSI / MSISDN |
 | `profile.status` | string | 生命周期：`RELEASED` → `DOWNLOADED` → `INSTALLED` → `ENABLED` ↔ `DISABLED` → `DELETED`；另有 `UNKNOWN`（上游给了平台不认识的值）。共 **7** 个取值 |
 | `profile.statusTime` | string | 平台**观测到**该状态的时刻（平台时钟，**不是**上游报告的变更时刻；新卡上是履约投影时刻） |
@@ -1404,7 +1730,7 @@ public String renew(XpinEsimClient client, String iccid, String productCode,
 | `renewal.maxConcurrentPackages` | number\|null | 并发上限。`null` 有两种含义 —— 该卡型未声明上限，或平台尚未同步到该卡型能力，**本接口无法区分**。请勿据此自行判断能否续订，那个问题请用 §4.7 |
 | `renewal.evidenceFresh` | boolean | 平台对续订证据新鲜度的判定结果。`false` 表示平台目前不会凭这份证据受理续订 —— 具体原因请用 §4.7 拿 |
 | `renewal.evidenceSyncedAt` | string\|null | 证据同步时刻。它是**卡型能力**的刷新时刻，同一卡型的多张卡上取值相同，与 `usage.observedAt` 不是一回事 |
-| `usage` | object\|null | 用量；`null` 见 §4.10 |
+| `usage` | object\|null | 用量；`null` 见 §4.11 |
 | `packageStatus` | string\|null | 套餐当前状态，共 12 个取值：`CREATED` / `NOT_ACTIVATED` / `ACTIVATED` / `IN_USE` / `SUSPENDED` / `EXHAUSTED` / `EXPIRED` / `CANCELLED` / `ABANDONED` / `TERMINATED` / `REFUNDED` / `UNKNOWN`；`null` 等同 `CREATED`。**这是判断「用户激活了没有」的字段 —— 已激活的判据是 `ACTIVATED` 或 `IN_USE`** |
 | `packageStartTime` | string\|null | 套餐可用窗口的**起点** |
 | `packageEndTime` | string\|null | 套餐可用窗口的**终点** |
@@ -1439,33 +1765,46 @@ public String renew(XpinEsimClient client, String iccid, String productCode,
 ```json
 {
   "data": {
-    "iccid": "89000000000000000442",
-    "externalUserId": "your-user-0442",
-    "cardType": "ep1",
+    "iccid": "89000000000000000134",
+    "externalUserId": null,
+    "cardType": "eo1",
     "delivery": {
-      "activationCode": "LPA:1$smdp-a.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE",
-      "installTime": "2026-09-05T12:58:03.000Z",
-      "latestActivationTime": "2026-12-04T12:53:54.000Z",
-      "imsi": "460000000000442",
-      "msisdn": "850000000000442"
+      "activationCode": "LPA:1$smdp.example.com$D0C23496B79C4179A7FA57E7EXAMPLE",
+      "latestActivationTime": "2027-09-08T10:45:15.000Z",
+      "installTime": null,
+      "imsi": "450000000000134",
+      "msisdn": "850000000000134"
     },
-    "profile": { "status": "ENABLED", "statusTime": "2026-09-05T13:00:21.079Z", "changeVersion": 1 },
+    "profile": {
+      "status": "ENABLED",
+      "statusTime": "2026-09-08T10:58:24.005Z",
+      "changeVersion": 1
+    },
     "renewal": {
-      "renewable": true, "expirationTime": "2026-12-07T12:53:53.000Z",
-      "activePackages": 1, "maxConcurrentPackages": 99,
-      "evidenceFresh": true, "evidenceSyncedAt": "2026-09-05T13:04:45.813Z"
+      "renewable": true,
+      "expirationTime": "2028-09-07T10:45:15.000Z",
+      "activePackages": 1,
+      "maxConcurrentPackages": 99,
+      "evidenceFresh": true,
+      "evidenceSyncedAt": "2026-09-16T10:18:45.929Z"
     },
     "usage": {
-      "orderNo": "XE1788612831173B352E275F4",
-      "dataTotalBytes": null, "dataUsedBytes": 0, "dataRemainBytes": null,
-      "refuelingTotalBytes": null, "qtaConsumptionBytes": null,
-      "observedUnit": "MB", "observedAt": "2026-09-05T13:29:24.791Z"
+      "orderNo": "XE1788864310025C4C7895AE2",
+      "dataTotalBytes": 1073741824,
+      "dataUsedBytes": 0,
+      "dataRemainBytes": 1073741824,
+      "refuelingTotalBytes": null,
+      "qtaConsumptionBytes": null,
+      "observedUnit": "MB",
+      "observedAt": "2026-09-16T10:25:39.378Z"
     },
     "packageStatus": "NOT_ACTIVATED",
-    "packageStartTime": "2026-09-05T12:53:54.000Z",
-    "packageEndTime": "2026-09-08T12:53:54.000Z"
+    "packageStartTime": "2026-09-08T10:45:16.000Z",
+    "packageEndTime": "2027-09-08T10:45:15.000Z"
   },
-  "code": 200, "msg": "ok", "t": 1788615660098
+  "code": 200,
+  "msg": "ok",
+  "t": 1789554467901
 }
 ```
 
@@ -1493,7 +1832,7 @@ String qrPayload = p.get("delivery").get("activationCode").asText();
 
 ---
 
-### 4.10 用量查询 `/order/usage`
+### 4.11 用量查询 `/order/usage`
 
 **请求**
 
@@ -1535,19 +1874,21 @@ String qrPayload = p.get("delivery").get("activationCode").asText();
 ```json
 {
   "data": {
-    "iccid": "89000000000000000430",
+    "iccid": "89000000000000000134",
     "usage": {
-      "orderNo": "XE1788614425833E413E81C10",
-      "dataTotalBytes": null,
+      "orderNo": "XE1788864310025C4C7895AE2",
+      "dataTotalBytes": 1073741824,
       "dataUsedBytes": 0,
-      "dataRemainBytes": null,
+      "dataRemainBytes": 1073741824,
       "refuelingTotalBytes": null,
       "qtaConsumptionBytes": null,
       "observedUnit": "MB",
-      "observedAt": "2026-09-05T13:29:24.791Z"
+      "observedAt": "2026-09-16T10:25:39.378Z"
     }
   },
-  "code": 200, "msg": "ok", "t": 1788431716876
+  "code": 200,
+  "msg": "ok",
+  "t": 1789554468075
 }
 ```
 
@@ -1580,7 +1921,7 @@ String qrPayload = p.get("delivery").get("activationCode").asText();
 
 ---
 
-### 4.11 退款申请 `/order/refund`
+### 4.12 退款申请 `/order/refund`
 
 对一张**已履约**的订单发起退款申请。scope `esim.write`。
 
@@ -1630,6 +1971,26 @@ String qrPayload = p.get("delivery").get("activationCode").asText();
 | 409 | `IDEMPOTENCY_KEY_REUSED` | 同一个 `idempotencyKey` 之前用过、但内容不同（`reason` 也算内容） |
 | 400 | `ORDER_INPUT_INVALID` | `clientOrderNo` 或 `idempotencyKey` 传了但是空白串。**缺字段**走 §3 的通用参数校验（`400 <字段> required`），不是这个码 |
 
+**示例响应**
+
+```json
+{
+  "data": {
+    "refundNo": "XR17895552840796EAFB9CA6C",
+    "orderNo": "XE17895552527309526B1A7E1",
+    "clientOrderNo": "docrenew-1789555252454",
+    "refundStatus": "REQUESTED",
+    "amount": "0.100000",
+    "currency": "USD",
+    "accepted": true,
+    "replayed": false
+  },
+  "code": 200,
+  "msg": "ok",
+  "t": 1789555284083
+}
+```
+
 **幂等语义**：同一个 `idempotencyKey` + 同样的内容重发 → 返回同一张退款单 + `replayed: true`，**不会退两次钱**。一张订单可以有多张历史退款单（第一次被拒之后可以再申请），但**同时只能有一张在途**。
 
 ⚠️ **没有"撤销退款申请"的接口。** 一张 `REQUESTED` 的单只有两个出口：平台确认（`CONFIRMED`）或平台拒绝（`REJECTED`）。改主意了请联系平台。
@@ -1657,7 +2018,7 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED �
 | `RETRY_PENDING` | 等待重试 | 继续等 |
 | **`FULFILLED`** | **已履约，`iccid` 可用** | 取激活码交付用户 |
 | **`FAILED`** | **这一单没有出卡** | **停止轮询**。需要出卡就重新下一单（用**新的** `idempotencyKey` 与 `clientOrderNo`）。原因需联系平台核查 |
-| **`REFUNDED`** | **这一单已退款**（你提交的退款申请被确认，见 §4.11） | 停止轮询。卡已废弃，激活码不再可用 |
+| **`REFUNDED`** | **这一单已退款**（你提交的退款申请被确认，见 §4.12） | 停止轮询。卡已废弃，激活码不再可用 |
 
 > 🔴 **轮询必须同时判 `FAILED`。** 只等 `FULFILLED` 的循环会在失败单上一直转到超时。
 > `FULFILLED` / `FAILED` / `REFUNDED` 都按终态处理，收到任一个就停止轮询。
@@ -1667,7 +2028,7 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED �
 > **不要在收到 `FAILED` 时删除本地订单记录或让它变得不可更新** —— 否则你会收到一条
 > 无处安放的事件，同时有一张已交付却无人认领的卡。
 >
-> ⚠️ **`REFUNDED` 只出现在你自己提交过退款申请的订单上**（§4.11），不使用退款接口的接入方
+> ⚠️ **`REFUNDED` 只出现在你自己提交过退款申请的订单上**（§4.12），不使用退款接口的接入方
 > 不会看到它。按契约你的状态解析**不应因遇到未知取值而报错** —— 请把它当作与 `FAILED`
 > 同族的终态处理。
 
@@ -1696,8 +2057,9 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED �
 ### 5.3 续订完整流程
 
 ```
-1. iccid/renew             实时查资格（不要缓存！）
-2. allowed === true 才继续，否则按 reasons 分类提示用户
+1. iccid/renewProducts     列出这张卡此刻能续的商品，供用户选择（实时查，不要缓存！）
+   或 iccid/renew          对用户选中的商品查资格，不可续时拿到 reasons
+2. 商品在列表里 / allowed === true 才继续，否则按 reasons 分类提示用户
 3. order/renew             → ACCEPTED + 新的 orderNo（iccid 不变）
 4. 轮询 order/query 到 FULFILLED，或等 ORDER_RENEW_RESULT 回调
 5. 断言 iccid 未变
@@ -1705,7 +2067,7 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED �
 
 > ⚠️ **续订资格有时间窗**：新卡建成后，平台需要先同步上游的续订证据；该证据也有新鲜期。
 > 期间查资格会拿到 §4.7 标 🔄 的 reason（`RENEWABILITY_PENDING_SYNC` / `RENEW_WINDOW_PENDING_SYNC` /
-> `CARD_CAPABILITY_UNKNOWN`），按"稍后再试"提示即可。资格还会随卡上套餐的变动实时改变，
+> `CARD_CAPABILITY_UNKNOWN`），`/iccid/renewProducts` 则返回空列表，按"稍后再试"提示即可。资格还会随卡上套餐的变动实时改变，
 > 所以**必须在用户点击的那一刻查**，不要缓存。
 
 ### 5.4 退款完整流程
@@ -1759,7 +2121,7 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED �
 > `ORDER_RENEW_RESULT` 的 `iccid`、`imsi`、`msisdn`、`activationCode`。
 > 推送模式开卡的订单可以在没有 `iccid` 的情况下落 `FULFILLED`。
 > 直接 `qrcode(event.data.activationCode)` 会在这条真实路径上抛异常 ——
-> 为 `null` 时请改用 §4.9 的 `/iccid/profile` 取；仍为空请联系平台，**不要重新下单**。
+> 为 `null` 时请改用 §4.10 的 `/iccid/profile` 取；仍为空请联系平台，**不要重新下单**。
 
 > ⚠️ **`STATUS_CHANGED` 的 `orderNo` 是该 ICCID 当前最新的订单号，用来定位这张卡，
 > 不代表引发本次变更的订单。** profile 变更是**卡级**事件，本来就不存在"引发它的那一单"；
@@ -1802,12 +2164,12 @@ ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED �
 
 ```json
 // ORDER_OPEN_RESULT
-{"msg":"success","code":"0000","data":{"imsi":"460000000000433","iccid":"89000000000000000433","msisdn":"850000000000433","orderNo":"XE1788489809764F48C390102","orderStatus":"FULFILLED","productCode":"XP205032025ED92397E2AE461C","clientOrderNo":"m1whA-1788489808349","activationCode":"LPA:1$smdp-a.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE","idempotencyKey":"m1whA-idem-1788489808349"},"eventId":"145b1ba79790575ae1fa22a5b172fb2fc6687a27de71d584","eventType":"ORDER_OPEN_RESULT","timestamp":"2026-09-04T02:43:37.180Z","nonce":"b2106d10-f164-4c89-84d9-4c7887dc7d03","businessType":"ESIM"}
+{"msg":"success","code":"0000","data":{"imsi":"460000000000433","iccid":"89000000000000000433","msisdn":"850000000000433","orderNo":"XE1788489809764F48C390102","orderStatus":"FULFILLED","productCode":"XP0909F3C1C8A9D7F97456F799","clientOrderNo":"m1whA-1788489808349","activationCode":"LPA:1$smdp-a.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE","idempotencyKey":"m1whA-idem-1788489808349"},"eventId":"145b1ba79790575ae1fa22a5b172fb2fc6687a27de71d584","eventType":"ORDER_OPEN_RESULT","timestamp":"2026-09-04T02:43:37.180Z","nonce":"b2106d10-f164-4c89-84d9-4c7887dc7d03","businessType":"ESIM"}
 ```
 
 ```json
 // ORDER_RENEW_RESULT
-{"msg":"success","code":"0000","data":{"imsi":"460000000000574","iccid":"89000000000000000574","msisdn":"850000000000574","orderNo":"XE1788505564505CF4DE8D310","orderStatus":"FULFILLED","productCode":"XP563E64913D5D5E0B8DBC925F","clientOrderNo":"m1n-C4-DATA-rn-1788504527118","activationCode":"LPA:1$smdp-b.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE","idempotencyKey":"m1n-C4-DATA-rnidem-1788504527118"},"eventId":"881c95a391b04045a10b5f91ebecb3512bbb8b99c70584f9","eventType":"ORDER_RENEW_RESULT","timestamp":"2026-09-04T07:06:22.502Z","nonce":"66677339-0820-4926-86aa-53fe1c5bc248","businessType":"ESIM"}
+{"msg":"success","code":"0000","data":{"imsi":"460000000000574","iccid":"89000000000000000574","msisdn":"850000000000574","orderNo":"XE1788505564505CF4DE8D310","orderStatus":"FULFILLED","productCode":"XP01791078F286D359D6790456","clientOrderNo":"m1n-C4-DATA-rn-1788504527118","activationCode":"LPA:1$smdp-b.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE","idempotencyKey":"m1n-C4-DATA-rnidem-1788504527118"},"eventId":"881c95a391b04045a10b5f91ebecb3512bbb8b99c70584f9","eventType":"ORDER_RENEW_RESULT","timestamp":"2026-09-04T07:06:22.502Z","nonce":"66677339-0820-4926-86aa-53fe1c5bc248","businessType":"ESIM"}
 ```
 
 ```json
@@ -1905,10 +2267,29 @@ app.post('/xpin/webhook', async (req, res) => {
 |---|---|
 | 送达判定 | **HTTP 2xx 且响应体 `code === "0000"`（字符串）** |
 | 失败情形 | 非 2xx、响应超时、`code` 不是 `"0000"`、响应体过大 |
-| 重投间隔 | **约 5 秒** |
-| 最多重投 | 计划内多次（约 2 小时内），超出后不再重投 |
+| 重投节奏 | **退避**，见下表 |
+| 总尝试次数 | **7 次**（首投 + 6 次重投），之后不再重投 |
 | 重投时 | `eventId` 与 `data` **不变**；`timestamp` / `nonce` / `sign` **每次重新生成** |
 | ACK 之后 | **立即停止重投** |
+
+**退避阶梯**
+
+| 第几次失败 | 下一次重投在 | 距首投约 |
+|---|---|---|
+| 第 1 次 | 10 秒后 | 10 秒 |
+| 第 2 次 | 30 秒后 | 40 秒 |
+| 第 3 次 | 60 秒后 | 1 分 40 秒 |
+| 第 4 次 | 600 秒后 | 11 分 40 秒 |
+| 第 5 次 | 3600 秒后 | 1 小时 12 分 |
+| 第 6 次 | 7200 秒后 | **3 小时 12 分** |
+| 第 7 次 | — | 不再重投 |
+
+> ⚠️ **上表是最短耗时，不是保证。** 实际重投在到点之后由后台按批处理，积压时会比表上更晚
+> —— 只会更晚，不会更早。请按"最终会到、但可能迟"来设计，不要用固定时限判定平台失败。
+
+> 🔴 **7 次全部失败之后事件不再重投，且没有补发入口。** 端点长时间不可用时，请用
+> `/order/list`（[§4.6](#46-订单列表-orderlist)）按 `externalUserId` 或 `iccid` 对账补齐
+> —— 尤其是 `ORDER_OPEN_RESULT`，它是激活码唯一的推送通道。
 
 > 💡 **长时间没收到预期事件时**，用 `/order/list`（§4.6）按 `externalUserId` 或 `iccid`
 > 对账补齐 —— 那是事件之外唯一的兜底入口。
@@ -1930,6 +2311,210 @@ app.post('/xpin/webhook', async (req, res) => {
 > **请与平台方约定轮换时间窗**，选在没有事件在途的时段。轮换后请核对这段时间内是否有
 > 订单只在 `/order/query` 里变成了 `FULFILLED` 却没有收到对应事件 ——
 > 用 `/order/list` 按 `externalUserId` 或 `iccid` 对账补齐。
+
+---
+
+## 7. 沙盒专用：状态模拟 `/sandbox/card/status`
+
+把你自己名下的一张卡（或它的某一笔订单）设成你指定的状态。scope `esim.write`。
+
+> 🔴 **这个接口只在沙盒环境存在。** 生产环境**没有这条路由** —— 调用它得到的是
+> `HTTP 404`，与一个拼错的路径无法区分（按 [§3.1](#31-非-200-的响应怎么处理) 处理）。
+> 请把它隔离在你的联调代码里，**不要**让它出现在发往生产的调用路径上。
+
+**它解决什么**：沙盒上的卡开出来之后就停在未激活，不会自己走到使用中、用尽或过期。
+于是「开卡之后的那一整段」你在沙盒上跑不出来 —— 收不到 `STATUS_CHANGED`，也没法验证
+自己的状态机。这个接口让你直接把卡推到想验证的那个状态上。
+
+**它不能做什么**：
+
+- **不能凭空开出一张卡。** 它只能改已经存在的、你名下的卡；开卡仍然只能走
+  `/order/create`（[§4.4](#44-开卡下单-ordercreate)）。
+- **不能改别人的卡。** 目标按你的凭证归属校验，查不到与"不属于你"返回同一个
+  `404 CARD_NOT_FOUND`。
+- **不动钱。** 它不碰你的预付费余额，也不产生退款。
+
+---
+
+### 7.1 可以设成哪些状态
+
+**不是** [§5.1](#51-订单状态机) 那张表的全集 —— 只有这些：
+
+| 参数 | 可选值 |
+|---|---|
+| `packageStatus` | `NOT_ACTIVATED`、`ACTIVATED`、`IN_USE`、`EXHAUSTED`、`EXPIRED`、`ABANDONED`、`TERMINATED` |
+| `profileStatus` | `UNKNOWN`、`RELEASED`、`DOWNLOADED`、`INSTALLED`、`ENABLED`、`DISABLED`、`DELETED` |
+
+表以外的值返回 `422`（见 [§7.3](#73-拒绝)）。
+
+#### 只给 `packageStatus` 时，Profile 状态会被一并模拟
+
+设一个套餐状态，平台会推出**一个自洽的上游会推的那几条事件**，而不是只推你字面点到的
+那一条。对应关系：
+
+| 你设的 `packageStatus` | 连带把 `profileStatus` 设成 |
+|---|---|
+| `NOT_ACTIVATED` | `INSTALLED` |
+| `ACTIVATED`、`IN_USE`、`EXHAUSTED` | `ENABLED` |
+| `EXPIRED`、`ABANDONED`、`TERMINATED` | `DISABLED` |
+
+> ⚠️ **这是平台的模拟策略，不是对上游行为的描述。** 我们并不声称真实上游在套餐进入
+> `IN_USE` 时一定会同时推 Profile 变更 —— 这张表是"一个自洽的上游会怎么做"。
+> 你的接收端不应把它当成生产环境的时序契约。
+
+**显式传的 `profileStatus` 永远压过上表**，所以要一个不自洽的组合（例如套餐 `IN_USE`
+但 Profile `DISABLED`）就两个都传。表里推不出 `DELETED` —— 要它就显式传。
+
+---
+
+### 7.2 调用与返回
+
+**入参**
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `iccid` | string | 是 | 10–32 字符。目标卡，必须在你名下 |
+| `packageStatus` | string | 否 | 目标套餐状态，取值见 [§7.1](#71-可以设成哪些状态) |
+| `profileStatus` | string | 否 | 目标 eSIM Profile 状态，取值见 [§7.1](#71-可以设成哪些状态) |
+| `clientOrderNo` | string | 否 | 1–100 字符。指定改哪一笔订单的套餐状态。不传就取这张卡的**最后一笔**订单 |
+
+`packageStatus` 与 `profileStatus` **至少要给一个**，都不给返回 `400`。
+
+> ⚠️ **续订过的卡请传 `clientOrderNo`。** 一张卡上有多笔订单时，"这张卡的套餐状态"
+> 本身是有歧义的；不传就落在最后一笔上，那未必是你想改的那一笔。
+>
+> 另外：**用量只会为最后一笔订单填充**（见下），指定更早的一笔时 `usage` 返回 `null`，
+> `usageSkippedReason` 是 `ORDER_NOT_LATEST`。
+
+**响应**
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `iccid` | string | 回显目标卡 |
+| `orderNo` | string \| null | 实际命中的平台订单号；只改 Profile 状态且这张卡尚无订单时为 `null` |
+| `clientOrderNo` | string \| null | 命中订单的业务单号 |
+| `simulationId` | string | 32 位十六进制。本次模拟的标识，排查时提供给平台 |
+| `accepted` | array | 本次受理的状态变更，每项 `{ kind, eventType }`。`kind` 为 `ORDER_CHANGE`（套餐状态）或 `PROFILE_CHANGE`（Profile 状态） |
+| `usage` | object \| null | 本次**已经写入**的模拟用量，见下。不填时为 `null` |
+| `usageSkippedReason` | string \| null | 没填用量的原因；填了则为 `null` |
+
+**示例响应**
+
+```json
+{
+  "data": {
+    "iccid": "89000000000000000134",
+    "orderNo": "XE17895552527309526B1A7E1",
+    "clientOrderNo": "docrenew-1789555252454",
+    "simulationId": "3f1a9c7e42b84d05a6c1e8f70b23d95c",
+    "accepted": [
+      { "kind": "ORDER_CHANGE", "eventType": 5 },
+      { "kind": "PROFILE_CHANGE", "eventType": 4 }
+    ],
+    "usage": {
+      "dataTotalBytes": 3145728,
+      "dataUsedBytes": 1110118,
+      "dataRemainBytes": 2035610
+    },
+    "usageSkippedReason": null
+  },
+  "code": 200,
+  "msg": "ok",
+  "t": 1789555284083
+}
+```
+
+#### 用量
+
+⚠️ **`accepted` 与 `usage` 的语义不同，不要混着读：**
+
+- `accepted` 是**已受理**。状态变更走的是回调链路，落库是异步的（通常几秒）。
+- `usage` 是**已生效**。流量数字在上游的回调协议里没有任何载体，所以平台直接写投影，
+  返回时它已经能从 `/order/usage` 读到了。
+
+**只有把套餐设成 `ACTIVATED` 或 `IN_USE` 时才填**，因为只有这两个状态下平台原本会去向
+上游实查。其余状态一律不填，`usageSkippedReason` 会说明原因：
+
+| 情形 | `usageSkippedReason` | 说明 |
+|---|---|---|
+| 设成 `NOT_ACTIVATED` / `EXHAUSTED` | `PLATFORM_DERIVE` | 平台按套餐总量自己算（用了 0 / 用满），不需要模拟 |
+| 设成 `EXPIRED` 等终态 | `PLATFORM_KEEP` | 平台保留最后一次读数，覆盖它会毁掉那条语义 |
+| 只设了 `profileStatus` | `NO_PACKAGE_STATUS_REQUESTED` | 用量跟着套餐状态走 |
+| 指定了更早的一笔订单 | `ORDER_NOT_LATEST` | 用量按卡记录，且恒挂在最后一笔订单上 |
+| 不限量套餐、或商品没有配总量 | `PACKAGE_TOTAL_UNKNOWN` | 没有总量就没有合理区间，平台不编一个数字出来 |
+
+填充规则：总量取自该订单**商品配置的套餐总量**（不是随机的）；已用量在区间内随机 ——
+`ACTIVATED` 取 0–5%，`IN_USE` 取 5–85%；剩余量 = 总量 − 已用量。
+
+> ⚠️ **模拟的用量是一次快照，不会随时间增长，也可能被覆盖。** 平台仍会按自己的节奏
+> 就 `ACTIVATED` / `IN_USE` 的卡向上游查实时流量；查到了就按实测值覆盖你这次写进去的
+> 数字。要一个稳定的"跑满了"场景，用 `EXHAUSTED`（平台会算出用满，且那个状态不实查）。
+
+> 🔴 **状态变更的 `code: 200` 是"已受理"，不是"已生效"。**
+>
+> 平台收到你的请求之后走的是与真实上游回调完全相同的那条链路，状态落库是**异步**的
+> —— 通常几秒内完成。**响应里刻意不带任何"新状态"字段**：那会是一个还没发生的事实。
+>
+> 要确认已经生效，调 `/order/query`（[§4.5](#45-订单查询-orderquery)）或
+> `/iccid/profile`（[§4.10](#410-卡档案-iccidprofile)）复核，**不要**假定调用返回即生效。
+> （`usage` 是例外，它在返回时已经生效。）
+
+> ⚠️ **重复调用会重复推送，不是幂等的。** 同样的参数调两次会产生两次状态变更
+> （因而可能有两条 `STATUS_CHANGED` 回调）。这是刻意的 —— 状态被别的流程改回去之后
+> 你需要能再推一次。所以本接口**没有** `idempotencyKey`。
+
+> ⚠️ **模拟出来的状态不是永久的。** 平台仍会按自己的节奏与上游核对这张卡；
+> 一段时间之后，上游的真实状态可能把你设的值覆盖掉。请在设定之后**尽快**完成验证，
+> 不要把一张模拟状态的卡当成长期夹具。
+
+---
+
+### 7.3 拒绝
+
+| HTTP | `msg` | 含义与处置 |
+|---|---|---|
+| 400 | `SIMULATION_TARGET_REQUIRED` | `packageStatus` 与 `profileStatus` 一个都没给 |
+| 404 | `CARD_NOT_FOUND` | 你名下没有这个 `iccid` |
+| 404 | `ORDER_NOT_FOUND` | 传了 `clientOrderNo`，但这张卡上没有这笔订单 |
+| 409 | `ORDER_NOT_SIMULATABLE` | 命中的订单还没履约（或没有可用的上游单号），套餐状态改不了。**先把卡开出来**；只改 `profileStatus` 不受此限 |
+| 422 | `PACKAGE_STATUS_NOT_SIMULATABLE` | `packageStatus` 不在 [§7.1](#71-可以设成哪些状态) 的表里 |
+| 422 | `PROFILE_STATUS_NOT_SIMULATABLE` | `profileStatus` 不在 [§7.1](#71-可以设成哪些状态) 的表里 |
+| 503 | `SIMULATION_NOT_AVAILABLE` | 这个环境没有开启状态模拟。**改请求改不出来**，联系平台 |
+| 503 | `SIMULATION_INGRESS_UNCONFIGURED` | 平台侧配置缺失。同上 |
+| 503 | `SIMULATION_SUPPLIER_UNAVAILABLE` | 平台侧配置问题。同上 |
+
+三个 `503` 都与你的请求无关，退避重试并联系平台。
+
+---
+
+### 7.4 用它验证回调链路
+
+**`STATUS_CHANGED`（[§6.1](#61-事件类型)）只由 Profile 状态变更产生。** 套餐状态自己
+**不是**一个出站事件类型 —— 但由于 [§7.1](#71-可以设成哪些状态) 的连带规则，设一个套餐
+状态通常也会带出一次 Profile 变更，因而**间接**产生 `STATUS_CHANGED`。
+
+> ⚠️ 只在 Profile 状态**真的发生了变化**时才会发。卡本来就是 `ENABLED`，再设一次
+> `IN_USE` 不会产生新事件（`changeVersion` 也不会前进）—— 那是正确行为，不是丢事件。
+
+一条建议的联调顺序：
+
+1. `/order/create` 开一张卡，等 `ORDER_OPEN_RESULT`。
+2. `POST /sandbox/card/status`，`{"iccid": "...", "packageStatus": "IN_USE"}` ——
+   一次调用同时验证：套餐状态推进、连带的 `STATUS_CHANGED`、`changeVersion` 去重逻辑，
+   以及 `/order/usage` 上出现的模拟流量。
+3. `{"iccid": "...", "profileStatus": "DISABLED"}` —— 验证你对 Profile 单独变更的处理。
+4. 再调一次第 3 步同样的参数 —— 此时 Profile 没有变化，**不该**再收到事件；验证你没有
+   把"没有事件"误判成链路故障。
+5. `{"packageStatus": "EXHAUSTED"}` —— 验证你对"套餐用尽"的处理，并确认
+   `/order/usage` 的剩余量变成 0。
+
+#### 这个接口**不能**帮你验证的
+
+| | 为什么 |
+|---|---|
+| **开卡 / 激活码** | 履约事件在上游协议里要求签名，本接口不构造签名。开卡只能走 `/order/create` |
+| **续订资格** | 续订窗口（套餐起止时间、可续订截止时间）不由状态变更事件携带，本接口改不动它们。**设了状态也不会让一张不可续订的卡变得可续订** —— 续订联调请用真实下单 |
+| **用量随时间增长** | 模拟的用量是一次快照，见 [§7.2](#72-调用与返回) |
 
 ---
 

@@ -118,7 +118,7 @@
 <ul><li><a href="#71-可以设成哪些状态">7.1 可以设成哪些状态</a></li><li><a href="#72-调用与返回">7.2 调用与返回</a></li><li><a href="#73-拒绝">7.3 拒绝</a></li><li><a href="#74-用它验证回调链路">7.4 用它验证回调链路</a></li></ul>
 <hr>
 <h2 id="1-基础约定">1. 基础约定<a class="anchor" href="#1-基础约定">#</a></h2>
-<div class="tw"><table><thead><tr><th>项</th><th>值</th></tr></thead><tbody><tr><td>Base URL（沙盒环境）</td><td><code>https://sandboxapi.xpin.network</code></td></tr><tr><td>Base URL（生产环境）</td><td>请向平台方获取</td></tr><tr><td>协议</td><td>全部 <code>POST</code>，<code>Content-Type: application/json</code></td></tr><tr><td>字符集</td><td>UTF-8</td></tr><tr><td>字符串参数</td><td>首尾空白先被去掉，再按约束校验长度。长度按宽度计：ASCII 字符计 1，其它字符（如中文）计 2</td></tr><tr><td>可选参数</td><td>不用时<strong>不要放进请求体</strong>。可选的字符串参数传 <code>null</code> 会被参数校验拒绝（<code>400</code>）</td></tr><tr><td><strong>成功判定</strong></td><td><strong>看响应体的 <code>code</code> 字段，不看 HTTP 状态码</strong></td></tr><tr><td>凭证</td><td>平台发放的 <code>app_key</code> / <code>app_secret</code>（需要从平台方获取）</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>项</th><th>值</th></tr></thead><tbody><tr><td>Base URL（沙盒环境）</td><td><code>https://sandboxapi.xpin.network</code></td></tr><tr><td>Base URL（生产环境）</td><td>请向平台方获取</td></tr><tr><td>协议</td><td>全部 <code>POST</code>，<code>Content-Type: application/json</code></td></tr><tr><td>字符集</td><td>UTF-8</td></tr><tr><td>字符串参数</td><td>首尾空白先被去掉，再按约束校验长度。长度按宽度计：U+0000–U+00FF 的字符（ASCII，以及 <code>é</code>、<code>ü</code> 这类西欧字母）计 1，其它字符（如中文）计 2，emoji 等四字节字符计 4</td></tr><tr><td>可选参数</td><td>不用时<strong>不要放进请求体</strong>。可选的字符串参数传 <code>null</code> 会被参数校验拒绝（<code>400</code>）</td></tr><tr><td><strong>成功判定</strong></td><td><strong>看响应体的 <code>code</code> 字段，不看 HTTP 状态码</strong></td></tr><tr><td>凭证</td><td>平台发放的 <code>app_key</code> / <code>app_secret</code>（需要从平台方获取）</td></tr></tbody></table></div>
 <p><strong>平台的业务应答一律是 <code>HTTP 200</code></strong>，响应体统一为：</p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{ "data": {...}, "code": 200, "msg": "ok", "t": 1788431707137 }</code></pre></figure>
 <p>业务成功还是失败，<strong>看响应体的 <code>code</code>，不看 HTTP 状态码</strong> —— 一个业务失败（余额不足、
@@ -126,8 +126,9 @@
 <blockquote class="note warn"><p>🔴 <strong>但"请求没进到业务层"是另一回事，你的客户端必须能区分。</strong> 用了 <code>http://</code>、路径<strong>前缀</strong>写错
 （不是 <code>/openapi/v1</code>）、请求在到达平台之前就被拦下、连接中途出错，这些都不会进到上面那套信封 ——
 你拿到的是一个<strong>真实的 HTTP 状态码</strong>，响应体<strong>可能不是 JSON</strong>（网关的 HTML 错误页、
-空响应、纯文本都可能）。前缀正确时，路径名拼错、方法不对、<code>Content-Type</code> 不对、请求体超过
-256KB，仍然是 <code>HTTP 200</code> + 信封，见 <a href="#31-非-200-的响应怎么处理">§3.1</a>。</p>
+空响应、纯文本都可能）。前缀正确时，路径名拼错、方法不对、<code>Content-Type</code> 不对，仍然是 <code>HTTP 200</code> + 信封；
+请求体超过 256KB 一般也是 <code>HTTP 200</code> + <code>code: 413</code>，但体积大得多的请求会在到达平台之前就被拒绝，
+得到真实的 <code>HTTP 413</code>。见 <a href="#31-非-200-的响应怎么处理">§3.1</a>。</p>
 <p><code>JSON.parse(响应体)</code> 在这种情况下会抛异常，而抛出来的是 <code>Unexpected token &lt;</code> 这类
 与真实原因毫无关系的错误 —— 排查方向会整个跑偏。</p>
 <p><strong>所以判定是两步，不是一步：</strong></p>
@@ -137,8 +138,10 @@
 <p>上面那句"看 <code>code</code> 不看 HTTP 状态码"说的是<strong>第 2 步之内</strong>的事，不是"完全不用看状态码"。</p></blockquote>
 <div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>data</code></td><td>object</td><td>业务数据。失败时为 <code>{}</code></td></tr><tr><td><code>code</code></td><td>number</td><td><strong>业务码</strong>。<code>200</code> 才是成功</td></tr><tr><td><code>msg</code></td><td>string</td><td>成功为 <code>ok</code>；失败为错误码或字段级提示</td></tr><tr><td><code>t</code></td><td>number</td><td>服务端毫秒时间戳。⚠️ 个别服务端异常响应（<code>406</code>）不带这个字段，不要当作必有字段解析</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>⚠️ <strong>断言一定要写 <code>body.code === 200</code></strong>。写 <code>res.status === 200</code> 会把所有业务失败都当成功。</p></blockquote>
-<p>每个响应都带 <code>X-Request-ID</code> 响应头：请求里带了合法的 <code>X-Request-ID</code>（<code>[A-Za-z0-9._:-]</code>，1–64 位）时原样回显，否则由平台生成。向平台报障时请附上它。</p>
-<p>HTTP 80 端口的请求会 <code>301</code> 跳转到 HTTPS，且 <strong>301 不保留 POST body</strong>——直接用 <code>https://</code>。</p>
+<p>每个平台应答（<code>HTTP 200</code> + 信封）都带 <code>X-Request-ID</code> 响应头：请求里带了合法的 <code>X-Request-ID</code>（<code>[A-Za-z0-9._:-]</code>，1–64 位）时原样回显，否则由平台生成。<a href="#31-非-200-的响应怎么处理">§3.1</a> 那类没进到业务层的响应不带它。向平台报障时请附上它。</p>
+<p>HTTP 80 端口的请求会 <code>301</code> 跳转到 HTTPS，且 <strong>301 不保留 POST body</strong>——直接用 <code>https://</code>。
+⚠️ 多数 HTTP 客户端（包括 §2.5 用到的 Python <code>requests</code> 与 Node <code>fetch</code>）会自动跟随这个 301，并改用不带 body 的
+<code>GET</code> 重发 —— 于是你看到的不是 <code>301</code>，而是 <code>HTTP 200</code> + <code>code: 405</code>。</p>
 <hr>
 <h2 id="2-认证与签名">2. 认证与签名<a class="anchor" href="#2-认证与签名">#</a></h2>
 <p>每个请求带四个头：</p>
@@ -171,7 +174,9 @@
 <p><strong>另有两条结构上限</strong>，都从<strong>被签对象的根</strong>算起，不是从 <code>body</code> 算起：嵌套深度 8 层 —— <code>body</code>
 本身已是第 1 层，所以 <code>body.a.b.c.d.e.f.g</code> 是最深能签的路径；节点总数 512 —— 对象、数组本身也计入，
 被签对象的固定部分已占 8 个，留给 <code>body</code> 内部的约 504 个。超出分别是 <code>CANONICAL_TOO_DEEP</code> 与
-<code>CANONICAL_TOO_LARGE</code>（都是 <code>400</code>）。正常业务载荷离这两条线很远。</p>
+<code>CANONICAL_TOO_LARGE</code>（都是 <code>400</code>）。正常业务载荷离这两条线很远。§2.5 的两份客户端没有实现这两条上限；
+要在本地复现，拍平时自行计数即可：被签对象的根是第 0 层，任一节点超过第 8 层即拒绝；每访问一个节点（根、对象、
+数组本身都算）计 1，超过 512 即拒绝。</p>
 <p><strong>R3 每一项的字面量</strong>（长度前缀）：</p>
 <figure class="code"><button class="copy" type="button">复制</button><pre><code>路径 + "=" + &lt;编码值的 UTF-8 字节数&gt; + ":" + 编码值</code></pre></figure>
 <p>⚠️ 长度算的是<strong>编码值整体</strong>的字节数，<strong>包含 <code>s:</code> / <code>i:</code> 这两个字符的类型标记</strong>。
@@ -237,7 +242,7 @@
 <p>缺 <code>esim.write</code> 调写接口 → <code>403 SCOPE_FORBIDDEN</code>（在签名校验<strong>之后</strong>判定，所以它确实是权限问题，不是签名问题）。
 两个 scope 互相独立：<code>esim.write</code> 不包含 <code>esim.read</code>，只持写权限的凭证调查询接口同样是 <code>403 SCOPE_FORBIDDEN</code>。</p>
 <h3 id="25-签名客户端">2.5 签名客户端<a class="anchor" href="#25-签名客户端">#</a></h3>
-<p>两份实现都是完整的，直接抄走即可，除 HTTP 库外不依赖任何第三方包。规则见 2.1。</p>
+<p>两份实现都是完整的（只有 2.1 末尾的两条结构上限没有实现），直接抄走即可，除 HTTP 库外不依赖任何第三方包。规则见 2.1。</p>
 <p><strong>Python</strong></p>
 <figure class="code" data-lang="python"><button class="copy" type="button">复制</button><pre><code>import hashlib, hmac, re, secrets, time, requests
 
@@ -390,18 +395,20 @@ Python 的 <code>bool</code> 是 <code>int</code> 的子类型，必须先判布
 <code>x-timestamp = 1788400000000</code>、<code>x-nonce = n_demo0001</code>、<code>method = POST</code>。
 <strong>先让这张表全过，再去联调</strong>——签名对不上时，能省掉绝大部分来回。</p>
 <div class="tw"><table><thead><tr><th>#</th><th>用意</th><th><code>path</code></th><th><code>body</code></th><th>期望 <code>x-sign</code></th></tr></thead><tbody><tr><td>1</td><td>最小：空 body</td><td><code>/openapi/v1/products/list</code></td><td><code>{}</code></td><td><code>3eb1cdb9b139d2de36df73bcae880b72c4b6e408d6c22b8ce9727735b9ee6c75</code></td></tr><tr><td>2</td><td>标量三型 + null</td><td><code>/openapi/v1/order/list</code></td><td><code>{"a":"x","b":1,"c":true,"d":null}</code></td><td><code>78240ca8b1a938974f2ce3ebf9b95b0ea31103c045fa8940a0989b9ad6d18343</code></td></tr><tr><td>3</td><td>字符串 1 与整数 1 不同签</td><td><code>/openapi/v1/products/list</code></td><td><code>{"v":"1"}</code></td><td><code>31f9ec6d8e2098fbdf3d4c749d8c9bc5296479a0db3907196ba5e5d48e6bab89</code></td></tr><tr><td>4</td><td>（对照）整数 1</td><td><code>/openapi/v1/products/list</code></td><td><code>{"v":1}</code></td><td><code>15a7330e47ebc988b3772f69ca452800125f7b56592372722d5b87d5425a9688</code></td></tr><tr><td>5</td><td>嵌套与数组</td><td><code>/openapi/v1/order/create</code></td><td><code>{"data":{"orderNo":"X"},"tags":["a","b"]}</code></td><td><code>a0f6a4db62b1e51330fd67cf61c9b3e3cb7d1fce1c10b022c0fd6be35d95e84d</code></td></tr><tr><td>6</td><td>空对象与空数组要留痕</td><td><code>/openapi/v1/products/list</code></td><td><code>{"o":{},"a":[]}</code></td><td><code>2628471b9872c77f1f84391657cf02e8770e06a686024ac20e94ef6cbb40b629</code></td></tr><tr><td>7</td><td>（对照）两者都缺省</td><td><code>/openapi/v1/products/list</code></td><td><code>{}</code></td><td><code>3eb1cdb9b139d2de36df73bcae880b72c4b6e408d6c22b8ce9727735b9ee6c75</code></td></tr><tr><td>8</td><td>值里含 &amp; = : 不与拆字段碰撞</td><td><code>/openapi/v1/order/query</code></td><td><code>{"clientOrderNo":"1&amp;b=s:2"}</code></td><td><code>38b88ad966366fe0b0ab78b9040d188a22ad6dc5f9c62210109b7a488d449053</code></td></tr><tr><td>9</td><td>非 ASCII 原文参与，不转义</td><td><code>/openapi/v1/products/detail</code></td><td><code>{"productCode":"套餐-中文"}</code></td><td><code>a7d86f5a2ea0a0e83d36f6112766360afabb08df407de15543600ef8cf2542d5</code></td></tr><tr><td>10</td><td>路径归一：重复斜杠与尾斜杠</td><td><code>/openapi/v1//products//detail/</code></td><td><code>{"productCode":"XP_DEMO"}</code></td><td><code>63655a08ff52c78dd0942219cdfab9df4072fcc25d9784f1fcef6e488603f13e</code></td></tr><tr><td>11</td><td>（对照）已归一的路径</td><td><code>/openapi/v1/products/detail</code></td><td><code>{"productCode":"XP_DEMO"}</code></td><td><code>63655a08ff52c78dd0942219cdfab9df4072fcc25d9784f1fcef6e488603f13e</code></td></tr><tr><td>12</td><td>数组下标按字节序排：<code>tags.10</code> 排在 <code>tags.2</code> 之前</td><td><code>/openapi/v1/products/list</code></td><td><code>{"tags":["a","b","c","d","e","f","g","h","i","j","k"]}</code></td><td><code>d05ecfa3deb79b2d0f1588560e0aedbc38fcff7c65211500fd112a984c33ef1b</code></td></tr></tbody></table></div>
-<blockquote class="note"><p>第 3 与第 4 条、第 6 与第 7 条、第 10 与第 11 条各是一组<strong>对照</strong>：两条签出不同的值才算对。
+<blockquote class="note"><p>第 3 与第 4 条、第 6 与第 7 条各是一组<strong>对照</strong>：两条签出不同的值才算对。第 10 与第 11 条也是一组对照，
+但反过来：两条必须签出<strong>相同</strong>的值。
 第 3/4 组验的是类型标记（少了它字符串 <code>"1"</code> 与整数 <code>1</code> 会同签），第 6/7 组验的是空容器
-留痕，第 10/11 组验的是路径归一（这一组反过来，两条必须<strong>相同</strong>）。
+留痕，第 10/11 组验的是路径归一。
 第 12 条验的是排序：按完整路径的字节序，<code>tags.10</code> 小于 <code>tags.2</code>，按数组下标顺序拼会签出别的值。</p>
 <p>⚠️ 路径归一只作用于<strong>被签的</strong> <code>path</code>。实际请求的路径必须与 §4 逐字一致（大小写、斜杠都不能差），
 否则在鉴权之前就会得到 <code>code: 404</code>。</p></blockquote>
 <hr>
 <h2 id="3-错误码">3. 错误码<a class="anchor" href="#3-错误码">#</a></h2>
-<div class="tw"><table><thead><tr><th><code>code</code></th><th><code>msg</code></th><th>含义</th><th>你该做什么</th></tr></thead><tbody><tr><td><code>200</code></td><td><code>ok</code></td><td>成功</td><td>—</td></tr><tr><td><code>400</code></td><td><code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code> / <code>&lt;字段&gt; Range error</code> / <code>&lt;字段&gt; Type error, ...</code></td><td>参数校验失败（<strong>自由文本，不是稳定错误码</strong>）。必填字段传空串得到 <code>required</code>，传纯空白得到 <code>length error</code>（先去首尾空白再计长度）</td><td>修参数。判定用 <code>code===400</code> + 字段名子串，不要精确匹配 <code>msg</code></td></tr><tr><td><code>400</code></td><td><code>ORDER_RANGE_SELECTOR_REQUIRED</code> / <code>ORDER_RANGE_SELECTOR_CONFLICT</code> / <code>ORDER_PAGE_TOKEN_INVALID</code></td><td>列表选择器/游标非法</td><td>见 §4.6</td></tr><tr><td><code>400</code></td><td><code>ACCOUNT_PAGE_NO_INVALID</code> / <code>ACCOUNT_PAGE_SIZE_INVALID</code></td><td>余额接口的分页参数过了参数校验、但不是合法整数（如数字 <code>0</code>、字符串 <code>"1.5"</code>）</td><td>传整数，见 §4.13</td></tr><tr><td><code>400</code></td><td><code>REQUEST_BODY_NOT_JSON</code> / <code>REQUEST_BODY_MUST_BE_OBJECT</code></td><td>请求体不是 JSON，或是 JSON 但不是对象</td><td>检查序列化</td></tr><tr><td><code>401</code></td><td><code>AUTH_HEADERS_MISSING</code></td><td>四个签名头缺任意一个</td><td>补头</td></tr><tr><td><code>401</code></td><td><code>NONCE_INVALID</code></td><td>nonce 格式不符</td><td>用 <code>^[A-Za-z0-9._:-]{8,128}$</code></td></tr><tr><td><code>401</code></td><td><code>TIMESTAMP_INVALID</code></td><td>时间戳非数字或偏差 &gt; 5 分钟</td><td><strong>对时</strong>；确认用的是毫秒</td></tr><tr><td><code>401</code></td><td><code>APP_KEY_INVALID</code></td><td>app_key 不存在/已停用/环境不匹配</td><td>找平台核对凭证</td></tr><tr><td><code>401</code></td><td><code>CREDENTIAL_EXPIRED</code></td><td>凭证已过期</td><td>找平台轮换</td></tr><tr><td><code>401</code></td><td><code>SIGNATURE_INVALID</code></td><td>签名不匹配</td><td>先跑 <a href="#26-自检向量">2.6</a> 的自检向量，全过再查联调</td></tr><tr><td><code>400</code></td><td><code>CANONICAL_*</code></td><td>载荷里有签不了的值（小数、超范围整数、不合法键名、嵌套过深、节点过多）</td><td><strong>查载荷，不要查密钥</strong>。<code>msg</code> 只有错误码、不指出字段，请用本地的规范化实现定位</td></tr><tr><td><code>401</code></td><td><code>NONCE_REPLAYED</code></td><td>nonce 已被用过</td><td>每次请求换新 nonce</td></tr><tr><td><code>403</code></td><td><code>SCOPE_FORBIDDEN</code></td><td>凭证 scope 不足</td><td>找平台加 scope</td></tr><tr><td><code>403</code></td><td><code>IP_NOT_ALLOWED</code></td><td>源 IP 不在白名单</td><td>找平台加 IP</td></tr><tr><td><code>400</code></td><td><code>ORDER_INPUT_INVALID</code> / <code>EXTERNAL_USER_ID_INVALID</code></td><td>受理类接口的兜底校验，<strong>正常不会出现</strong>：字符串参数先去首尾空白再校验长度，空白串、超长的 <code>externalUserId</code> 在通用参数校验那一步就会被拒（<code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code>）</td><td>同通用参数校验</td></tr><tr><td><code>403</code></td><td><code>SOURCE_PARTNER_NOT_ALLOWED</code></td><td><code>sourcePartnerCode</code> 不是你名下的子分销商</td><td>检查该字段</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_FOUND</code></td><td>商品不存在或不属于你</td><td>从 <code>products/list</code> 动态取码</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_AVAILABLE</code></td><td>下单时商品不可售/不存在</td><td>同上</td></tr><tr><td><code>404</code></td><td><code>ORDER_NOT_FOUND</code></td><td>订单不存在或不属于你</td><td>检查 <code>clientOrderNo</code></td></tr><tr><td><code>404</code></td><td><code>CARD_NOT_FOUND</code></td><td>卡不存在或不属于你</td><td>检查 <code>iccid</code></td></tr><tr><td><code>404</code> / <code>405</code></td><td>—</td><td>路径名拼错（前缀正确），或 HTTP 方法不是 <code>POST</code>（<code>GET</code> 得到 <code>405</code>，其它方法得到 <code>404</code>）。<code>msg</code> 不是稳定错误码，不要对它做断言。⚠️ <strong>前缀本身写错是另一回事</strong>，见 <a href="#31-非-200-的响应怎么处理">§3.1</a></td><td>核对路径名与方法</td></tr><tr><td><code>409</code></td><td><code>IDEMPOTENCY_KEY_REUSED</code></td><td>同 <code>idempotencyKey</code> 但请求内容不同</td><td>换新的幂等键</td></tr><tr><td><code>409</code></td><td><code>CLIENT_ORDER_NO_REUSED</code></td><td><code>clientOrderNo</code> 已被别的订单占用</td><td>换新的业务单号</td></tr><tr><td><code>409</code></td><td><code>RENEW_NOT_ALLOWED</code></td><td>这张卡此刻不可续订</td><td>先调 <code>iccid/renew</code> 看 <code>reasons</code></td></tr><tr><td><code>409</code></td><td><code>ORDER_NOT_REFUNDABLE</code></td><td>这一单现在不能退：未履约、已退款、或不具备可退款的计价信息</td><td>查 <code>/order/query</code> 看当前状态。<strong>改参数改不出来</strong>，见 §4.12</td></tr><tr><td><code>409</code></td><td><code>REFUND_ALREADY_IN_PROGRESS</code></td><td>这一单已有一张在途退款单</td><td>等 <code>ORDER_REFUND_RESULT</code> 出结论后再发起，见 §4.12</td></tr><tr><td><code>402</code></td><td><code>BALANCE_LIMIT_REACHED</code></td><td><strong>预付费余额不足</strong>：本单扣完会跌破你的透支额度，整单被拒、一分钱不扣</td><td>充值。<strong>不要重试</strong>，见下方 ⚠️</td></tr><tr><td><code>503</code></td><td><code>BALANCE_ACCOUNT_NOT_FOUND</code></td><td>余额账户尚未就绪</td><td>联系平台开通后重试</td></tr><tr><td><code>503</code></td><td><code>CURRENCY_MISMATCH</code></td><td>账户币种与商品币种不一致</td><td>联系平台核对，<strong>改请求改不出来</strong></td></tr><tr><td><code>503</code></td><td><code>ORDER_NO_COLLISION</code></td><td>平台生成订单号时连续冲突，本次请求什么都没写、没扣</td><td>用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后重试</td></tr><tr><td><code>503</code></td><td>其它未列出的 <code>msg</code></td><td>开卡 / 续订 / 退款受理时的平台侧临时故障。<code>msg</code> 是平台内部的错误标识，不是稳定错误码</td><td>用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后退避重试（已受理的会以 <code>replayed: true</code> 返回）；持续出现请联系平台</td></tr><tr><td><code>413</code></td><td><code>REQUEST_ENTITY_TOO_LARGE</code></td><td>请求体超过 256KB</td><td>拆小</td></tr><tr><td><code>415</code></td><td><code>CONTENT_TYPE_MUST_BE_JSON</code></td><td><code>Content-Type</code> 不是 <code>application/json</code></td><td>改头</td></tr><tr><td><code>429</code></td><td><code>QPS_LIMITED</code></td><td>超过该商户每秒请求上限。<strong>开卡、续订、退款三个写接口不受此限</strong>，配额口径见 <a href="#23-认证检查顺序">§2.3</a></td><td>退避重试</td></tr><tr><td><code>406</code></td><td><code>[controller error]</code></td><td>服务端异常。<code>msg</code> 为固定字符串 <code>[controller error]</code>，不携带原因</td><td>见下方 ⚠️</td></tr><tr><td><code>501</code></td><td><code>FEATURE_NOT_IMPLEMENTED</code></td><td>该路径是平台预留、尚未开放的接口（鉴权通过后才会给出这个码）</td><td>只调用 §4 列出的接口</td></tr><tr><td><code>503</code></td><td><code>OPENAPI_AUTH_UNAVAILABLE</code> / <code>PLATFORM_NOT_ENABLED</code> / <code>PRODUCT_ADAPTER_UNKNOWN</code></td><td>平台侧依赖或配置问题，与你的请求无关</td><td>退避重试并联系平台</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th><code>code</code></th><th><code>msg</code></th><th>含义</th><th>你该做什么</th></tr></thead><tbody><tr><td><code>200</code></td><td><code>ok</code></td><td>成功</td><td>—</td></tr><tr><td><code>400</code></td><td><code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code> / <code>&lt;字段&gt; Range error</code> / <code>&lt;字段&gt; Type error, ...</code></td><td>参数校验失败（<strong>自由文本，不是稳定错误码</strong>）。必填字段传空串得到 <code>required</code>，传纯空白得到 <code>length error</code>（先去首尾空白再计长度）</td><td>修参数。判定用 <code>code===400</code> + 字段名子串，不要精确匹配 <code>msg</code></td></tr><tr><td><code>400</code></td><td><code>ORDER_RANGE_SELECTOR_REQUIRED</code> / <code>ORDER_RANGE_SELECTOR_CONFLICT</code> / <code>ORDER_PAGE_TOKEN_INVALID</code></td><td>列表选择器/游标非法</td><td>见 §4.6</td></tr><tr><td><code>400</code></td><td><code>ACCOUNT_PAGE_TOKEN_INVALID</code></td><td>余额接口的 <code>pageToken</code> 被改动、已过期，或不是签发给你、签发给本接口的</td><td>去掉 <code>pageToken</code> 从第一页重新开始，见 §4.13</td></tr><tr><td><code>400</code></td><td><code>ACCOUNT_PAGE_SIZE_INVALID</code></td><td>余额接口的 <code>pageSize</code> 过了参数校验、但不是合法整数（如数字 <code>0</code>、字符串 <code>"10.5"</code>）</td><td>传 1–100 的整数，见 §4.13</td></tr><tr><td><code>400</code></td><td><code>REQUEST_BODY_NOT_JSON</code> / <code>REQUEST_BODY_MUST_BE_OBJECT</code></td><td>请求体不是 JSON，或是 JSON 但不是对象</td><td>检查序列化</td></tr><tr><td><code>401</code></td><td><code>AUTH_HEADERS_MISSING</code></td><td>四个签名头缺任意一个</td><td>补头</td></tr><tr><td><code>401</code></td><td><code>NONCE_INVALID</code></td><td>nonce 格式不符</td><td>用 <code>^[A-Za-z0-9._:-]{8,128}$</code></td></tr><tr><td><code>401</code></td><td><code>TIMESTAMP_INVALID</code></td><td>时间戳非数字或偏差 &gt; 5 分钟</td><td><strong>对时</strong>；确认用的是毫秒</td></tr><tr><td><code>401</code></td><td><code>APP_KEY_INVALID</code></td><td>app_key 不存在/已停用/环境不匹配</td><td>找平台核对凭证</td></tr><tr><td><code>401</code></td><td><code>CREDENTIAL_EXPIRED</code></td><td>凭证已过期</td><td>找平台轮换</td></tr><tr><td><code>401</code></td><td><code>SIGNATURE_INVALID</code></td><td>签名不匹配</td><td>先跑 <a href="#26-自检向量">2.6</a> 的自检向量，全过再查联调</td></tr><tr><td><code>400</code></td><td><code>CANONICAL_*</code>：<code>CANONICAL_KEY_INVALID</code> / <code>CANONICAL_NUMBER_UNSUPPORTED</code> / <code>CANONICAL_TOO_DEEP</code> / <code>CANONICAL_TOO_LARGE</code></td><td>载荷里有签不了的值：依次是不合法的键名、小数或超范围整数、嵌套过深、节点过多</td><td><strong>查载荷，不要查密钥</strong>。<code>msg</code> 只有错误码、不指出字段，请用本地的规范化实现定位</td></tr><tr><td><code>401</code></td><td><code>NONCE_REPLAYED</code></td><td>nonce 已被用过</td><td>每次请求换新 nonce</td></tr><tr><td><code>403</code></td><td><code>SCOPE_FORBIDDEN</code></td><td>凭证 scope 不足</td><td>找平台加 scope</td></tr><tr><td><code>403</code></td><td><code>IP_NOT_ALLOWED</code></td><td>源 IP 不在白名单</td><td>找平台加 IP</td></tr><tr><td><code>400</code></td><td><code>ORDER_INPUT_INVALID</code> / <code>EXTERNAL_USER_ID_INVALID</code></td><td>受理类接口的兜底校验，<strong>正常不会出现</strong>：字符串参数先去首尾空白再校验长度，空白串、超长的 <code>externalUserId</code> 在通用参数校验那一步就会被拒（<code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code>）</td><td>同通用参数校验</td></tr><tr><td><code>403</code></td><td><code>SOURCE_PARTNER_NOT_ALLOWED</code></td><td><code>sourcePartnerCode</code> 不是你名下的子分销商</td><td>检查该字段</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_FOUND</code></td><td>商品不存在或不属于你</td><td>从 <code>products/list</code> 动态取码</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_AVAILABLE</code></td><td>下单时商品不可售/不存在</td><td>同上</td></tr><tr><td><code>404</code></td><td><code>ORDER_NOT_FOUND</code></td><td>订单不存在或不属于你</td><td>检查 <code>clientOrderNo</code></td></tr><tr><td><code>404</code></td><td><code>CARD_NOT_FOUND</code></td><td>卡不存在或不属于你</td><td>检查 <code>iccid</code></td></tr><tr><td><code>404</code> / <code>405</code></td><td>—</td><td>路径名拼错（前缀正确），或 HTTP 方法不是 <code>POST</code>（<code>GET</code> 得到 <code>405</code>，其它方法得到 <code>404</code>）。<code>msg</code> 不是稳定错误码，不要对它做断言。⚠️ <strong>前缀本身写错是另一回事</strong>，见 <a href="#31-非-200-的响应怎么处理">§3.1</a></td><td>核对路径名与方法。确实发的是 <code>POST</code> 却收到 <code>405</code>，先检查 Base URL 是不是 <code>https://</code>（见 §1）</td></tr><tr><td><code>409</code></td><td><code>IDEMPOTENCY_KEY_REUSED</code></td><td>同 <code>idempotencyKey</code> 但请求内容不同</td><td>换新的幂等键</td></tr><tr><td><code>409</code></td><td><code>CLIENT_ORDER_NO_REUSED</code></td><td><code>clientOrderNo</code> 已被别的订单占用</td><td>换新的业务单号</td></tr><tr><td><code>409</code></td><td><code>RENEW_NOT_ALLOWED</code></td><td>这张卡此刻不可续订</td><td>先调 <code>iccid/renew</code> 看 <code>reasons</code></td></tr><tr><td><code>409</code></td><td><code>ORDER_NOT_REFUNDABLE</code></td><td>这一单现在不能退：未履约、已退款、或不具备可退款的计价信息</td><td>查 <code>/order/query</code> 看当前状态。<strong>改参数改不出来</strong>，见 §4.12</td></tr><tr><td><code>409</code></td><td><code>REFUND_ALREADY_IN_PROGRESS</code></td><td>这一单已有一张在途退款单</td><td>等 <code>ORDER_REFUND_RESULT</code> 出结论后再发起，见 §4.12</td></tr><tr><td><code>402</code></td><td><code>BALANCE_LIMIT_REACHED</code></td><td><strong>预付费余额不足</strong>：本单扣完会跌破你的透支额度，整单被拒、一分钱不扣</td><td>充值。<strong>不要重试</strong>，见下方 ⚠️</td></tr><tr><td><code>503</code></td><td><code>BALANCE_ACCOUNT_NOT_FOUND</code></td><td>余额账户尚未就绪</td><td>联系平台开通后重试</td></tr><tr><td><code>503</code></td><td><code>CURRENCY_MISMATCH</code></td><td>账户币种与商品币种不一致</td><td>联系平台核对，<strong>改请求改不出来</strong></td></tr><tr><td><code>503</code></td><td><code>ORDER_NO_COLLISION</code></td><td>平台生成订单号时连续冲突，本次请求什么都没写、没扣</td><td>用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后重试</td></tr><tr><td><code>503</code></td><td>其它未列出的 <code>msg</code></td><td>开卡 / 续订 / 退款受理时的平台侧临时故障。<code>msg</code> 是平台内部的错误标识，不是稳定错误码</td><td>用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后退避重试（已受理的会以 <code>replayed: true</code> 返回）；持续出现请联系平台</td></tr><tr><td><code>413</code></td><td><code>REQUEST_ENTITY_TOO_LARGE</code></td><td>请求体超过 256KB（体积再大时会在到达平台之前被拒，得到传输层的 <code>HTTP 413</code>，见 §3.1）</td><td>拆小</td></tr><tr><td><code>415</code></td><td><code>CONTENT_TYPE_MUST_BE_JSON</code></td><td><code>Content-Type</code> 不是 <code>application/json</code></td><td>改头</td></tr><tr><td><code>429</code></td><td><code>QPS_LIMITED</code></td><td>超过该商户每秒请求上限。<strong>开卡、续订、退款三个写接口不受此限</strong>，配额口径见 <a href="#23-认证检查顺序">§2.3</a></td><td>退避重试</td></tr><tr><td><code>406</code></td><td><code>[controller error]</code></td><td>服务端异常。<code>msg</code> 为固定字符串 <code>[controller error]</code>，不携带原因</td><td>见下方 ⚠️</td></tr><tr><td><code>501</code></td><td><code>FEATURE_NOT_IMPLEMENTED</code></td><td>该路径是平台预留、尚未开放的接口（鉴权通过后才会给出这个码）</td><td>只调用 §4 列出的接口</td></tr><tr><td><code>503</code></td><td><code>OPENAPI_AUTH_UNAVAILABLE</code> / <code>PLATFORM_NOT_ENABLED</code> / <code>PRODUCT_ADAPTER_UNKNOWN</code></td><td>平台侧依赖或配置问题，与你的请求无关</td><td>退避重试并联系平台</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>⚠️ <strong><code>402</code> 请不要重试。</strong></p>
 <p>你的账户在平台上是<strong>预付费</strong>的：<code>/order/create</code> 与 <code>/order/renew</code> 在受理时就按结算价扣款，
-余额扣完会跌破额度时整单被拒、一分钱不扣。充值之前重试是同一个结果。</p>
+余额扣完会跌破额度时整单被拒、一分钱不扣。在余额回升（充值，或在途订单落 <code>FAILED</code> / <code>REFUNDED</code>
+自动退回）之前，重试都是同一个结果。</p>
 <p>请把 <code>402</code> 当成<strong>需要人工介入</strong>的信号（告警 + 暂停该
 商户的下单队列），不要交给自动重试 —— 对它做无限重试除了浪费两边的资源，不会得到
 任何不同的答案。</p>
@@ -417,11 +424,12 @@ Python 的 <code>bool</code> 是 <code>int</code> 的子类型，必须先判布
 <p>上面整张错误码表说的都是<strong>平台的业务应答</strong>，它们一律是 <code>HTTP 200</code> + JSON 信封，
 错误码在 <code>code</code> 里 —— 包括 <code>429 QPS_LIMITED</code>。</p>
 <p>但有一类响应<strong>根本没有进到业务层</strong>，它们带真实的 HTTP 状态码，响应体<strong>可能不是 JSON</strong>：</p>
-<div class="tw"><table><thead><tr><th>你会看到</th><th>通常是因为</th></tr></thead><tbody><tr><td><code>301</code> + 非 JSON</td><td>用了 <code>http://</code>。<strong>301 不保留 POST body</strong>，直接用 <code>https://</code></td></tr><tr><td><code>404</code> + 非 JSON</td><td><strong>路径前缀</strong>写错（正确前缀是 <code>/openapi/v1</code>）</td></tr><tr><td><code>429</code></td><td>请求频率异常 —— 退避重试，并检查客户端有没有重试风暴或死循环</td></tr><tr><td><code>5xx</code> / 连接中断</td><td>传输层或服务端异常</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>你会看到</th><th>通常是因为</th></tr></thead><tbody><tr><td><code>301</code> + 非 JSON</td><td>用了 <code>http://</code>。<strong>301 不保留 POST body</strong>，直接用 <code>https://</code>。会自动跟随重定向的客户端看不到这个 301，而是得到 <code>HTTP 200</code> + <code>code: 405</code>（见 §1）</td></tr><tr><td><code>404</code> + 非 JSON</td><td><strong>路径前缀</strong>写错（正确前缀是 <code>/openapi/v1</code>）</td></tr><tr><td><code>413</code> + 非 JSON</td><td>请求体过大，在到达平台之前就被拒绝。拆小后重发，原样重试是同一个结果</td></tr><tr><td><code>429</code></td><td>请求频率异常 —— 退避重试，并检查客户端有没有重试风暴或死循环</td></tr><tr><td><code>5xx</code> / 连接中断</td><td>传输层或服务端异常</td></tr></tbody></table></div>
 <blockquote class="note"><p>ℹ️ <strong>注意区分</strong>：只有<strong>前缀</strong>写错才会落到上表的 <code>404</code>。前缀正确、只是路径名拼错时，
 请求已经进到业务层，你拿到的是 <code>HTTP 200</code> + <code>code: 404</code> 的正常信封。
-同样地，HTTP 方法用错（<code>code</code> 为 <code>405</code> 或 <code>404</code>）、<code>Content-Type</code> 不对（<code>415</code>）、请求体超过 256KB（<code>413</code>）
-<strong>也都是 <code>HTTP 200</code> + 对应的 <code>code</code></strong>，不在上表之列。</p></blockquote>
+同样地，HTTP 方法用错（<code>code</code> 为 <code>405</code> 或 <code>404</code>）、<code>Content-Type</code> 不对（<code>415</code>）
+<strong>也都是 <code>HTTP 200</code> + 对应的 <code>code</code></strong>，不在上表之列；请求体超过 256KB 通常是 <code>HTTP 200</code> + <code>code: 413</code>，
+体积再大才是上表的 <code>413</code>。</p></blockquote>
 <p><strong>判定顺序必须是先状态码、后 JSON</strong>：</p>
 <figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>const res = await fetch(url, init)
 
@@ -450,17 +458,17 @@ return body.data</code></pre></figure>
 <h3 id="41-商品列表-productslist">4.1 商品列表 <code>/products/list</code><a class="anchor" href="#41-商品列表-productslist">#</a></h3>
 <p>拉取<strong>发布给你</strong>的在售商品。这是获取 <code>productCode</code> 的<strong>唯一正确来源</strong>。</p>
 <p><strong>请求</strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th><th>说明</th></tr></thead><tbody><tr><td><code>pageNo</code></td><td>number</td><td>否</td><td><code>[1, 100000]</code>，默认 <code>1</code></td><td>页码，从 <code>1</code> 开始。负数或大于 100000 返回 <code>400 pageNo Range error</code>；传 <code>0</code> 按 <code>1</code> 处理（不报错 —— 从 0 起翻会把第一页取两次）</td></tr><tr><td><code>pageSize</code></td><td>number</td><td>否</td><td><code>[1, 100]</code>，默认 <code>20</code></td><td>每页条数。负数或大于 100 返回 <code>400 pageSize Range error</code>；传 <code>0</code> 按默认值 <code>20</code> 处理</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th><th>说明</th></tr></thead><tbody><tr><td><code>pageNo</code></td><td>number</td><td>否</td><td><code>[1, 100000]</code>，默认 <code>1</code></td><td>页码，从 <code>1</code> 开始。负数或大于 100000 返回 <code>400 pageNo Range error</code>；传数字 <code>0</code> 按 <code>1</code> 处理（不报错 —— 从 0 起翻会把第一页取两次），字符串 <code>"0"</code> 则返回 <code>400 pageNo Range error</code></td></tr><tr><td><code>pageSize</code></td><td>number</td><td>否</td><td><code>[1, 100]</code>，默认 <code>20</code></td><td>每页条数。负数或大于 100 返回 <code>400 pageSize Range error</code>；传数字 <code>0</code> 按默认值 <code>20</code> 处理，字符串 <code>"0"</code> 则返回 <code>400 pageSize Range error</code></td></tr></tbody></table></div>
 <p><strong>响应 <code>data</code></strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>list</code></td><td>array</td><td>商品数组，见下</td></tr><tr><td><code>hasMore</code></td><td>boolean</td><td>是否还有下一页（翻页终止条件）</td></tr><tr><td><code>pageNo</code> / <code>pageSize</code></td><td>number</td><td><strong>实际生效的</strong>页码 / 每页条数。传 <code>0</code> 时按默认值处理，以字符串传入的小数（如 <code>"2.5"</code>）向下取整 —— 它们可能与你发出的值不同。请始终传整数：JSON 数字形式的小数在验签环节即被拒（<code>400 CANONICAL_NUMBER_UNSUPPORTED</code>）</td></tr><tr><td><code>language</code></td><td>string</td><td>商品文案的语言，当前恒为 <code>en</code>。平台不做语言协商，请不要在请求里传语言相关参数（传了 <code>lang</code> 也会被忽略，但仍按 2–8 位字符串校验，不合规返回 <code>400</code>）</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>list</code></td><td>array</td><td>商品数组，见下</td></tr><tr><td><code>hasMore</code></td><td>boolean</td><td>是否还有下一页（翻页终止条件）</td></tr><tr><td><code>pageNo</code> / <code>pageSize</code></td><td>number</td><td><strong>实际生效的</strong>页码 / 每页条数。传数字 <code>0</code> 时按默认值处理，以字符串传入的小数（如 <code>"2.5"</code>）向下取整 —— 它们可能与你发出的值不同。请始终传整数：JSON 数字形式的小数在验签环节即被拒（<code>400 CANONICAL_NUMBER_UNSUPPORTED</code>）</td></tr><tr><td><code>language</code></td><td>string</td><td>商品文案的语言，当前恒为 <code>en</code>。平台不做语言协商，请不要在请求里传语言相关参数（传了 <code>lang</code> 也会被忽略，但仍按 2–8 位字符串校验，不合规返回 <code>400</code>）</td></tr></tbody></table></div>
 <blockquote class="note"><p>ℹ️ <code>list</code> 按 <code>productCode</code> 升序排列。分页基于偏移量：翻页期间若恰有商品发布或下架，可能漏项或重复 ——
 请按 <code>productCode</code> 去重，并定期全量重拉。</p></blockquote>
 <p><strong>商品对象</strong></p>
 <p>同一个商品在 <code>/products/list</code>、<code>/products/detail</code>、<code>/order/query</code>、<code>/order/list</code> 上是
 <strong>同一份结构</strong>，字段名、字段集、键序一致。</p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td>对外商品码，下单用它</td></tr><tr><td><code>productName</code></td><td>string|null</td><td>商品名</td></tr><tr><td><code>tagName</code></td><td>string|null</td><td>分组标签，如 <code>Europe</code></td></tr><tr><td><code>volume</code></td><td>string|null</td><td>流量额度（字符串形式的十进制数），<strong>单位 MB</strong>。不限量套餐（<code>dataLimited: "N"</code>）上它没有意义，当前为 <code>"0.000000"</code> —— 是否限量请以 <code>dataLimited</code> 为准</td></tr><tr><td><code>dataLimited</code></td><td>string</td><td><code>Y</code> 限量 / <code>N</code> 不限量</td></tr><tr><td><code>validity</code></td><td>number|null</td><td>套餐天数：激活之后可以使用的天数</td></tr><tr><td><code>expireDay</code></td><td>number|null</td><td>未激活状态下的有效期（天）：开卡之后须在这段时间内完成激活</td></tr><tr><td><code>cardType</code></td><td>string</td><td>卡型标识，如 <code>eo1</code> / <code>ep1</code> / <code>ep3</code> / <code>C4</code>。取值由平台目录决定，<strong>请勿枚举或硬编码</strong></td></tr><tr><td><code>productType</code></td><td>string|null</td><td>形态：<code>DATA_PACKAGE</code> 流量包 / <code>DAYPASS</code> 日包；无法归类时为 <code>null</code></td></tr><tr><td><code>mccList</code></td><td>string[]|null</td><td>覆盖网络的 MCC 列表</td></tr><tr><td><code>attributes</code></td><td>object|null</td><td>展示用扩展属性，<strong>见下方专节</strong></td></tr><tr><td><code>settlementPrice</code></td><td>string|null</td><td>结算单价。<strong>默认结构不披露金额，恒为 <code>"0"</code></strong>；仅当平台方为贵方账号开通了结算价披露时才是真实单价（十进制字符串，6 位小数），此时早期受理订单的快照里可能为 <code>null</code></td></tr><tr><td><code>retailPrice</code></td><td>string</td><td>平台不披露零售价，恒为 <code>"0"</code></td></tr><tr><td><code>currency</code></td><td>string|null</td><td>币种，如 <code>USD</code></td></tr><tr><td><code>configVersion</code></td><td>number</td><td>商品配置的<strong>发布代次</strong>：平台每次发布该商品都会递增，<strong>即使内容未变</strong>。可用于判断"需要重新拉取"，不能用于判断"内容确实变了"</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td>对外商品码，下单用它</td></tr><tr><td><code>productName</code></td><td>string|null</td><td>商品名</td></tr><tr><td><code>tagName</code></td><td>string|null</td><td>分组标签，如 <code>Europe</code></td></tr><tr><td><code>volume</code></td><td>string|null</td><td>流量额度（字符串形式的十进制数），<strong>单位 MB</strong>。不限量套餐（<code>dataLimited: "N"</code>）上它没有意义，当前为 <code>"0.000000"</code> —— 是否限量请以 <code>dataLimited</code> 为准</td></tr><tr><td><code>dataLimited</code></td><td>string</td><td><code>Y</code> 限量 / <code>N</code> 不限量</td></tr><tr><td><code>validity</code></td><td>number|null</td><td>套餐天数：激活之后可以使用的天数</td></tr><tr><td><code>expireDay</code></td><td>number|null</td><td>未激活状态下的有效期（天）：开卡之后须在这段时间内完成激活</td></tr><tr><td><code>cardType</code></td><td>string</td><td>卡型标识，如 <code>eo1</code> / <code>ep1</code> / <code>ep3</code> / <code>C4</code>。取值由平台目录决定，<strong>请勿枚举或硬编码</strong></td></tr><tr><td><code>productType</code></td><td>string|null</td><td>形态：<code>DATA_PACKAGE</code> 流量包 / <code>DAYPASS</code> 日包；无法归类时为 <code>null</code></td></tr><tr><td><code>mccList</code></td><td>string[]|null</td><td>覆盖网络的 MCC 列表</td></tr><tr><td><code>attributes</code></td><td>object|null</td><td>展示用扩展属性，<strong>见下方专节</strong></td></tr><tr><td><code>settlementPrice</code></td><td>string|null</td><td>结算单价。<strong>默认结构不披露金额，恒为 <code>"0"</code></strong>；仅当平台方为贵方账号开通了结算价披露时才是真实单价（十进制字符串，6 位小数），此时个别尚未定价的商品、以及早期受理订单的快照里可能为 <code>null</code></td></tr><tr><td><code>retailPrice</code></td><td>string</td><td>平台不披露零售价，恒为 <code>"0"</code></td></tr><tr><td><code>currency</code></td><td>string|null</td><td>币种，如 <code>USD</code></td></tr><tr><td><code>configVersion</code></td><td>number</td><td>商品配置的<strong>发布代次</strong>：平台每次发布该商品都会递增，<strong>即使内容未变</strong>。可用于判断"需要重新拉取"，不能用于判断"内容确实变了"</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>⚠️ <strong>类型里带 <code>null</code> 的字段都可能是 <code>null</code></strong>，<code>attributes</code> 尤其常见（见下节）。
-平台<strong>不为未知值编造默认值</strong> —— 请按上表的类型解析，不要假设可空字段一定有值。</p></blockquote>
+平台<strong>不为可空字段的未知值编造默认值</strong>（取不到就是 <code>null</code>）—— 请按上表的类型解析，不要假设可空字段一定有值。</p></blockquote>
 <blockquote class="note"><p>ℹ️ <strong><code>volume</code> 的单位是 MB</strong>，与 <code>/order/usage</code> 的字节口径换算关系为
 <code>dataTotalBytes = volume × 1024 × 1024</code>（例："CIS 1GB 365D" 的 <code>volume</code> 是
 <code>"1024.000000"</code>，对应 <code>dataTotalBytes</code> 为 <code>1073741824</code>）。</p>
@@ -472,7 +480,7 @@ return body.data</code></pre></figure>
 <h4 id="attributes-里有什么"><code>attributes</code> 里有什么<a class="anchor" href="#attributes-里有什么">#</a></h4>
 <p><code>attributes</code> 是商品的<strong>展示用</strong>扩展属性块，由平台目录<strong>原样返回</strong>，<strong>整块可能为 <code>null</code></strong>。</p>
 <blockquote class="note warn"><p>🔴 <strong>除 <code>speedRule</code> 外，平台不解释这个块里的任何键。</strong> 这些键不参与下单、续订、用量或任何业务判定，
-平台也不校验它们的键名与取值。因此：</p>
+平台也不按任何结构校验它们的键名与取值。因此：</p>
 <ul><li><strong>键集不是契约</strong>，不同商品可以不同，也可能随目录维护而增减，恕不另行通知；</li><li><strong>请按可选字段读取</strong>，取不到就不展示；</li><li><strong>不要基于它做业务判定</strong>，也不要对它做强类型解析。</li></ul></blockquote>
 <p>以目前的沙盒目录为例，<code>attributes</code> 常见两种形态：<strong><code>null</code></strong>，或<strong>只含一个 <code>speedRule</code> 键</strong> —— 这不是承诺，见上方 🔴。
 <code>speedRule</code> 出现在不限量（<code>dataLimited: "N"</code>）的日包上，描述"高速额度用完后限速"的规则：</p>
@@ -490,7 +498,8 @@ return body.data</code></pre></figure>
   }
 }</code></pre></figure>
 <p><code>speedRule</code> 是唯一的例外：<strong>它出现时，结构已在发布时按下表校验过</strong>，不合下表的规则发布不上去。
-它本身仍可能不出现，所以请照样按可选字段读取；出现时可以按下表解析。</p>
+它本身仍可能不出现，所以请照样按可选字段读取；出现时可以按下表解析。但订单接口里的商品块是受理那一刻的
+快照（§4.5），较早受理的订单上的 <code>speedRule</code> 未必经过这道校验 —— 遇到不合下表的值请按"取不到"处理，不要报错。</p>
 <div class="tw"><table><thead><tr><th>路径</th><th>取值</th></tr></thead><tbody><tr><td><code>speedRule.period</code></td><td><code>"daily"</code>：高速额度每天重置；<code>"total"</code>：整个有效期共用一份额度。<strong>与 <code>productType</code> 无关</strong>：日包上也可能是 <code>"total"</code>，总量包上也可能是 <code>"daily"</code>，额度周期以这个字段为准</td></tr><tr><td><code>speedRule.highSpeed.value</code> / <code>.unit</code></td><td>大于 0 的数值 + <code>"MB"</code> 或 <code>"GB"</code>，如 <code>2</code> + <code>"GB"</code> —— 每个周期的高速额度</td></tr><tr><td><code>speedRule.throttle</code></td><td><code>null</code>：高速额度用完即断网；或 <code>{ "value", "unit" }</code>：大于 0 的数值 + <code>"Kbps"</code> 或 <code>"Mbps"</code>，如 <code>512</code> + <code>"Kbps"</code> —— 超出后的限速值</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>⚠️ <code>speedRule</code> 里的 <code>unit</code> 是这个块自带的单位标注，<strong>与商品对象顶层 <code>volume</code> 的 MB 口径无关</strong>，
 两者不要混用。单位区分大小写（<code>MB</code> 是兆字节，<code>Kbps</code> 是千比特每秒）。
@@ -601,19 +610,21 @@ return body.data</code></pre></figure>
     return all;
 }</code></pre></figure>
 <blockquote class="note warn"><p>⚠️ <strong>不要硬编码 <code>productCode</code></strong>，也不要使用任何不是从 <code>products/list</code> 取得的编码（例如其他渠道的商品 SKU）：
-查询类接口会返回 <code>404 PRODUCT_NOT_FOUND</code>，开卡返回 <code>404 PRODUCT_NOT_AVAILABLE</code>，续订返回 <code>409 RENEW_NOT_ALLOWED</code>。
+<code>/products/detail</code> 与 <code>/cardType</code> 返回 <code>404 PRODUCT_NOT_FOUND</code>，<code>/iccid/renew</code> 判 <code>allowed: false</code>
+（<code>reasons: ["PRODUCT_NOT_FOUND"]</code>），开卡返回 <code>404 PRODUCT_NOT_AVAILABLE</code>，续订返回 <code>409 RENEW_NOT_ALLOWED</code>。
 平台可能调整商品目录，对外码会随之变化。</p></blockquote>
 <h4 id="沙盒环境联调用的套餐码">沙盒环境联调用的套餐码<a class="anchor" href="#沙盒环境联调用的套餐码">#</a></h4>
 <p>沙盒同样可以调用 <code>products/list</code>，但沙盒里并非每个商品都能真正开卡 / 续充 —— 平台方为你配置好账号后，
 请<strong>向平台方索取本账号在沙盒环境可用于开卡 / 续充的套餐码</strong>（它们都在 <code>products/list</code> 的结果里）。
 生产环境直接调用 <code>products/list</code> 拉取即可 —— 它返回的就是发布给你的全部在售商品。</p>
 <p><strong>联调选型建议</strong>（与具体码无关，按 <code>products/list</code> 返回的属性挑）：</p>
-<div class="tw"><table><thead><tr><th>你要验证的</th><th>怎么挑</th></tr></thead><tbody><tr><td>开卡</td><td>任选一个即可</td></tr><tr><td>续充正向流程</td><td>选 <code>productType = DATA_PACKAGE</code> 的。在"日包独占"规则的卡型上，卡上有日包（从下单到日包结束，含未激活期间）时整张卡都不可续订，会稳定返回 <code>DAYPASS_IN_FORCE</code>，跑不了正向流程</td></tr><tr><td>续充的"不可续"分支</td><td>反过来选 <code>DAYPASS</code>，正好用来验证你对 <code>DAYPASS_IN_FORCE</code> 的处理</td></tr><tr><td>跨形态续充规则</td><td>给 <code>ep3</code> 流量包卡续一个 <code>ep3</code> 日包，会得到 <code>DAYPASS_REQUIRES_EMPTY_CARD</code>；而 <code>C4</code> 卡型（"自由续订"规则）在同卡型内跨形态续充是放行的</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>你要验证的</th><th>怎么挑</th></tr></thead><tbody><tr><td>开卡</td><td>从平台方给你的沙盒可开卡套餐码里任选一个</td></tr><tr><td>续充正向流程</td><td>选 <code>productType = DATA_PACKAGE</code> 的。在"日包独占"规则的卡型上，卡上有日包（从日包订单履约到日包结束，含未激活期间）时整张卡都不可续订，会稳定返回 <code>DAYPASS_IN_FORCE</code>，跑不了正向流程</td></tr><tr><td>续充的"不可续"分支</td><td>反过来，在"日包独占"规则的卡型上选 <code>DAYPASS</code> 开卡：日包结束前对这张卡续订任何商品都会得到 <code>DAYPASS_IN_FORCE</code>，正好用来验证你的处理（"自由续订"规则卡型上的日包卡不会出现这个结果）</td></tr><tr><td>跨形态续充规则</td><td>给 <code>ep3</code> 流量包卡续一个 <code>ep3</code> 日包，会得到 <code>DAYPASS_REQUIRES_EMPTY_CARD</code>；而 <code>C4</code> 卡型（"自由续订"规则）在同卡型内跨形态续充是放行的（卡型与规则的对应以沙盒当前配置为准）</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>⚠️ <strong>沙盒环境与生产环境的 <code>productCode</code> 互不通用</strong>（不保证不同，也不保证相同），切换环境时必须重新拉取目录，不能沿用联调期的码。</p></blockquote>
 <hr>
 <h3 id="42-商品详情-productsdetail">4.2 商品详情 <code>/products/detail</code><a class="anchor" href="#42-商品详情-productsdetail">#</a></h3>
 <p><strong>请求</strong></p>
 <div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[1, 160]</code></td></tr></tbody></table></div>
+<p>与 <code>/products/list</code> 一样，请不要传语言参数：传了 <code>lang</code> 会被忽略，但仍按 2–8 位字符串校验，不合规返回 <code>400</code>。</p>
 <p><strong>响应 <code>data</code></strong>：字段与 §4.1 的商品对象相同，另加 <code>language</code>（商品文案语言，当前恒为 <code>en</code>）。</p>
 <p><strong>示例响应</strong></p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
@@ -705,7 +716,7 @@ return body.data</code></pre></figure>
 <h3 id="44-开卡下单-ordercreate">4.4 开卡下单 <code>/order/create</code><a class="anchor" href="#44-开卡下单-ordercreate">#</a></h3>
 <p><strong>需要 <code>esim.write</code> scope。</strong></p>
 <p><strong>请求</strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th><th>说明</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td><code>[1, 160]</code></td><td>从 <code>products/list</code> 取</td></tr><tr><td><code>idempotencyKey</code></td><td>string</td><td><strong>是</strong></td><td><code>[8, 96]</code></td><td>幂等键，见下</td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>否</td><td><code>[1, 100]</code></td><td>你自己的业务单号，<strong>在你的账号内必须唯一</strong>（沙盒与生产各自独立）。🔴 <strong>强烈建议必传</strong>，见下</td></tr><tr><td><code>externalUserId</code></td><td>string</td><td>否</td><td><code>[1, 128]</code></td><td>你系统里的终端用户标识</td></tr><tr><td><code>sourcePartnerCode</code></td><td>string</td><td>否</td><td><code>[1, 64]</code></td><td>委托下单时指定你名下<strong>已启用的直属</strong>子分销商。<strong>扣款始终发生在你（发起方）的余额上</strong>，订单与卡都归在你的账号下；子分销商只作归属记录，不在任何响应中返回，用子分销商自己的凭证也查不到这些订单</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th><th>说明</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td><code>[1, 160]</code></td><td>从 <code>products/list</code> 取</td></tr><tr><td><code>idempotencyKey</code></td><td>string</td><td><strong>是</strong></td><td><code>[8, 96]</code></td><td>幂等键，见下</td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>否</td><td><code>[1, 100]</code></td><td>你自己的业务单号，<strong>在你的账号内必须唯一</strong>（沙盒与生产各自独立）。🔴 <strong>强烈建议必传</strong>，见下</td></tr><tr><td><code>externalUserId</code></td><td>string</td><td>否</td><td><code>[1, 128]</code></td><td>你系统里的终端用户标识。出卡后它会绑定到这张卡上，之后续订时传入不同的值会被拒（§4.9）</td></tr><tr><td><code>sourcePartnerCode</code></td><td>string</td><td>否</td><td><code>[1, 64]</code></td><td>委托下单时指定你名下<strong>已启用的直属</strong>子分销商。<strong>扣款始终发生在你（发起方）的余额上</strong>，订单与卡都归在你的账号下；子分销商只作归属记录，不在任何响应中返回，用子分销商自己的凭证也查不到这些订单</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>🔴 <strong><code>clientOrderNo</code> 虽然可选，但省略它这一单就查不了、也退不了。</strong> <code>/order/query</code> 与 <code>/order/refund</code>
 <strong>只能</strong>按 <code>clientOrderNo</code> 定位订单 —— 平台返回的 <code>orderNo</code> <strong>不是查询键</strong>，没有任何接口按它查。
 省略后只能在 <code>/order/list</code> 里翻找（<code>externalUserId</code> 选择器 —— 前提是下单时传了它；或 <code>productCode</code> 选择器），
@@ -743,7 +754,7 @@ return body.data</code></pre></figure>
 <h4 id="幂等语义">幂等语义<a class="anchor" href="#幂等语义">#</a></h4>
 <div class="tw"><table><thead><tr><th>情况</th><th>结果</th></tr></thead><tbody><tr><td>同 <code>idempotencyKey</code> + <strong>相同请求内容</strong></td><td><code>200</code>，返回<strong>同一个</strong> <code>orderNo</code>，<code>replayed: true</code></td></tr><tr><td>同 <code>idempotencyKey</code> + <strong>不同请求内容</strong></td><td><code>409 IDEMPOTENCY_KEY_REUSED</code></td></tr><tr><td>同 <code>clientOrderNo</code> + <strong>不同</strong> <code>idempotencyKey</code></td><td><code>409 CLIENT_ORDER_NO_REUSED</code></td></tr></tbody></table></div>
 <p>所以：<strong>网络超时后原样重发是安全的</strong>，不会重复建单。但换了内容就必须换幂等键。</p>
-<ul><li><strong>"请求内容相同"</strong> 指 <code>productCode</code>、<code>clientOrderNo</code>、<code>externalUserId</code>、<code>sourcePartnerCode</code> 四个字段（去首尾空白后）完全相同；可选字段不传与传空串视为相同。</li><li><strong>重放不会再扣一次款</strong>，也不受之后商品下架、余额变化的影响。</li><li><strong>被拒的请求不占用</strong>幂等键与 <code>clientOrderNo</code>（<code>402</code> / <code>403</code> / <code>404</code> / <code>503</code> 都没有建单），处理完原因后可以用同一个键重发。</li><li><code>idempotencyKey</code> 与 <code>clientOrderNo</code> 都在"你的账号 + 环境"内唯一，<strong>开卡与续订（§4.9）共用同一个命名空间</strong>，永久有效、不会过期释放；比较时不区分大小写 —— 不要用只有大小写不同的值区分两单。</li><li>"原样重发"指请求体不变；签名头每次都要重新生成（新的 <code>x-nonce</code>，见 <a href="#22-nonce">§2.2</a>）。</li></ul>
+<ul><li><strong>"请求内容相同"</strong> 指 <code>productCode</code>、<code>clientOrderNo</code>、<code>externalUserId</code>、<code>sourcePartnerCode</code> 四个字段（去首尾空白后）完全相同；可选字段不传与传空串视为相同。</li><li><strong>重放不会再扣一次款</strong>，也不受之后商品下架、余额变化的影响。例外：委托下单（带 <code>sourcePartnerCode</code>）时，若该子分销商此后被停用，重放会得到 <code>403 SOURCE_PARTNER_NOT_ALLOWED</code>。</li><li><strong>被拒的请求不占用</strong>幂等键与 <code>clientOrderNo</code>：<code>400</code> / <code>402</code> / <code>403</code> / <code>404</code>，以及 <code>503 BALANCE_ACCOUNT_NOT_FOUND</code> / <code>CURRENCY_MISMATCH</code> / <code>ORDER_NO_COLLISION</code> 都没有建单，处理完原因后可以用同一个键重发。其它 <code>503</code>、<code>406</code> 与超时无法确定是否已受理，同样用同一个键重发 —— 已受理的会以 <code>replayed: true</code> 返回。</li><li><code>idempotencyKey</code> 与 <code>clientOrderNo</code> 都在"你的账号 + 环境"内唯一，<strong>开卡与续订（§4.9）共用同一个命名空间</strong>，永久有效、不会过期释放；唯一性比较不区分大小写 —— 不要用只有大小写不同的值区分两单。⚠️ 但重放是逐字比对的：重发时两个值都要逐字复用原值，只差大小写会被拒为 <code>409</code>（<code>CLIENT_ORDER_NO_REUSED</code> 或 <code>IDEMPOTENCY_KEY_REUSED</code>），而不是重放。</li><li>"原样重发"指请求体不变；签名头每次都要重新生成（新的 <code>x-nonce</code>，见 <a href="#22-nonce">§2.2</a>）。</li></ul>
 <p><strong>负例</strong>：商品不存在或不可售 → <code>404 PRODUCT_NOT_AVAILABLE</code>。⚠️ <strong>目录里存在的商品也可能返回这个码</strong>（该商品当前不可下单）—— 收到后请跳过该商品并联系平台，<strong>重新拉目录没有用</strong>，码本来就是从那儿取的；非法 <code>sourcePartnerCode</code> → <code>403 SOURCE_PARTNER_NOT_ALLOWED</code>。</p>
 <p><strong>Node.js</strong></p>
 <figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>async function createOrder(client, { productCode, clientOrderNo, externalUserId }) {
@@ -755,7 +766,7 @@ return body.data</code></pre></figure>
   // 幂等键与业务单号绑定：重试时必须复用同一个键（换了键而 clientOrderNo 不变会被拒为
   // 409 CLIENT_ORDER_NO_REUSED；键和单号都换了才会建出第二张卡）。
   // 这个键要和订单一起持久化，重试时读回同一个值，不要每次现算。
-  // `open-` 占 5 个字符：clientOrderNo 取 3–91 个字符，拼出来的键才落在 [8, 96]。
+  // `open-` 占 5 个字符：clientOrderNo 取 3–91 个 ASCII 字符，拼出来的键才落在 [8, 96]。
   const idempotencyKey = `open-${clientOrderNo}`
   const body = { productCode, idempotencyKey, clientOrderNo }
   if (externalUserId) body.externalUserId = externalUserId   // 可选字段为空就不要放进去
@@ -770,7 +781,7 @@ return body.data</code></pre></figure>
     // clientOrderNo 必须有值：它既是幂等键的来源，也是这一单唯一的查询键
     Objects.requireNonNull(clientOrderNo, "clientOrderNo is required");
     // 幂等键与业务单号绑定：重试时必须复用同一个键（要与订单一起持久化，不要每次现算）
-    // `open-` 占 5 个字符：clientOrderNo 取 3–91 个字符，拼出来的键才落在 [8, 96]
+    // `open-` 占 5 个字符：clientOrderNo 取 3–91 个 ASCII 字符，拼出来的键才落在 [8, 96]
     String idempotencyKey = "open-" + clientOrderNo;
     // ⚠️ 不要用 Map.of：它对 null 值抛 NPE，而 externalUserId 是可选的
     Map&lt;String, Object&gt; req = new HashMap&lt;&gt;();
@@ -787,12 +798,12 @@ return body.data</code></pre></figure>
 <hr>
 <h3 id="45-订单查询-orderquery">4.5 订单查询 <code>/order/query</code><a class="anchor" href="#45-订单查询-orderquery">#</a></h3>
 <p><strong>请求</strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>clientOrderNo</code></td><td>string</td><td><strong>是</strong></td><td><code>[1, 100]</code></td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>clientOrderNo</code></td><td>string</td><td><strong>是</strong></td><td><code>[1, 100]</code>。按下单时的业务单号匹配：首尾空白会被去掉，比较不区分大小写（同 §4.4）</td></tr></tbody></table></div>
 <p>查不到（不存在或不属于你）→ <code>404 ORDER_NOT_FOUND</code>。激活码不在本接口返回，请用 §4.10 的 <code>delivery.activationCode</code>。</p>
 <p><strong>响应 <code>data</code></strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>orderNo</code></td><td>string</td><td>平台订单号</td></tr><tr><td><code>clientOrderNo</code></td><td>string|null</td><td>你的业务单号。下单时未传的订单为 <code>null</code>（在 <code>/order/list</code> 上会出现）</td></tr><tr><td><code>externalUserId</code></td><td>string|null</td><td>终端用户标识</td></tr><tr><td><code>productCode</code></td><td>string</td><td>商品码</td></tr><tr><td><code>orderStatus</code></td><td>string</td><td>见 §5 状态机</td></tr><tr><td><code>iccid</code></td><td>string|null</td><td><strong>开卡单</strong>履约后才有值；<strong>续订单在受理时就已带上目标卡的 ICCID</strong>。判断履约一律看 <code>orderStatus === 'FULFILLED'</code>，不要用它是否为空来推断</td></tr><tr><td><code>profileStatus</code></td><td>string|null</td><td>这一单所在卡的 profile 状态：该单是卡上最近一次履约的订单时，随卡的状态变化同步更新；卡上有更晚履约的订单（如续订）之后就停在当时的值；履约瞬间可能为 <code>null</code>。要取卡的当前状态请一律用 <code>/iccid/profile</code> 的 <code>profile.status</code></td></tr><tr><td><code>fulfilledAt</code></td><td>string|null</td><td><strong>平台</strong>判定该单履约成功的时刻，ISO-8601（<code>2026-03-01T08:15:30.123Z</code>）</td></tr><tr><td><code>packageStartTime</code></td><td>string|null</td><td>套餐可用窗口的<strong>起点</strong></td></tr><tr><td><code>packageEndTime</code></td><td>string|null</td><td>套餐可用窗口的<strong>终点</strong></td></tr><tr><td><code>latestActivationTime</code></td><td>string|null</td><td>套餐的<strong>激活期限</strong>：过了这个时刻仍未激活，套餐作废</td></tr><tr><td><code>product</code></td><td>object</td><td>下单时刻的<strong>商品快照</strong>，字段集与 §4.1 的商品对象相同。见下方说明</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>orderNo</code></td><td>string</td><td>平台订单号</td></tr><tr><td><code>clientOrderNo</code></td><td>string|null</td><td>你的业务单号。下单时未传的订单为 <code>null</code>（在 <code>/order/list</code> 上会出现）</td></tr><tr><td><code>externalUserId</code></td><td>string|null</td><td>终端用户标识。续订单下单时未传的，沿用卡上已绑定的值</td></tr><tr><td><code>productCode</code></td><td>string</td><td>商品码</td></tr><tr><td><code>orderStatus</code></td><td>string</td><td>见 §5 状态机</td></tr><tr><td><code>iccid</code></td><td>string|null</td><td><strong>开卡单</strong>履约后才有值；<strong>续订单在受理时就已带上目标卡的 ICCID</strong>。判断履约一律看 <code>orderStatus === 'FULFILLED'</code>，不要用它是否为空来推断</td></tr><tr><td><code>profileStatus</code></td><td>string|null</td><td>这一单所在卡的 profile 状态。平台只在卡的 profile 状态<strong>发生变化</strong>时，把新值写到卡上最近一次履约的那一单：该单仍是最近履约的订单时随之更新；卡上有更晚履约的订单（如续订）之后就停在当时的值。履约时通常为 <code>null</code>，直到卡的状态下一次变化 —— 续订单履约后卡若一直是 <code>ENABLED</code>，它就一直是 <code>null</code>。要取卡的当前状态请一律用 <code>/iccid/profile</code> 的 <code>profile.status</code></td></tr><tr><td><code>fulfilledAt</code></td><td>string|null</td><td><strong>平台</strong>判定该单履约成功的时刻，ISO-8601（<code>2026-03-01T08:15:30.123Z</code>）</td></tr><tr><td><code>packageStartTime</code></td><td>string|null</td><td>套餐可用窗口的<strong>起点</strong></td></tr><tr><td><code>packageEndTime</code></td><td>string|null</td><td>套餐可用窗口的<strong>终点</strong></td></tr><tr><td><code>latestActivationTime</code></td><td>string|null</td><td>套餐的<strong>激活期限</strong>：过了这个时刻仍未激活，套餐作废</td></tr><tr><td><code>product</code></td><td>object</td><td>下单时刻的<strong>商品快照</strong>，字段集与 §4.1 的商品对象相同。见下方说明</td></tr></tbody></table></div>
 <blockquote class="note"><p><strong>这四个时刻怎么用</strong></p>
-<ul><li><strong>判断「用户激活了没有」请读 <code>/iccid/profile</code> 的 <code>packageStatus</code></strong>（<code>orderStatus</code> 只反映开卡进度），不要用时间字段去推。<code>packageStartTime</code> 有值<strong>不代表</strong>用户已经开始使用 —— 部分套餐的可用窗口在履约时就已确定。</li><li><code>packageStartTime</code> / <code>packageEndTime</code> 是这张套餐<strong>什么时候可用到什么时候</strong>，用于展示有效期与到期提醒。<code>latestActivationTime</code> 是另一回事：它是<strong>必须在此之前激活</strong>的期限，不是窗口的一部分。</li><li><code>fulfilledAt</code> 是<strong>平台</strong>的动作时刻；其余三个来自<strong>供应商</strong>，两类不同源，跨源比较时刻差没有意义。</li><li>四个都是<strong>订单</strong>维度。一张卡续订多次就有多个套餐窗口，各属各的订单 —— 要按卡看请用 <code>/order/list</code> 的 <code>iccid</code> 选择器取全部订单。<code>/iccid/profile</code> 上的同名字段取的是当前<strong>主导订单</strong>的值，多套餐时只代表其中一张。</li><li>较早履约的订单，这四个字段可能为 <code>null</code>。<strong>字段一定在</strong>，值可能没有。</li><li>⚠️ <strong>刚落 <code>FULFILLED</code> 时，<code>packageStartTime</code> / <code>packageEndTime</code> / <code>latestActivationTime</code> 与 <code>profileStatus</code> 可能还是 <code>null</code></strong>（<code>fulfilledAt</code> 一定有值），待后续的状态通知到达后才补齐。自动激活类套餐的起止时刻 要等终端用户<strong>真正激活</strong>之后才出现 —— 用户一直不激活，它们就一直是 <code>null</code>。 所以<strong>收到履约回调后立刻回查，拿到 <code>null</code> 是正常的</strong> —— 不要据此判定失败。</li></ul></blockquote>
+<ul><li><strong>判断「用户激活了没有」请读 <code>/iccid/profile</code> 的 <code>packageStatus</code></strong>（<code>orderStatus</code> 只反映开卡进度），不要用时间字段去推。<code>packageStartTime</code> 有值<strong>不代表</strong>用户已经开始使用 —— 部分套餐的可用窗口在履约时就已确定。</li><li><code>packageStartTime</code> / <code>packageEndTime</code> 是这张套餐<strong>什么时候可用到什么时候</strong>，用于展示有效期与到期提醒。<code>latestActivationTime</code> 是另一回事：它是<strong>必须在此之前激活</strong>的期限，不是窗口的一部分。</li><li><code>fulfilledAt</code> 是<strong>平台</strong>的动作时刻；其余三个以<strong>供应商</strong>的时钟为准（自动激活类套餐的起止时刻由平台按上游 报告的激活时刻与套餐周期推算），两类不同源，跨源比较时刻差没有意义。</li><li>四个都是<strong>订单</strong>维度。一张卡续订多次就有多个套餐窗口，各属各的订单 —— 要按卡看请用 <code>/order/list</code> 的 <code>iccid</code> 选择器取全部订单。<code>/iccid/profile</code> 上的同名字段取的是当前<strong>主导订单</strong>的值，多套餐时只代表其中一张。</li><li>较早履约的订单，除 <code>fulfilledAt</code> 外的三个字段可能为 <code>null</code>。<strong>字段一定在</strong>，值可能没有。</li><li>⚠️ <strong>刚落 <code>FULFILLED</code> 时，<code>packageStartTime</code> / <code>packageEndTime</code> / <code>latestActivationTime</code> 与 <code>profileStatus</code> 可能还是 <code>null</code></strong>（<code>fulfilledAt</code> 一定有值），要等后续的状态通知到达后才可能补齐，部分字段在某些套餐上可能 一直是 <code>null</code>：自动激活类套餐的起止时刻要等终端用户<strong>真正激活</strong>之后才出现 —— 用户一直不激活，它们就一直是 <code>null</code>；<code>profileStatus</code> 只在卡的 Profile 状态<strong>发生变化</strong>时写入（见上表）。 所以<strong>收到履约回调后立刻回查，拿到 <code>null</code> 是正常的</strong> —— 不要据此判定失败。</li></ul></blockquote>
 <p><strong>示例响应</strong>（已履约）</p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
   "data": {
@@ -851,7 +862,8 @@ return body.data</code></pre></figure>
 早期受理的订单，快照里没有冻结全部字段，因此 <code>attributes</code> 等字段
 在这些订单上可能是 <code>null</code>，而同一个商品在 <code>/products/detail</code> 上可能是有值的；
 <code>configVersion</code> 也会停留在受理当时的代次。</p>
-<p>这里的 <code>null</code> 含义是<strong>"当时没有记录"</strong>，不是"该商品没有这一项"。
+<p>这里的 <code>null</code> 只表示<strong>"快照里没有这一项的值"</strong>：可能是当时没有冻结这一项，也可能是该商品受理时本就没有设置
+—— 两者从响应上无法区分，不要据此推断"该商品没有这一项"。
 快照按定义不可回填 —— 回填会把"当时的事实"改写成"现在的事实"。</p>
 <p>不论渲染结果如何，<strong>订单本身总是查得到</strong>：商品块的字段可能为 <code>null</code>，但 <code>/order/query</code> 与 <code>/order/list</code> 不会因此失败。</p></blockquote>
 <p><strong>Node.js —— 轮询到出卡</strong></p>
@@ -900,13 +912,15 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
 <hr>
 <h3 id="46-订单列表-orderlist">4.6 订单列表 <code>/order/list</code><a class="anchor" href="#46-订单列表-orderlist">#</a></h3>
 <p><strong>请求</strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td><code>externalUserId</code> | <code>iccid</code> | <code>productCode</code></td><td>string</td><td><strong>恰好一个</strong></td><td>范围选择器。长度：<code>externalUserId</code> <code>[1, 128]</code>、<code>iccid</code> <code>[10, 32]</code>、<code>productCode</code> <code>[1, 160]</code></td></tr><tr><td><code>pageSize</code></td><td>number</td><td>否</td><td><code>[1, 100]</code>，默认 20</td></tr><tr><td><code>pageToken</code></td><td>string</td><td>否</td><td><code>[1, 2048]</code>，上一页返回的 <code>nextPageToken</code></td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td><code>externalUserId</code> | <code>iccid</code> | <code>productCode</code></td><td>string</td><td><strong>恰好一个</strong></td><td>范围选择器。长度：<code>externalUserId</code> <code>[1, 128]</code>、<code>iccid</code> <code>[10, 32]</code>、<code>productCode</code> <code>[1, 160]</code>。值先去首尾空白，比较不区分大小写</td></tr><tr><td><code>pageSize</code></td><td>number</td><td>否</td><td><code>[1, 100]</code>，默认 20。负数或大于 100 返回 <code>400 pageSize Range error</code>；传数字 <code>0</code> 按默认值 20 处理，字符串 <code>"0"</code> 则返回 <code>400 pageSize Range error</code></td></tr><tr><td><code>pageToken</code></td><td>string</td><td>否</td><td><code>[1, 2048]</code>，上一页返回的 <code>nextPageToken</code></td></tr></tbody></table></div>
 <p><strong>硬规则</strong>：</p>
 <div class="tw"><table><thead><tr><th>构造</th><th>结果</th></tr></thead><tbody><tr><td>零个选择器</td><td><code>400 ORDER_RANGE_SELECTOR_REQUIRED</code></td></tr><tr><td>两个及以上选择器</td><td><code>400 ORDER_RANGE_SELECTOR_CONFLICT</code></td></tr><tr><td><strong>只传 <code>pageToken</code> 不带选择器</strong></td><td><code>400 ORDER_RANGE_SELECTOR_REQUIRED</code>（不是游标错误！）</td></tr><tr><td>选择器 + 伪造/过期游标</td><td><code>400 ORDER_PAGE_TOKEN_INVALID</code></td></tr><tr><td><strong>选择器与签发该游标时不一致</strong>（换了值或换了字段）</td><td><code>400 ORDER_PAGE_TOKEN_INVALID</code> —— 游标与选择器绑定，换选择器必须从第一页重开</td></tr></tbody></table></div>
-<blockquote class="note warn"><p>🔴 <strong><code>pageToken</code> 不是独立的选择器</strong>，翻页时必须把<strong>原来的选择器一起带上</strong>。游标带签名且<strong>有效期 15 分钟</strong>。</p></blockquote>
+<blockquote class="note warn"><p>🔴 <strong><code>pageToken</code> 不是独立的选择器</strong>，翻页时必须把<strong>原来的选择器一起带上</strong>。游标带签名，<strong>有效期 15 分钟</strong>
+（每个 <code>nextPageToken</code> 各自从签发时起算），只在签发它的账号与环境下可用。</p></blockquote>
 <p><strong>响应 <code>data</code></strong></p>
 <div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>list</code></td><td>array</td><td>订单数组，元素结构同 §4.5 的 <code>data</code>。⚠️ 下单时未传 <code>clientOrderNo</code> 的订单，该字段为 <code>null</code></td></tr><tr><td><code>hasMore</code></td><td>boolean</td><td>是否还有下一页</td></tr><tr><td><code>nextPageToken</code></td><td>string|null</td><td>下一页游标；<code>null</code> 表示到底</td></tr></tbody></table></div>
-<blockquote class="note"><p><strong>排序</strong>：按受理时间<strong>倒序</strong>（最新的在前）。游标只能向后翻，不支持反向。</p></blockquote>
+<blockquote class="note"><p><strong>排序</strong>：按受理先后<strong>倒序</strong>（最新受理的在前，顺序确定、没有并列）。游标只能向后翻，不支持反向。
+翻页期间新受理的订单不会插进后续页（不会造成重复或漏项）；要看到新订单，不带 <code>pageToken</code> 从第一页重开。</p></blockquote>
 <p><strong>示例响应</strong></p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
   "data": {
@@ -1041,7 +1055,7 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
 <p><strong>请求</strong></p>
 <div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[10, 32]</code></td></tr><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td><code>[1, 160]</code>，想续的目标商品</td></tr><tr><td><code>externalUserId</code></td><td>string</td><td>否</td><td><code>[1, 128]</code>。<strong>传了才会校验用户归属</strong> —— 不传则预检看不出 <code>EXTERNAL_USER_ID_CONFLICT</code></td></tr></tbody></table></div>
 <p><strong>响应 <code>data</code></strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>allowed</code></td><td>boolean</td><td><strong>唯一判据</strong></td></tr><tr><td><code>reasons</code></td><td>string[]</td><td>不可续的原因；<code>allowed:true</code> 时为 <code>[]</code>。<code>CARD_NOT_FOUND</code> / <code>PRODUCT_NOT_FOUND</code> 出现时是唯一一条（不再评估其余条件），其余情况列出<strong>全部</strong>原因</td></tr><tr><td><code>iccid</code> / <code>productCode</code></td><td>string</td><td>回显</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>allowed</code></td><td>boolean</td><td><strong>唯一判据</strong></td></tr><tr><td><code>reasons</code></td><td>string[]</td><td>不可续的原因；<code>allowed:true</code> 时为 <code>[]</code>。<code>CARD_NOT_FOUND</code> / <code>PRODUCT_NOT_FOUND</code> 出现时是唯一一条（不再评估其余条件），其余情况列出<strong>全部</strong>原因 —— 唯一的例外是卡型续订规则那一组（<code>CARD_TYPE_RULE_NOT_PUBLISHED</code>、<code>PACKAGE_TYPE_NOT_CLASSIFIABLE</code>、<code>DAYPASS_IN_FORCE</code>、<code>DAYPASS_REQUIRES_EMPTY_CARD</code>、<code>SERIAL_RULE_SLOT_OCCUPIED</code>、<code>CONCURRENT_ORDER_LIMIT_REACHED</code>）：每次最多出现其中一条，它解除后可能出现同组的另一条</td></tr><tr><td><code>iccid</code> / <code>productCode</code></td><td>string</td><td>回显</td></tr></tbody></table></div>
 <blockquote class="note"><p>这个接口<strong>不用错误码表达"不可续"</strong>：卡不存在也是 <code>200</code>，判定在 <code>allowed:false</code> + <code>reasons:["CARD_NOT_FOUND"]</code>。</p></blockquote>
 <p><strong>示例响应</strong></p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>// 可续
@@ -1052,7 +1066,9 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
 {"data":{"allowed":false,"reasons":["DAYPASS_IN_FORCE"],"iccid":"89000000000000000435","productCode":"XP0909F3C1C8A9D7F97456F799"},
  "code":200,"msg":"ok","t":1788505549000}</code></pre></figure>
 <h4 id="reasons-全表按性质分类这是接入方最需要的一张表"><code>reasons</code> 全表（按性质分类，这是接入方最需要的一张表）<a class="anchor" href="#reasons-全表按性质分类这是接入方最需要的一张表">#</a></h4>
-<div class="tw"><table><thead><tr><th>reason</th><th>含义</th><th>性质</th></tr></thead><tbody><tr><td><code>CARD_NOT_FOUND</code></td><td>卡不存在或不属于你</td><td>❌ 终局</td></tr><tr><td><code>PRODUCT_NOT_FOUND</code></td><td>目标商品不存在、未发布给你，<strong>或与这张卡不兼容</strong></td><td>❌ 终局</td></tr><tr><td><code>PRODUCT_OFF_SALE</code></td><td>目标商品已下架</td><td>⚠️ 可恢复（换商品或等上架）</td></tr><tr><td><code>CARD_NOT_RENEWABLE</code></td><td>上游明确这张卡不可续</td><td>❌ 终局</td></tr><tr><td><code>CARD_TYPE_MISMATCH</code></td><td>目标商品的卡型与这张卡不同。极少数卡型信息缺失的卡也会报它，此时会与 <code>CARD_CAPABILITY_UNKNOWN</code>、<code>CARD_TYPE_RULE_NOT_PUBLISHED</code> 同时出现 —— 请联系平台</td><td>❌ 终局（续订永不换卡型）</td></tr><tr><td><code>RENEW_WINDOW_EXPIRED</code></td><td>续订窗口已过</td><td>❌ 终局</td></tr><tr><td><code>ORDER_NOT_RENEWABLE</code></td><td>当前套餐没有续订截止时间</td><td>❌ 终局</td></tr><tr><td><code>EXTERNAL_USER_ID_CONFLICT</code></td><td>传入的 <code>externalUserId</code> 与卡上绑定的不一致</td><td>❌ 终局（改传对的）</td></tr><tr><td><strong><code>RENEWABILITY_PENDING_SYNC</code></strong></td><td>平台还没同步到这张卡的可续订性</td><td>🔄 <strong>稍后重试</strong></td></tr><tr><td><strong><code>RENEW_WINDOW_PENDING_SYNC</code></strong></td><td>续订窗口尚未同步</td><td>🔄 <strong>稍后重试</strong></td></tr><tr><td><strong><code>DAYPASS_IN_FORCE</code></strong></td><td>卡上有尚未结束的日包（已下单、尚未激活的也算）时整张卡不可续（用流量包续也不行）</td><td>🔄 日包结束后解除</td></tr><tr><td><strong><code>DAYPASS_REQUIRES_EMPTY_CARD</code></strong></td><td>日包要求卡上没有占用中的套餐</td><td>🔄 卡上现有套餐全部结束后解除</td></tr><tr><td><strong><code>SERIAL_RULE_SLOT_OCCUPIED</code></strong></td><td>该卡型要求串行续订，卡上已有占用中的套餐</td><td>🔄 该套餐结束后解除</td></tr><tr><td><code>CONCURRENT_ORDER_LIMIT_REACHED</code></td><td>卡上并发套餐数已达上限</td><td>🔄 有套餐到期后解除</td></tr><tr><td><code>CARD_CAPABILITY_UNKNOWN</code></td><td>卡型能力未同步</td><td>🔄 稍后重试</td></tr><tr><td><code>CARD_TYPE_RULE_NOT_PUBLISHED</code></td><td>该卡型的续订能力尚未开放</td><td>⚙️ 联系平台</td></tr><tr><td><code>PACKAGE_TYPE_NOT_CLASSIFIABLE</code></td><td>目标商品的套餐形态无法判定</td><td>⚙️ 联系平台</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>reason</th><th>含义</th><th>性质</th></tr></thead><tbody><tr><td><code>CARD_NOT_FOUND</code></td><td>卡不存在或不属于你</td><td>❌ 终局</td></tr><tr><td><code>PRODUCT_NOT_FOUND</code></td><td>目标商品不存在、未发布给你，<strong>或与这张卡不兼容</strong></td><td>❌ 终局</td></tr><tr><td><code>PRODUCT_OFF_SALE</code></td><td>目标商品已下架</td><td>⚠️ 可恢复（换商品或等上架）</td></tr><tr><td><code>CARD_NOT_RENEWABLE</code></td><td>上游明确这张卡不可续</td><td>❌ 终局</td></tr><tr><td><code>CARD_TYPE_MISMATCH</code></td><td>目标商品的卡型与这张卡不同。极少数卡型信息缺失的卡也会报它，此时会与 <code>CARD_CAPABILITY_UNKNOWN</code>、<code>CARD_TYPE_RULE_NOT_PUBLISHED</code> 同时出现 —— 请联系平台</td><td>❌ 终局（续订永不换卡型）</td></tr><tr><td><code>RENEW_WINDOW_EXPIRED</code></td><td>续订窗口已过</td><td>❌ 终局</td></tr><tr><td><code>ORDER_NOT_RENEWABLE</code></td><td>当前套餐没有续订截止时间</td><td>❌ 终局</td></tr><tr><td><code>EXTERNAL_USER_ID_CONFLICT</code></td><td>传入的 <code>externalUserId</code> 与卡上绑定的不一致</td><td>❌ 终局（改传对的）</td></tr><tr><td><strong><code>RENEWABILITY_PENDING_SYNC</code></strong></td><td>平台还没同步到这张卡的可续订性</td><td>🔄 <strong>稍后重试</strong></td></tr><tr><td><strong><code>RENEW_WINDOW_PENDING_SYNC</code></strong></td><td>续订窗口尚未同步</td><td>🔄 <strong>稍后重试</strong></td></tr><tr><td><strong><code>DAYPASS_IN_FORCE</code></strong></td><td>卡型规则为"日包独占"，且卡上有尚未结束的日包（已履约、尚未激活的也算）：整张卡不可续（用流量包续也不行）。尚未履约的日包订单不触发这一条，但会占用套餐槽位</td><td>🔄 日包结束后解除</td></tr><tr><td><strong><code>DAYPASS_REQUIRES_EMPTY_CARD</code></strong></td><td>卡型规则为"日包独占"时，用日包续要求卡上没有占用中的套餐</td><td>🔄 卡上现有套餐全部结束后解除</td></tr><tr><td><strong><code>SERIAL_RULE_SLOT_OCCUPIED</code></strong></td><td>该卡型要求串行续订，卡上已有占用中的套餐</td><td>🔄 该套餐结束后解除</td></tr><tr><td><code>CONCURRENT_ORDER_LIMIT_REACHED</code></td><td>卡上并发套餐数已达上限</td><td>🔄 有套餐到期后解除</td></tr><tr><td><code>CARD_CAPABILITY_UNKNOWN</code></td><td>卡型能力未同步</td><td>🔄 稍后重试</td></tr><tr><td><code>CARD_TYPE_RULE_NOT_PUBLISHED</code></td><td>该卡型的续订能力尚未开放</td><td>⚙️ 联系平台</td></tr><tr><td><code>PACKAGE_TYPE_NOT_CLASSIFIABLE</code></td><td>目标商品的套餐形态无法判定</td><td>⚙️ 联系平台</td></tr></tbody></table></div>
+<blockquote class="note"><p>ℹ️ 表中"占用中的套餐"包含尚未履约的在途订单；已用尽、已过期、已取消、已作废或已退款的套餐不占用。
+已终止（<code>TERMINATED</code>）而未退款的套餐，在续订截止时间之前仍算占用。</p></blockquote>
 <blockquote class="note warn"><p>🔴 <strong><code>allowed: true</code> 不保证下得了单。</strong> 这是一次<strong>预检</strong>：<code>allowed: false</code> 一定下不了单，
 反过来不成立。受理时还有两道闸门不在预检范围内 —— 该商品当前是否可下单
 （<code>409 RENEW_NOT_ALLOWED</code>）与你的预付费余额（<code>402 BALANCE_LIMIT_REACHED</code>）。
@@ -1060,8 +1076,8 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
 <p>🔴 <strong>不要把"稍后重试"类的 reason 当成永久拒绝。</strong> 上表标 🔄 的七条都会自行解除：
 <code>RENEWABILITY_PENDING_SYNC</code> / <code>RENEW_WINDOW_PENDING_SYNC</code> / <code>CARD_CAPABILITY_UNKNOWN</code> 随平台同步完成而解除，其余四条随卡上套餐的变动而解除。资格是<strong>随时在变</strong>的量（卡上每多一张单、每结束一张单都会变），
 所以请<strong>在用户点击的那一刻实时查</strong>，不要缓存资格结果。</p>
-<p>ℹ️ 传 <code>externalUserId</code> 时预检才能预测归属冲突。<strong>下单要传的 <code>externalUserId</code>，
-预检也要传</strong> —— 不传的话 <code>EXTERNAL_USER_ID_CONFLICT</code> 这一条预检看不出来。</p></blockquote>
+<p>ℹ️ 传 <code>externalUserId</code> 时预检才能预测归属冲突。下单时归属冲突同样被拒（<code>409 RENEW_NOT_ALLOWED</code>，不单独给码）。
+<strong>下单要传的 <code>externalUserId</code>，预检也要传</strong> —— 不传的话 <code>EXTERNAL_USER_ID_CONFLICT</code> 这一条预检看不出来。</p></blockquote>
 <h4 id="规则按卡型差异化示例">规则按卡型差异化（示例）<a class="anchor" href="#规则按卡型差异化示例">#</a></h4>
 <blockquote class="note warn"><p>⚠️ 下表是<strong>形态示例</strong>，不是取值清单。具体哪个卡型适用哪条规则由平台目录决定，
 请勿硬编码卡型码。</p></blockquote>
@@ -1141,12 +1157,13 @@ public RenewCheck checkRenewable(XpinEsimClient client, String iccid, String pro
   "attributes":null,"settlementPrice":"0","retailPrice":"0","currency":"USD","configVersion":1}],
   "hasMore":false,"pageNo":1,"pageSize":1,"language":"en"},"code":200,"msg":"ok","t":1791543582196}
 
-// 一个都不能续（例：卡上的日包还在用）
+// 一个都不能续（例：卡型规则为"日包独占"、卡上的日包还在用）
 {"data":{"list":[],"hasMore":false,"pageNo":1,"pageSize":0,"language":"en"},"code":200,"msg":"ok","t":1791543582983}
 
 // 卡不存在或不属于你
 {"data":{},"code":404,"msg":"CARD_NOT_FOUND","t":1791543583688}</code></pre></figure>
-<blockquote class="note warn"><p>🔴 <strong>列表里有，不等于一定下得了单。</strong> 边界与 §4.7 的预检相同：受理时还会扣你的预付费余额
+<blockquote class="note warn"><p>🔴 <strong>列表里有，不等于一定下得了单。</strong> 边界比 §4.7 的预检少一道（当前不可下单的商品本来就不会列出），
+其余相同：受理时还会扣你的预付费余额
 （<code>402 BALANCE_LIMIT_REACHED</code>）；本接口<strong>不收 <code>externalUserId</code></strong>，看不出你下单时要传的终端用户
 与卡上绑定的是否一致（<code>EXTERNAL_USER_ID_CONFLICT</code>）；查询与下单之间，卡上的套餐也可能变化。
 下单侧照样要处理 <code>409 RENEW_NOT_ALLOWED</code> 与 <code>402</code>。</p>
@@ -1175,7 +1192,7 @@ public List&lt;JsonNode&gt; renewOptions(XpinEsimClient client, String iccid) th
 <h3 id="49-续订下单-orderrenew">4.9 续订下单 <code>/order/renew</code><a class="anchor" href="#49-续订下单-orderrenew">#</a></h3>
 <p><strong>需要 <code>esim.write</code> scope。</strong> 给<strong>已有的卡</strong>追加套餐，<strong>不换卡</strong>（ICCID 不变）。卡的激活码以 <code>/iccid/profile</code> 的 <code>delivery.activationCode</code> 为准。</p>
 <p><strong>请求</strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[10, 32]</code></td></tr><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td><code>[1, 160]</code>，目标商品</td></tr><tr><td><code>idempotencyKey</code></td><td>string</td><td><strong>是</strong></td><td><code>[8, 96]</code></td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>否</td><td><code>[1, 100]</code>，你的业务单号。<strong>强烈建议必传</strong>，理由同 <a href="#44-开卡下单-ordercreate">§4.4</a></td></tr><tr><td><code>externalUserId</code></td><td>string</td><td>否</td><td><code>[1, 128]</code>，终端用户标识</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[10, 32]</code></td></tr><tr><td><code>productCode</code></td><td>string</td><td><strong>是</strong></td><td><code>[1, 160]</code>，目标商品</td></tr><tr><td><code>idempotencyKey</code></td><td>string</td><td><strong>是</strong></td><td><code>[8, 96]</code></td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>否</td><td><code>[1, 100]</code>，你的业务单号。<strong>强烈建议必传</strong>，理由同 <a href="#44-开卡下单-ordercreate">§4.4</a></td></tr><tr><td><code>externalUserId</code></td><td>string</td><td>否</td><td><code>[1, 128]</code>，终端用户标识。传了就必须与卡上已绑定的一致，否则 <code>409 RENEW_NOT_ALLOWED</code>（即 §4.7 的 <code>EXTERNAL_USER_ID_CONFLICT</code>）；卡上尚未绑定时，本次的值会绑定到这张卡上。不传则不校验，这一单沿用卡上已绑定的值</td></tr></tbody></table></div>
 <p><strong>响应 <code>data</code></strong>：与 §4.4 相同，另含 <code>iccid</code>。</p>
 <p><strong>示例响应</strong></p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
@@ -1192,7 +1209,7 @@ public List&lt;JsonNode&gt; renewOptions(XpinEsimClient client, String iccid) th
   "msg": "ok",
   "t": 1789555252743
 }</code></pre></figure>
-<ul><li>续订单有<strong>独立于开卡单的 <code>orderNo</code></strong>，<code>iccid</code> 保持不变。</li><li>幂等语义与开卡完全相同（同键同内容 → <code>replayed:true</code>；同键异内容 → <code>409</code>）。 <code>orderStatus</code> 同样<strong>不要断言恒为 <code>ACCEPTED</code></strong>，理由见 <a href="#44-开卡下单-ordercreate">§4.4</a>。</li><li>不可续时 → <code>409 RENEW_NOT_ALLOWED</code>。卡不存在 / 不属于你、商品不存在 / 已下架 / 当前不可下单也都是这个码（本接口不返回 <code>404</code>），具体原因用 §4.7 查。</li><li>🔴 <strong>续订与开卡一样是受理即扣款。</strong> 平台在受理的同一个事务里就按该商品的结算价从你的 预付费余额扣钱；订单落 <code>FAILED</code> 或 <code>REFUNDED</code> 时自动退回，中间态不动钱。</li><li>🔴 <strong>余额不足 → <code>402 BALANCE_LIMIT_REACHED</code></strong>，整单被拒、一分钱不扣。<strong>不要重试</strong> —— 在充值之前每一次重试都是同一个结果。请为续订预留额度，并像开卡一样处理这个码。</li></ul>
+<ul><li>续订单有<strong>独立于开卡单的 <code>orderNo</code></strong>，<code>iccid</code> 保持不变。</li><li>幂等语义与开卡相同（同键同内容 → <code>replayed:true</code>；同键异内容 → <code>409 IDEMPOTENCY_KEY_REUSED</code>； 同 <code>clientOrderNo</code> 异键 → <code>409 CLIENT_ORDER_NO_REUSED</code>）。这里的"请求内容"指 <code>iccid</code>、<code>productCode</code>、 <code>clientOrderNo</code>、<code>externalUserId</code> 四个字段（去首尾空白后）。键与单号和开卡共用命名空间：拿开卡用过的键调续订 （或反过来），即使字段相同也是 <code>409 IDEMPOTENCY_KEY_REUSED</code>。<code>409 RENEW_NOT_ALLOWED</code> 与 <code>402</code> 一样不占用键和单号。 <code>orderStatus</code> 同样<strong>不要断言恒为 <code>ACCEPTED</code></strong>，理由见 <a href="#44-开卡下单-ordercreate">§4.4</a>。</li><li>不可续时 → <code>409 RENEW_NOT_ALLOWED</code>。卡不存在 / 不属于你、商品不存在 / 已下架 / 当前不可下单也都是这个码（本接口不返回 <code>404</code>），具体原因用 §4.7 查。</li><li>🔴 <strong>续订与开卡一样是受理即扣款。</strong> 平台在受理的同一个事务里就按该商品的结算价从你的 预付费余额扣钱；订单落 <code>FAILED</code> 或 <code>REFUNDED</code> 时自动退回，中间态不动钱。</li><li>🔴 <strong>余额不足 → <code>402 BALANCE_LIMIT_REACHED</code></strong>，整单被拒、一分钱不扣。<strong>不要重试</strong> —— 在余额回升（充值，或在途订单落 <code>FAILED</code> / <code>REFUNDED</code> 自动退回）之前，每一次重试都是同一个结果。 请为续订预留额度，并像开卡一样处理这个码。</li></ul>
 <p><strong>Node.js —— 完整续订流程</strong></p>
 <figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>async function renew(client, { iccid, productCode, clientOrderNo, externalUserId }) {
   // clientOrderNo 必须有值，理由同 §4.4（它既是幂等键的来源，也是之后的查询键）
@@ -1211,7 +1228,7 @@ public List&lt;JsonNode&gt; renewOptions(XpinEsimClient client, String iccid) th
   //    ⚠️ 预检通过**不等于**受理一定成功：这里仍可能拿到 409 RENEW_NOT_ALLOWED
   //    （商品当前不可下单）或 402 BALANCE_LIMIT_REACHED（余额不足）。两个都要接住，
   //    402 尤其**不要重试** —— 充值之前每次都是同一个结果。
-  // `renew-` 占 6 个字符：clientOrderNo 取 2–90 个字符，拼出来的键才落在 [8, 96]
+  // `renew-` 占 6 个字符：clientOrderNo 取 2–90 个 ASCII 字符，拼出来的键才落在 [8, 96]
   const body = { iccid, productCode, idempotencyKey: `renew-${clientOrderNo}`, clientOrderNo }
   if (externalUserId) body.externalUserId = externalUserId
   const data = await client.invoke('/openapi/v1/order/renew', body)
@@ -1235,7 +1252,7 @@ public List&lt;JsonNode&gt; renewOptions(XpinEsimClient client, String iccid) th
     Map&lt;String, Object&gt; req = new HashMap&lt;&gt;();      // 不用 Map.of：它对 null 值抛 NPE
     req.put("iccid", iccid);
     req.put("productCode", productCode);
-    req.put("idempotencyKey", "renew-" + clientOrderNo);   // clientOrderNo 取 2–90 个字符，键才落在 [8, 96]
+    req.put("idempotencyKey", "renew-" + clientOrderNo);   // clientOrderNo 取 2–90 个 ASCII 字符，键才落在 [8, 96]
     req.put("clientOrderNo", clientOrderNo);
     if (externalUserId != null) req.put("externalUserId", externalUserId);
     JsonNode data = client.invoke("/openapi/v1/order/renew", req);
@@ -1252,21 +1269,26 @@ public List&lt;JsonNode&gt; renewOptions(XpinEsimClient client, String iccid) th
 <p><strong>请求</strong></p>
 <div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>约束</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td><strong>是</strong></td><td>长度 <code>[10, 32]</code></td></tr></tbody></table></div>
 <p><strong>响应 <code>data</code></strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td>卡号</td></tr><tr><td><code>externalUserId</code></td><td>string|null</td><td>绑定的终端用户</td></tr><tr><td><code>cardType</code></td><td>string|null</td><td>卡型</td></tr><tr><td><code>delivery.activationCode</code></td><td>string|null</td><td><strong>激活码</strong>，形如 <code>LPA:1$&lt;smdp&gt;$&lt;matchingId&gt;</code></td></tr><tr><td><code>delivery.latestActivationTime</code></td><td>string|null</td><td>套餐的<strong>激活期限</strong>：过了这个时刻仍未激活，套餐作废</td></tr><tr><td><code>delivery.installTime</code></td><td>string|null</td><td>这张 profile 被装到设备上的时刻。同一张卡可被多次安装，该值是<strong>当前报告值</strong>。⚠️ 见下方说明</td></tr><tr><td><code>delivery.imsi</code> / <code>delivery.msisdn</code></td><td>string|null</td><td>IMSI / MSISDN</td></tr><tr><td><code>profile.status</code></td><td>string</td><td>生命周期：<code>RELEASED</code> → <code>DOWNLOADED</code> → <code>INSTALLED</code> → <code>ENABLED</code> ↔ <code>DISABLED</code> → <code>DELETED</code>；另有 <code>UNKNOWN</code>：平台尚未收到这张卡的 Profile 状态（<strong>新卡在上游首次上报之前都是此值</strong>，卡一直未安装时可能一直如此），或上游给了平台不认识的值。共 <strong>7</strong> 个取值</td></tr><tr><td><code>profile.statusTime</code></td><td>string</td><td>平台<strong>观测到</strong>该状态的时刻（平台时钟，<strong>不是</strong>上游报告的变更时刻；新卡上是履约投影时刻）</td></tr><tr><td><code>profile.changeVersion</code></td><td>number</td><td>状态变更版本，<strong>单调递增</strong>，可用于丢序检测</td></tr><tr><td><code>renewal.renewable</code></td><td>boolean|null</td><td>可续订性；<code>null</code> = 未同步</td></tr><tr><td><code>renewal.expirationTime</code></td><td>string|null</td><td>续订截止时间。<strong>开卡履约完成即可读到</strong>，不必等后续刷新</td></tr><tr><td><code>renewal.activePackages</code></td><td>number</td><td>这张卡当前占用的套餐槽位数（<strong>含尚未履约的在途订单</strong>，见下方警告）</td></tr><tr><td><code>renewal.maxConcurrentPackages</code></td><td>number|null</td><td>并发上限。<code>null</code> 有两种含义 —— 该卡型未声明上限，或平台尚未同步到该卡型能力，<strong>本接口无法区分</strong>。请勿据此自行判断能否续订，那个问题请用 §4.7</td></tr><tr><td><code>renewal.evidenceFresh</code></td><td>boolean</td><td>续订证据是否仍在平台的新鲜度窗口内。<strong>仅供展示，不参与续订判定</strong>；能不能续以 §4.7 为准</td></tr><tr><td><code>renewal.evidenceSyncedAt</code></td><td>string|null</td><td>证据同步时刻，取自<strong>卡型能力</strong>的刷新时刻（逐卡跟进：同一卡型的卡通常相同，刷新后的短时间内可能不一致），与 <code>usage.observedAt</code> 不是一回事</td></tr><tr><td><code>usage</code></td><td>object|null</td><td>用量；<code>null</code> 见 §4.11</td></tr><tr><td><code>packageStatus</code></td><td>string|null</td><td>套餐当前状态，共 12 个取值：<code>CREATED</code> / <code>NOT_ACTIVATED</code> / <code>ACTIVATED</code> / <code>IN_USE</code> / <code>SUSPENDED</code> / <code>EXHAUSTED</code> / <code>EXPIRED</code> / <code>CANCELLED</code> / <code>ABANDONED</code> / <code>TERMINATED</code> / <code>REFUNDED</code> / <code>UNKNOWN</code>；<code>null</code> 等同 <code>CREATED</code>。<strong>这是判断「用户激活了没有」的字段 —— 已激活的判据是 <code>ACTIVATED</code> 或 <code>IN_USE</code></strong></td></tr><tr><td><code>packageStartTime</code></td><td>string|null</td><td>套餐可用窗口的<strong>起点</strong></td></tr><tr><td><code>packageEndTime</code></td><td>string|null</td><td>套餐可用窗口的<strong>终点</strong></td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td>卡号</td></tr><tr><td><code>externalUserId</code></td><td>string|null</td><td>绑定的终端用户</td></tr><tr><td><code>cardType</code></td><td>string|null</td><td>卡型</td></tr><tr><td><code>delivery.activationCode</code></td><td>string|null</td><td><strong>激活码</strong>，形如 <code>LPA:1$&lt;smdp&gt;$&lt;matchingId&gt;</code></td></tr><tr><td><code>delivery.latestActivationTime</code></td><td>string|null</td><td>套餐的<strong>激活期限</strong>：过了这个时刻仍未激活，套餐作废</td></tr><tr><td><code>delivery.installTime</code></td><td>string|null</td><td>这张 profile 被装到设备上的时刻。同一张卡可被多次安装，该值是<strong>当前报告值</strong>。⚠️ 见下方说明</td></tr><tr><td><code>delivery.imsi</code> / <code>delivery.msisdn</code></td><td>string|null</td><td>IMSI / MSISDN</td></tr><tr><td><code>profile.status</code></td><td>string</td><td>生命周期：<code>RELEASED</code> → <code>DOWNLOADED</code> → <code>INSTALLED</code> → <code>ENABLED</code> ↔ <code>DISABLED</code> → <code>DELETED</code>；另有 <code>UNKNOWN</code>：平台尚未收到这张卡的 Profile 状态（<strong>新卡在上游首次上报之前都是此值</strong>，卡一直未安装时可能一直如此；上游的首次上报早于开卡结果到达时，也会停在此值直到下一次上报），或上游给了平台不认识的值。共 <strong>7</strong> 个取值</td></tr><tr><td><code>profile.statusTime</code></td><td>string</td><td>平台<strong>观测到</strong>该状态的时刻（平台时钟，<strong>不是</strong>上游报告的变更时刻；新卡上是履约投影时刻）</td></tr><tr><td><code>profile.changeVersion</code></td><td>number</td><td>状态变更版本，<strong>单调递增</strong>，可用于丢序检测</td></tr><tr><td><code>renewal.renewable</code></td><td>boolean|null</td><td>该卡<strong>卡型</strong>的可续订标识；<code>null</code> = 未同步。这张卡此刻能不能续以 §4.7 为准</td></tr><tr><td><code>renewal.expirationTime</code></td><td>string|null</td><td>续订截止时间，取自主导订单（见下方说明）；该单不支持续订时为 <code>null</code>。<strong>开卡履约完成即可读到</strong>，不必等后续刷新</td></tr><tr><td><code>renewal.activePackages</code></td><td>number</td><td>这张卡当前占用的套餐槽位数（<strong>含尚未履约的在途订单</strong>，见下方警告）。已用尽、已过期、已取消 / 作废 / 退款的套餐不计入；已终止的套餐在续订截止时间之前仍计入</td></tr><tr><td><code>renewal.maxConcurrentPackages</code></td><td>number|null</td><td>该卡型声明的同时有效套餐数上限（同 §4.3 的 <code>capability.maxRenewCount</code>），仅供参考：是否按它限制取决于卡型的续订规则。<code>null</code> 有两种含义 —— 该卡型未声明上限，或平台尚未同步到该卡型能力，<strong>本接口无法区分</strong>。请勿据此自行判断能否续订，那个问题请用 §4.7</td></tr><tr><td><code>renewal.evidenceFresh</code></td><td>boolean</td><td>续订证据是否仍在平台的新鲜度窗口内。<strong>仅供展示，不参与续订判定</strong>；能不能续以 §4.7 为准</td></tr><tr><td><code>renewal.evidenceSyncedAt</code></td><td>string|null</td><td>证据同步时刻，取自<strong>卡型能力</strong>的刷新时刻（逐卡跟进：同一卡型的卡通常相同，刷新后的短时间内可能不一致），与 <code>usage.observedAt</code> 不是一回事</td></tr><tr><td><code>usage</code></td><td>object|null</td><td>用量；<code>null</code> 见 §4.11</td></tr><tr><td><code>packageStatus</code></td><td>string|null</td><td>套餐当前状态，共 12 个取值：<code>CREATED</code> / <code>NOT_ACTIVATED</code> / <code>ACTIVATED</code> / <code>IN_USE</code> / <code>SUSPENDED</code> / <code>EXHAUSTED</code> / <code>EXPIRED</code> / <code>CANCELLED</code> / <code>ABANDONED</code> / <code>TERMINATED</code> / <code>REFUNDED</code> / <code>UNKNOWN</code>；<code>null</code> 等同 <code>CREATED</code>。<code>CREATED</code> = 已开通、平台尚未收到上游的套餐状态（可能持续到上游首次报告状态），不能据此判断激活与否；<code>UNKNOWN</code> = 上游报了平台不认识的状态。<strong>这是判断「用户激活了没有」的字段 —— 正处于激活期的判据是 <code>ACTIVATED</code> 或 <code>IN_USE</code></strong>（<code>EXHAUSTED</code> 等后续状态说明曾经激活过）</td></tr><tr><td><code>packageStartTime</code></td><td>string|null</td><td>套餐可用窗口的<strong>起点</strong></td></tr><tr><td><code>packageEndTime</code></td><td>string|null</td><td>套餐可用窗口的<strong>终点</strong></td></tr></tbody></table></div>
 <blockquote class="note"><p><strong>三个时间字段的分工</strong>（名字很像，含义互不相同）</p>
 <div class="tw"><table><thead><tr><th>字段</th><th>回答的问题</th><th>维度</th></tr></thead><tbody><tr><td><code>delivery.installTime</code></td><td>卡什么时候被装到设备上</td><td>卡</td></tr><tr><td><code>packageStartTime</code> / <code>packageEndTime</code></td><td>这张套餐什么时候可用到什么时候</td><td>订单</td></tr><tr><td><code>delivery.latestActivationTime</code></td><td>最晚必须在什么时候之前激活</td><td>订单</td></tr></tbody></table></div>
 <p>⚠️ <strong>判断「用户激活了没有」请读 <code>packageStatus</code>，不要用时间字段去推。</strong> <code>packageStartTime</code>
 有值不代表用户已经开始使用 —— 部分套餐的可用窗口在履约时就已确定。</p>
-<p>⚠️ <strong>下面这 </strong>五<strong> 个字段是订单维度的事实，摆在这个卡维度的响应里</strong>：
+<p>⚠️ <strong>下面这五个字段是订单维度的事实，摆在这个卡维度的响应里</strong>：
 <code>packageStatus</code>、<code>packageStartTime</code>、<code>packageEndTime</code>、<code>delivery.latestActivationTime</code>、
 <code>renewal.expirationTime</code>。它们全部取自这张卡当前的<strong>主导订单</strong> —— 一张续订过多次、
 同时挂着多个套餐的卡，这里只代表其中一张。要按订单逐笔看，请用 <code>/order/query</code> 与 <code>/order/list</code>。</p>
+<p><strong>主导订单怎么选</strong>：卡上有正在使用（<code>IN_USE</code>）且未过套餐终点的套餐时取它；否则取已激活（<code>ACTIVATED</code>）且
+未过终点的；否则取仍然有效（不是 <code>CANCELLED</code> / <code>ABANDONED</code> / <code>TERMINATED</code> / <code>REFUNDED</code>）的；同一档里优先
+平台已收到上游套餐状态的，再取最近受理的一单。尚未履约的在途订单不会成为主导订单。所以主导订单会随套餐
+状态变化、套餐到期而切换。</p>
 <p>⚠️ <strong><code>usage</code> 与上面五个字段取自同一张主导订单，但更新节奏不同。</strong> 五个字段随订单状态即时变化；
 <code>usage</code> 要等下一轮用量刷新才切到新的主导订单，若新主导订单处于不再刷新用量的状态，会一直保留上一单的最后读数。
 所以多套餐卡上两者<strong>仍可能不是同一张单</strong> —— 请比对 <code>usage.orderNo</code>，不要默认它们同属一单
 （例如"拿 <code>packageStatus</code> 判激活、拿 <code>usage</code> 显示剩余"可能把 A 单的状态和 B 单的流量拼在一起）。</p>
-<p>⚠️ <strong><code>delivery.installTime</code> 为 <code>null</code> 不代表卡没装上。</strong> 这个时刻只来自上游的一次性推送，
-没有轮询兜底 —— 卡已经是 <code>ENABLED</code> 而它仍为 <code>null</code> 是正常的稳定状态。
+<p>⚠️ <strong><code>delivery.installTime</code> 为 <code>null</code> 不代表卡没装上。</strong> 这个时刻只随上游的 Profile 状态推送到达，
+没有轮询兜底 —— 推送没带这个字段、推送丢失或早于开卡结果到达时，卡已经是 <code>ENABLED</code> 而它仍为 <code>null</code>
+是正常的稳定状态。
 <strong>不要用它判断卡有没有装上</strong>，那个问题请读 <code>profile.status</code>（<code>DOWNLOADED</code> / <code>INSTALLED</code> /
 <code>ENABLED</code> / <code>DISABLED</code> 都表示 Profile 已到达设备）。</p></blockquote>
 <p><strong>示例响应</strong></p>
@@ -1334,7 +1356,8 @@ String qrPayload = ac.isTextual() ? ac.asText() : null;   // 为 null 时 asText
 <div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td>回显</td></tr><tr><td><code>usage</code></td><td>object|null</td><td>用量投影，字段见下</td></tr></tbody></table></div>
 <p><strong><code>usage</code> 对象</strong></p>
 <div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>orderNo</code></td><td>string</td><td>这组数字属于<strong>哪一张订单</strong>。见下面的量程说明</td></tr><tr><td><code>dataTotalBytes</code></td><td>number|null</td><td><strong>当前周期</strong>总量，<strong>整数字节</strong></td></tr><tr><td><code>dataUsedBytes</code></td><td>number|null</td><td><strong>当前周期</strong>已用量，<strong>整数字节</strong></td></tr><tr><td><code>dataRemainBytes</code></td><td>number|null</td><td><strong>当前周期</strong>剩余量，<strong>整数字节</strong></td></tr><tr><td><code>refuelingTotalBytes</code></td><td>number|null</td><td><strong>当日</strong>加油包总量，<strong>整数字节</strong></td></tr><tr><td><code>qtaConsumptionBytes</code></td><td>number|null</td><td><strong>当日</strong>高速已用量，<strong>整数字节</strong></td></tr><tr><td><code>observedUnit</code></td><td>string|null</td><td>这组数字换算前的单位，仅作证据。<strong>它不是上面五个字段的单位</strong> —— 那永远是字节</td></tr><tr><td><code>observedAt</code></td><td>string</td><td>这组读数的观测时刻（ISO-8601）。终止态套餐上它不再前进，见下方 ⚠️</td></tr></tbody></table></div>
-<blockquote class="note"><p><strong>五个数值字段是整数字节，字段名自带单位。</strong> 不要按 <code>observedUnit</code> 去二次换算。</p>
+<blockquote class="note"><p><strong>五个数值字段是整数字节，字段名自带单位。</strong> 不要按 <code>observedUnit</code> 去二次换算。平台换算时按
+1 MB = 1024 × 1024 字节、四舍五入到整数字节，与 §4.1 <code>volume</code> 的口径一致。</p>
 <p>⚠️ <strong>但它们分属两个窗口。</strong> 前三个是「当前周期」，后两个是「当日」：
 <code>refuelingTotalBytes</code> <strong>不是</strong> <code>dataTotalBytes</code> 的一部分，<code>qtaConsumptionBytes</code> 也
 <strong>不是</strong> <code>dataUsedBytes</code> 的子集。把它们混在一起算剩余，得到的是一个说不清是哪个窗口的
@@ -1359,41 +1382,42 @@ String qrPayload = ac.isTextual() ? ac.asText() : null;   // 为 null 时 asText
   "msg": "ok",
   "t": 1789554468075
 }</code></pre></figure>
-<blockquote class="note"><p><strong>不限量套餐没有总量。</strong> <code>products/list</code> 里 <code>dataLimited: "N"</code> 的套餐，
-<code>dataTotalBytes</code> 与 <code>dataRemainBytes</code> 恒为 <code>null</code>，只有 <code>dataUsedBytes</code> 是数字。
-这不是"取数失败"，是这类套餐本来就没有这个概念 —— 不要把它当异常重试。</p></blockquote>
+<blockquote class="note"><p><strong>不限量套餐没有总量。</strong> <code>products/list</code> 里 <code>dataLimited: "N"</code> 的套餐，平台不为它推导总量与剩余：
+<code>dataTotalBytes</code> 与 <code>dataRemainBytes</code> 通常为 <code>null</code>，只有 <code>dataUsedBytes</code> 有意义；即使出现数字也不代表
+套餐总量，不要据此计算剩余。<code>null</code> 不是"取数失败"，是这类套餐本来就没有这个概念 —— 不要把它当异常重试。</p></blockquote>
 <blockquote class="note warn"><p>🔴 <strong>这是 <code>orderNo</code> 那一单的用量，不是这张卡的合计。</strong> 一张卡上可以同时有多个套餐
-（上限见 <code>/cardType</code> 的 <code>capability.maxRenewCount</code>），这里返回的是<strong>主导订单</strong>（即 <code>/iccid/profile</code>
+（卡型声明的上限见 <code>/cardType</code> 的 <code>capability.maxRenewCount</code>，仅供参考），这里返回的是<strong>主导订单</strong>（即 <code>/iccid/profile</code>
 报 <code>packageStatus</code> 的那一单）的读数；主导订单刚切换时可能仍是上一单的读数。<code>orderNo</code> 就是说明这件事的字段。
 只读 <code>dataRemainBytes</code> 的调用方在多套餐卡上会得到一个<strong>偏小的数</strong> —— 它是这一单还剩多少，不是这张卡还能用多少。</p></blockquote>
 <blockquote class="note"><p><strong><code>usage: null</code> 的成因，参考 <code>cardType</code> 的 <code>capability.supportUsageQuery</code></strong>：</p>
-<ul><li><code>supportUsageQuery: true</code> 但 <code>usage</code> 为 <code>null</code> → 还没有样本，稍后再查。</li><li><code>supportUsageQuery: false</code> → 这个卡型<strong>不做实时测量</strong>。⚠️ 但这<strong>不等于恒为 <code>null</code></strong>： 套餐未激活或已用尽时，仍会返回一组由套餐状态推导出的数字（未激活恒 <code>used=0</code>， 用尽恒 <code>remain=0</code>）；真正走量期间没有新读数 —— 此时 <code>usage</code> 仍是激活前推导出的那组数字 （如 <code>dataUsedBytes: 0</code>），<code>observedAt</code> 停在激活前，<strong>不代表实际用量</strong>。</li><li><code>capability</code> 整块为 <code>null</code>（该卡型尚未同步，见 §4.3）→ 无从判断，按"稍后再查"处理。</li></ul></blockquote>
+<ul><li><code>supportUsageQuery: true</code> 但 <code>usage</code> 为 <code>null</code> → 还没有样本，稍后再查。</li><li><code>supportUsageQuery: false</code> → 这个卡型<strong>不做实时测量</strong>。⚠️ 但这<strong>不等于恒为 <code>null</code></strong>： 套餐未激活或已用尽时，仍会返回一组由套餐状态推导出的数字（见下一条）；真正走量期间没有新读数 —— 此时 <code>usage</code> 仍是激活前推导出的那组数字（如 <code>dataUsedBytes: 0</code>），<code>observedAt</code> 停在激活前，<strong>不代表实际用量</strong>。</li><li><code>capability</code> 整块为 <code>null</code>（该卡型尚未同步，见 §4.3）→ 无从判断，按"稍后再查"处理。</li><li><strong>任何卡型</strong>上，<code>packageStatus</code> 为 <code>NOT_ACTIVATED</code> 或 <code>EXHAUSTED</code> 时，读数都由套餐状态<strong>推导</strong>、不实测： 未激活恒 <code>dataUsedBytes = 0</code>、剩余 = 总量；用尽恒剩余 <code>0</code>、已用 = 总量（不限量套餐用尽时不推导，保留最后 一次读数）。推导读数的 <code>observedAt</code> 是平台推导的时刻，每轮刷新都会前进。<code>packageStatus</code> 仍为 <code>CREATED</code> 时既不推导也不测量，<code>usage</code> 可能为 <code>null</code>。</li></ul></blockquote>
 <blockquote class="note"><p><strong>读数是周期性刷新的</strong>，不是每次调用都实时回源。两次调用之间 <code>observedAt</code> 不变，
 表示期间没有新样本，不是接口失败。</p>
-<p>⚠️ <strong>套餐进入终止状态（过期 / 取消 / 退款等）后，这里保留的是最后一次读数，
-<code>observedAt</code> 不再前进。</strong> 那就是最终值 —— 不要继续轮询等一个不会到来的更新。</p></blockquote>
+<p>⚠️ <strong>套餐进入终止状态（过期 / 取消 / 退款等）后，这里保留的是该单最后一次读数，
+<code>observedAt</code> 不再前进。</strong> 对这一单而言那就是最终值 —— 不要继续轮询等一个不会到来的更新。只有卡上另有套餐
+成为主导订单时，读数才会切到那一单（<code>usage.orderNo</code> 随之变化）。</p></blockquote>
 <p><strong>负例</strong>：卡不存在 → <code>404 CARD_NOT_FOUND</code>。</p>
 <p><code>/iccid/profile</code> 的 <code>usage</code> 与本接口返回的是<strong>同一个投影</strong>，字段与取值完全一致，
 按哪条取都行。</p>
 <hr>
 <h3 id="412-退款申请-orderrefund">4.12 退款申请 <code>/order/refund</code><a class="anchor" href="#412-退款申请-orderrefund">#</a></h3>
 <p>对一张<strong>已履约</strong>的订单发起退款申请。scope <code>esim.write</code>。</p>
-<p>⚠️ <strong>这个接口只受理，不动钱。</strong> 它落一张退款单并返回 <code>REQUESTED</code>；金额要等平台确认这一单确实已退之后才退回你的预付费余额。确认由平台的定期核实流程做出，<strong>不是同步的</strong>，端到端时延取决于上游何时把这一单标记为已退 —— <strong>不要把固定时限当作失败判据</strong>（退款单不会因超时自动失败）；可以设一个宽松的人工跟进时限，超过后联系平台。</p>
-<p>结论通过 <code>ORDER_REFUND_RESULT</code> 回调推给你（§6.1）。</p>
+<p>⚠️ <strong>这个接口只受理，不动钱。</strong> 它落一张退款单并返回 <code>REQUESTED</code>；金额要等平台确认这一单确实已退之后才退回你的预付费余额。确认由平台的定期核实流程做出，<strong>不是同步的</strong>，端到端时延取决于平台处理这张申请、以及上游何时把这一单标记为已退 —— <strong>不要把固定时限当作失败判据</strong>（退款单不会因超时自动失败）；可以设一个宽松的人工跟进时限，超过后联系平台。</p>
+<p>结论通过 <code>ORDER_REFUND_RESULT</code> 回调推给你（§6.1；需已开通回调并订阅该事件，见 §6）。</p>
 <blockquote class="note warn"><p>⚠️ <strong>轮询 <code>/order/query</code> 只能看到"确认"这一种结论。</strong> 确认会把 <code>orderStatus</code> 改成
 <code>REFUNDED</code>；<strong>拒绝不改变订单状态</strong>（订单留在 <code>FULFILLED</code>），轮询看不出来。
-要同时拿到两种结论，只能订阅 <code>ORDER_REFUND_RESULT</code>。</p>
+要同时拿到两种结论，请订阅 <code>ORDER_REFUND_RESULT</code>。</p>
 <p>回调路同样需要超时兜底：一张 <code>REQUESTED</code> 的退款单在拿到结论前不会有任何事件，
 超过你设定的时限仍无结论，请联系平台 —— 本接口<strong>没有撤销退款申请的入口</strong>。</p></blockquote>
 <p><strong>入参</strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td><code>clientOrderNo</code></td><td>string</td><td>是</td><td>1–100 字符。你的业务单号（首尾空白会被去掉，比较不区分大小写）。<strong>不引入第二种订单号</strong></td></tr><tr><td><code>idempotencyKey</code></td><td>string</td><td>是</td><td>8–96 字符。与 <code>/order/create</code> 同族的重放保护（参与哈希的内容不同：这里是 <code>clientOrderNo</code> + <code>reason</code>）</td></tr><tr><td><code>reason</code></td><td>string</td><td>否</td><td>1–512 字符。退款原因，落在平台退款单上供人工查阅。不需要时请省略（传 <code>null</code> 会被参数校验拒绝；省略与传 <code>""</code> 视为不同的请求内容）</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td><code>clientOrderNo</code></td><td>string</td><td>是</td><td>1–100 字符。你的业务单号（首尾空白会被去掉，比较不区分大小写）。<strong>不引入第二种订单号</strong> —— 下单时没传 <code>clientOrderNo</code> 的订单无法通过本接口退款（见 §4.4）。重放时请逐字复用首次的值：只差大小写会被当成内容不同，得到 <code>409 IDEMPOTENCY_KEY_REUSED</code></td></tr><tr><td><code>idempotencyKey</code></td><td>string</td><td>是</td><td>8–96 字符。重放保护，规则与 <code>/order/create</code> 相同（参与哈希的内容不同：这里是 <code>clientOrderNo</code> + <code>reason</code>）。<strong>退款的幂等键自成一个命名空间</strong>：与开卡 / 续订用过的键互不冲突；在你的账号 + 环境内唯一，比较不区分大小写。被拒的申请（<code>404 ORDER_NOT_FOUND</code> / <code>409 ORDER_NOT_REFUNDABLE</code> / <code>409 REFUND_ALREADY_IN_PROGRESS</code>）不占用这个键</td></tr><tr><td><code>reason</code></td><td>string</td><td>否</td><td>1–512 字符。退款原因，落在平台退款单上供人工查阅。不需要时请省略（传 <code>null</code> 会被参数校验拒绝；省略与传 <code>""</code> 视为不同的请求内容）</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>⚠️ <strong>你传的 <code>reason</code> 不会回到 <code>ORDER_REFUND_RESULT</code> 的 <code>reason</code> 字段。</strong> 那个字段在
 <code>CONFIRMED</code> 时恒为 <code>null</code>，在 <code>REJECTED</code> 时是<strong>平台的拒绝原因</strong>（也可能为 <code>null</code>）。
 不要用它传递你自己的关联信息 —— 关联请用 <code>refundNo</code> 或 <code>idempotencyKey</code>。</p></blockquote>
 <p><strong>响应</strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>refundNo</code></td><td>string</td><td>平台退款单号，后续沟通用它</td></tr><tr><td><code>orderNo</code></td><td>string</td><td>被退的平台订单号</td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>回显你传的业务单号</td></tr><tr><td><code>refundStatus</code></td><td>string</td><td>新受理时是 <code>"REQUESTED"</code>。<strong>重放时是那张退款单此刻的状态</strong>，可能已是 <code>CONFIRMED</code> / <code>REJECTED</code> —— 那不是错误，正是你要的幂等结果</td></tr><tr><td><code>amount</code></td><td>string</td><td>退款金额，<strong>恒等于该单的结算金额</strong>（本期只支持全额退）</td></tr><tr><td><code>currency</code></td><td>string</td><td>取自受理那一刻冻结的商品快照，本期恒为 <code>USD</code></td></tr><tr><td><code>accepted</code></td><td>boolean</td><td>恒为 <code>true</code></td></tr><tr><td><code>replayed</code></td><td>boolean</td><td><code>true</code> = 这是一次重放，没有新建退款单</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>refundNo</code></td><td>string</td><td>平台退款单号，后续沟通用它</td></tr><tr><td><code>orderNo</code></td><td>string</td><td>被退的平台订单号</td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>回显你传的业务单号</td></tr><tr><td><code>refundStatus</code></td><td>string</td><td>新受理时是 <code>"REQUESTED"</code>。<strong>重放时是那张退款单此刻的状态</strong>，可能已是 <code>CONFIRMED</code> / <code>REJECTED</code> —— 那不是错误，正是你要的幂等结果</td></tr><tr><td><code>amount</code></td><td>string</td><td>退款金额，十进制字符串（6 位小数），<strong>恒等于该单的结算金额</strong>（本期只支持全额退）</td></tr><tr><td><code>currency</code></td><td>string</td><td>取自该订单<strong>下单受理时</strong>冻结的商品快照（即扣款时的币种），本期恒为 <code>USD</code></td></tr><tr><td><code>accepted</code></td><td>boolean</td><td>恒为 <code>true</code></td></tr><tr><td><code>replayed</code></td><td>boolean</td><td><code>true</code> = 这是一次重放，没有新建退款单</td></tr></tbody></table></div>
 <p><strong>拒绝</strong></p>
-<div class="tw"><table><thead><tr><th><code>code</code></th><th><code>msg</code></th><th>含义与处置</th></tr></thead><tbody><tr><td>404</td><td><code>ORDER_NOT_FOUND</code></td><td>你名下没有这个 <code>clientOrderNo</code></td></tr><tr><td>409</td><td><code>ORDER_NOT_REFUNDABLE</code></td><td>这一单现在不能退：尚未履约（处理中的订单款项已在受理时预扣，失败会自动退回，履约后才能申请退款）、已失败（款项已自动退回）、已退款、或受理于预付费上线之前（没有可退的计价信息）。查 <code>/order/query</code> 看当前状态 —— <strong>改参数改不出来</strong></td></tr><tr><td>409</td><td><code>REFUND_ALREADY_IN_PROGRESS</code></td><td>这一单已有一张在途退款单。等它出结论（<code>ORDER_REFUND_RESULT</code>）之后才能再发起</td></tr><tr><td>409</td><td><code>IDEMPOTENCY_KEY_REUSED</code></td><td>同一个 <code>idempotencyKey</code> 之前用过、但内容不同（<code>reason</code> 也算内容）</td></tr><tr><td>400</td><td><code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code></td><td><code>clientOrderNo</code> / <code>idempotencyKey</code> 缺失或为空串（<code>required</code>）、纯空白（<code>length error</code>，先去首尾空白再计长度）。这是 §3 的通用参数校验</td></tr><tr><td>503</td><td>其它 <code>msg</code></td><td>平台侧临时故障。用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后重试是安全的（已建单的会以 <code>replayed: true</code> 返回）；持续出现请联系平台</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th><code>code</code></th><th><code>msg</code></th><th>含义与处置</th></tr></thead><tbody><tr><td>404</td><td><code>ORDER_NOT_FOUND</code></td><td>你名下没有这个 <code>clientOrderNo</code></td></tr><tr><td>409</td><td><code>ORDER_NOT_REFUNDABLE</code></td><td>这一单现在不能退：尚未履约（处理中的订单款项已在受理时预扣，失败会自动退回，履约后才能申请退款）、已失败（款项已自动退回）、已退款、或受理于预付费上线之前（没有可退的计价信息）。查 <code>/order/query</code> 看当前状态 —— <strong>改参数改不出来</strong></td></tr><tr><td>409</td><td><code>REFUND_ALREADY_IN_PROGRESS</code></td><td>这一单已有一张在途退款单。等它出结论（<code>ORDER_REFUND_RESULT</code>）之后才能再发起</td></tr><tr><td>409</td><td><code>IDEMPOTENCY_KEY_REUSED</code></td><td>同一个 <code>idempotencyKey</code> 之前用过、但内容不同（<code>reason</code> 也算内容）</td></tr><tr><td>400</td><td><code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code> / <code>&lt;字段&gt; Type error, ...</code></td><td>§3 的通用参数校验：<code>clientOrderNo</code> / <code>idempotencyKey</code> 缺失、为空串或为 <code>null</code>（<code>required</code>）；长度越界或纯空白（<code>length error</code>，先去首尾空白再按宽度计长度，如 <code>idempotencyKey</code> 不足 8 位）；<code>reason</code> 纯空白或超长（<code>reason length error [1-512]</code>）；字段传了非字符串（含 <code>reason: null</code>）→ <code>Type error</code></td></tr><tr><td>503</td><td>其它 <code>msg</code></td><td>平台侧临时故障。用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后重试是安全的（已建单的会以 <code>replayed: true</code> 返回）；持续出现请联系平台。没有错误标识的服务端异常是 <code>406 [controller error]</code>，处置见 §3</td></tr></tbody></table></div>
 <p><strong>示例响应</strong></p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
   "data": {
@@ -1413,20 +1437,26 @@ String qrPayload = ac.isTextual() ? ac.asText() : null;   // 为 null 时 asText
 <p><strong>幂等语义</strong>：同一个 <code>idempotencyKey</code> + 同样的内容重发 → 返回同一张退款单 + <code>replayed: true</code>，<strong>不会退两次钱</strong>。一张订单可以有多张历史退款单（第一次被拒之后可以再申请），但<strong>同时只能有一张在途</strong>。</p>
 <p>被拒（<code>REJECTED</code>）之后再次申请，必须使用<strong>新的</strong> <code>idempotencyKey</code>：原键原样重发只会重放出那张 <code>REJECTED</code> 单（<code>replayed: true</code>），原键改了 <code>reason</code> 则是 <code>409 IDEMPOTENCY_KEY_REUSED</code>。</p>
 <p>⚠️ <strong>没有"撤销退款申请"的接口。</strong> 一张 <code>REQUESTED</code> 的单只有两个出口：平台确认（<code>CONFIRMED</code>）或平台拒绝（<code>REJECTED</code>）。改主意了请联系平台。</p>
+<hr>
 <h3 id="413-账户余额与充值记录-accountbalance">4.13 账户余额与充值记录 <code>/account/balance</code><a class="anchor" href="#413-账户余额与充值记录-accountbalance">#</a></h3>
-<p>查询<strong>你自己</strong>（当前凭证所属分销商、当前环境）的预付费余额，以及平台为你入账的充值记录（分页，最新的在前）。scope <code>esim.read</code>。</p>
+<p>查询<strong>你自己</strong>（当前凭证所属分销商、当前环境）的预付费余额，以及平台为你入账的充值记录（游标分页，最新的在前）。scope <code>esim.read</code>。</p>
 <p>商户身份只取自签名凭证，请求里<strong>无法</strong>指定别的分销商。</p>
 <p><strong>入参</strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td><code>pageNo</code></td><td>integer</td><td>否</td><td>充值记录页码，默认 1，1–100000</td></tr><tr><td><code>pageSize</code></td><td>integer</td><td>否</td><td>每页条数，默认 25，1–100</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td><code>pageSize</code></td><td>integer</td><td>否</td><td>每页充值记录条数，默认 25，1–100。传数字 <code>0</code> 返回 <code>ACCOUNT_PAGE_SIZE_INVALID</code>（与 <code>/products/list</code>、<code>/order/list</code> 不同，不按默认值处理）</td></tr><tr><td><code>pageToken</code></td><td>string</td><td>否</td><td>上一页返回的 <code>creditHistory.nextPageToken</code>；不传表示从最新一条开始</td></tr></tbody></table></div>
+<blockquote class="note warn"><p>🔴 游标带签名、<strong>有效期 15 分钟</strong>（每页返回的 <code>nextPageToken</code> 各自从签发时起算），与你的分销商账号和当前环境
+绑定，只能用于本接口（拿 <code>/order/list</code> 的游标来调用会被拒绝，反之亦然）。过期后从第一页重新开始即可。
+只能向后翻，不支持反向或跳页。</p></blockquote>
 <p><strong>响应</strong></p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>hasAccount</code></td><td>boolean</td><td>你是否已开通预付费余额账户。<code>false</code> 时 <code>available</code> 与 <code>currency</code> 为 <code>null</code>，<strong>不是余额为 0</strong> —— 请联系平台开通</td></tr><tr><td><code>available</code></td><td>string|null</td><td>当前余额，十进制字符串（6 位小数）。开通了透支额度时<strong>可能为负数</strong>，它不等于"还能下多少单"。下单受理时从这里扣；订单失败或退款确认后退回这里</td></tr><tr><td><code>currency</code></td><td>string|null</td><td>余额币种</td></tr><tr><td><code>creditHistory.list[]</code></td><td>array</td><td>本页充值记录，按入账时间倒序</td></tr><tr><td><code>creditHistory.list[].rechargeNo</code></td><td>string|null</td><td>平台充值单号，对账、沟通用它</td></tr><tr><td><code>creditHistory.list[].amount</code></td><td>string|null</td><td>入账金额，正数十进制字符串</td></tr><tr><td><code>creditHistory.list[].currency</code></td><td>string|null</td><td>入账币种</td></tr><tr><td><code>creditHistory.list[].creditedAt</code></td><td>string</td><td>入账时刻，ISO-8601 UTC</td></tr><tr><td><code>creditHistory.hasMore</code></td><td>boolean</td><td>是否还有下一页</td></tr><tr><td><code>creditHistory.pageNo</code> / <code>pageSize</code></td><td>integer</td><td>回显本页分页参数</td></tr><tr><td><code>creditHistory.totalCount</code></td><td>integer</td><td>充值记录总条数，没有记录时为 0</td></tr><tr><td><code>creditHistory.totalPages</code></td><td>integer</td><td>按 <code>pageSize</code> 计的总页数，没有记录时为 0</td></tr></tbody></table></div>
-<blockquote class="note"><p>ℹ️ 只包含<strong>充值入账</strong>，不包含下单扣款与退款退回 —— 那些请看 <code>/order/list</code>。</p>
-<p>ℹ️ 充值记录从平台开始逐笔记录充值之日起才有；更早的入账只体现在余额里，不在 <code>list</code> 与 <code>totalCount</code> 中。</p>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>hasAccount</code></td><td>boolean</td><td>你是否已开通预付费余额账户。<code>false</code> 时 <code>available</code> 与 <code>currency</code> 为 <code>null</code>，<strong>不是余额为 0</strong> —— 请联系平台开通。此时 <code>creditHistory</code> 照常返回同一结构（通常为空）</td></tr><tr><td><code>available</code></td><td>string|null</td><td>当前余额，十进制字符串（6 位小数）。开通了透支额度时<strong>可能为负数</strong>，它不等于"还能下多少单"。下单受理时从这里扣；订单失败或退款确认后退回这里</td></tr><tr><td><code>currency</code></td><td>string|null</td><td>余额币种</td></tr><tr><td><code>creditHistory.list[]</code></td><td>array</td><td>本页充值记录，按入账时间倒序</td></tr><tr><td><code>creditHistory.list[].rechargeNo</code></td><td>string|null</td><td>平台充值单号，对账、沟通用它</td></tr><tr><td><code>creditHistory.list[].amount</code></td><td>string|null</td><td>入账金额，正数十进制字符串（6 位小数）</td></tr><tr><td><code>creditHistory.list[].currency</code></td><td>string|null</td><td>入账币种</td></tr><tr><td><code>creditHistory.list[].creditedAt</code></td><td>string</td><td>入账时刻，ISO-8601 UTC</td></tr><tr><td><code>creditHistory.hasMore</code></td><td>boolean</td><td>是否还有下一页</td></tr><tr><td><code>creditHistory.nextPageToken</code></td><td>string|null</td><td>下一页游标；<code>null</code> 表示到底</td></tr></tbody></table></div>
+<blockquote class="note"><p>ℹ️ 只包含<strong>充值入账</strong>，不包含下单扣款，也不包含订单失败、退款确认时的退回 —— 那些体现在订单的
+<code>orderStatus</code> 上（<code>/order/query</code>、<code>/order/list</code>）；默认结构不披露单笔金额，结算金额以平台与贵方的商务约定为准。</p>
+<p>ℹ️ 充值记录从平台开始逐笔记录充值之日起才有；更早的入账只体现在余额里，不在 <code>list</code> 中。</p>
+<p>ℹ️ 游标记录的是"上一页最后一条"的位置：翻页期间新入账的充值排在最前面，不会让后续页
+重复或漏项。要看新入账的记录，不带 <code>pageToken</code> 重新查第一页。</p>
 <p>ℹ️ 余额与充值记录是两次读取，不是同一时刻的快照：恰好在两次读取之间入账的一笔充值，
-可能已出现在记录里而余额尚未体现（或相反），稍后重查即可一致。<code>pageNo</code> 超过总页数时
-返回空 <code>list</code>，不是错误。</p></blockquote>
+可能已出现在记录里而余额尚未体现（或相反），稍后重查即可一致。每一页都会返回当前余额。</p></blockquote>
 <p><strong>拒绝</strong></p>
-<div class="tw"><table><thead><tr><th><code>code</code></th><th><code>msg</code></th><th>含义与处置</th></tr></thead><tbody><tr><td>400</td><td><code>ACCOUNT_PAGE_NO_INVALID</code></td><td><code>pageNo</code> 过了 §3 的通用参数校验、但不是 1–100000 的整数：数字 <code>0</code>，或带小数的数字字符串（如 <code>"1.5"</code>）。负数、大于 100000、非数字走通用参数校验；JSON 数字形式的小数（如 <code>1.5</code>）在验签环节即被拒为 <code>400 CANONICAL_NUMBER_UNSUPPORTED</code></td></tr><tr><td>400</td><td><code>ACCOUNT_PAGE_SIZE_INVALID</code></td><td><code>pageSize</code> 同理：数字 <code>0</code>，或带小数的数字字符串（如 <code>"10.5"</code>）</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th><code>code</code></th><th><code>msg</code></th><th>含义与处置</th></tr></thead><tbody><tr><td>400</td><td><code>ACCOUNT_PAGE_TOKEN_INVALID</code></td><td><code>pageToken</code> 被改动、已过期、属于别的分销商或环境，或不是本接口签发的。去掉 <code>pageToken</code> 从第一页重新开始</td></tr><tr><td>400</td><td><code>ACCOUNT_PAGE_SIZE_INVALID</code></td><td><code>pageSize</code> 过了 §3 的通用参数校验、但不是 1–100 的整数：数字 <code>0</code>，或带非零小数部分的数字字符串（如 <code>"10.5"</code>；<code>"10.0"</code> 按 10 处理）。负数、大于 100、字符串 <code>"0"</code>、非数字走通用参数校验（<code>pageSize Range error</code> / <code>pageSize Type error, ...</code>）；JSON 数字形式的小数（如 <code>1.5</code>）在验签环节即被拒为 <code>400 CANONICAL_NUMBER_UNSUPPORTED</code></td></tr></tbody></table></div>
 <p><strong>示例响应</strong></p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
   "data": {
@@ -1438,16 +1468,27 @@ String qrPayload = ac.isTextual() ? ac.asText() : null;   // 为 null 时 asText
         { "rechargeNo": "RC-20261001-0001", "amount": "500.000000", "currency": "USD", "creditedAt": "2026-10-01T02:00:00.000Z" }
       ],
       "hasMore": true,
-      "pageNo": 1,
-      "pageSize": 1,
-      "totalCount": 3,
-      "totalPages": 3
+      "nextPageToken": "eyJ2IjoxLCJleHAiOjE3OTE5MDA5MDAwMDB9.c2lnbmF0dXJl"
     }
   },
   "code": 200,
   "msg": "ok",
   "t": 1791900000000
 }</code></pre></figure>
+<p><strong>Node.js —— 遍历全部充值记录</strong></p>
+<figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>async function listAllCredits(client) {
+  const all = []
+  let pageToken = null
+  do {
+    const body = { pageSize: 100 }
+    if (pageToken) body.pageToken = pageToken
+    const { creditHistory } = await client.invoke('/openapi/v1/account/balance', body)
+    all.push(...creditHistory.list)
+    pageToken = creditHistory.nextPageToken
+  } while (pageToken)
+  return all
+}</code></pre></figure>
+<hr>
 <h2 id="5-业务流程与状态机">5. 业务流程与状态机<a class="anchor" href="#5-业务流程与状态机">#</a></h2>
 <h3 id="51-订单状态机">5.1 订单状态机<a class="anchor" href="#51-订单状态机">#</a></h3>
 <figure class="code"><button class="copy" type="button">复制</button><pre><code>ACCEPTED ──► SUBMITTING ──► PROVIDER_ACCEPTED ──► FULFILLED ──► REFUNDED
@@ -1460,14 +1501,16 @@ String qrPayload = ac.isTextual() ? ac.asText() : null;   // 为 null 时 asText
 <p>上图是主路径，不是全部跃迁：上游明确拒单或遇到不可重试的错误时，<code>SUBMITTING</code> 会直接落 <code>FAILED</code>；
 履约通知也可能在 <code>SUBMITTING</code> / <code>RETRY_PENDING</code> / <code>RECONCILING</code> 期间到达，订单直接变成 <code>FULFILLED</code> ——
 不要假设一定先看到 <code>PROVIDER_ACCEPTED</code>。</p>
-<div class="tw"><table><thead><tr><th>状态</th><th>含义</th><th>你该做什么</th></tr></thead><tbody><tr><td><code>ACCEPTED</code></td><td>平台已受理，尚未提交电信运营商</td><td>继续等</td></tr><tr><td><code>SUBMITTING</code></td><td>正在提交电信运营商</td><td>继续等</td></tr><tr><td><code>PROVIDER_ACCEPTED</code></td><td>上游已受理，等履约回调</td><td>继续等；<strong>长时间不动不是你的参数问题</strong>，请联系平台核查</td></tr><tr><td><code>RECONCILING</code></td><td>提交/对账阶段异常，正在核对</td><td>继续等，超时联系平台</td></tr><tr><td><code>RETRY_PENDING</code></td><td>等待重试</td><td>继续等</td></tr><tr><td><strong><code>FULFILLED</code></strong></td><td><strong>已履约，<code>iccid</code> 可用</strong></td><td>取激活码交付用户</td></tr><tr><td><strong><code>FAILED</code></strong></td><td><strong>这一单没有出卡</strong></td><td><strong>停止轮询</strong>。需要出卡就重新下一单（用<strong>新的</strong> <code>idempotencyKey</code> 与 <code>clientOrderNo</code>）。原因需联系平台核查</td></tr><tr><td><strong><code>REFUNDED</code></strong></td><td><strong>这一单已退款</strong>（你提交的退款申请被确认，见 §4.12）</td><td>停止轮询。这一单的套餐已作废（续订单退款只作废那一笔续订，卡上其它套餐不受影响）</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>状态</th><th>含义</th><th>你该做什么</th></tr></thead><tbody><tr><td><code>ACCEPTED</code></td><td>平台已受理，尚未提交电信运营商</td><td>继续等</td></tr><tr><td><code>SUBMITTING</code></td><td>正在提交电信运营商</td><td>继续等</td></tr><tr><td><code>PROVIDER_ACCEPTED</code></td><td>上游已受理，等履约回调</td><td>继续等；<strong>长时间不动不是你的参数问题</strong>，请联系平台核查</td></tr><tr><td><code>RECONCILING</code></td><td>提交/对账阶段异常，正在核对</td><td>继续等，超时联系平台</td></tr><tr><td><code>RETRY_PENDING</code></td><td>等待重试</td><td>继续等</td></tr><tr><td><strong><code>FULFILLED</code></strong></td><td><strong>已履约</strong></td><td>取激活码交付用户。极少数情况下 <code>iccid</code> / 激活码暂为 <code>null</code>（见 §5.2），此时联系平台，<strong>不要重新下单</strong></td></tr><tr><td><strong><code>FAILED</code></strong></td><td><strong>这一单没有出卡</strong></td><td><strong>停止轮询</strong>。需要出卡就重新下一单（用<strong>新的</strong> <code>idempotencyKey</code> 与 <code>clientOrderNo</code>）。原因需联系平台核查</td></tr><tr><td><strong><code>REFUNDED</code></strong></td><td><strong>这一单已退款</strong>（你提交的退款申请被确认，见 §4.12）</td><td>停止轮询。这一单的套餐已作废（续订单退款只作废那一笔续订，卡上其它套餐不受影响）</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>🔴 <strong>轮询必须同时判 <code>FAILED</code>。</strong> 只等 <code>FULFILLED</code> 的循环会在失败单上一直转到超时。
 <code>FULFILLED</code> / <code>FAILED</code> / <code>REFUNDED</code> 都按终态处理，收到任一个就停止轮询。</p>
 <p>⚠️ <strong>但请让你的状态写入保持可重入。</strong> 极少数情况下，平台在补齐更晚到达的履约证据后
-会把一张 <code>FAILED</code> 或 <code>REFUNDED</code> 的订单改回 <code>FULFILLED</code>（并按原结算价重新扣款）；反过来，上游事后报告
-履约失败时，<code>FULFILLED</code> 也会被更正为 <code>FAILED</code>（款项退回余额）。这两种更正<strong>通常不发事件</strong> —— 只有这一单
-此前从未发出过履约事件时才会补发一条（开卡单 <code>ORDER_OPEN_RESULT</code>，续订单 <code>ORDER_RENEW_RESULT</code>），
-所以多半只能靠 <code>/order/query</code> 发现。
+会把一张 <code>FAILED</code> 或 <code>REFUNDED</code> 的订单改回 <code>FULFILLED</code>，并按原结算价重新扣款 —— 这笔扣款不受透支额度限制，
+余额可能因此低于额度线，此后的新单会以 <code>402</code> 被拒，直到余额回升。反过来，上游事后报告履约失败时，
+<code>FULFILLED</code> 会被更正为 <code>FAILED</code>（款项退回余额），已 <code>REFUNDED</code> 的单也可能被更正为 <code>FAILED</code>（不再动钱）。
+更正为 <code>FAILED</code> <strong>从不发事件</strong>；改回 <code>FULFILLED</code> 时，只有这一单此前从未发出过履约事件才会补发一条
+（开卡单 <code>ORDER_OPEN_RESULT</code>，续订单 <code>ORDER_RENEW_RESULT</code>）—— 从未出过卡就落了 <code>FAILED</code> 的单正是这种情况，
+由 <code>REFUNDED</code> 改回的单则不会再发。所以这类更正多半只能靠 <code>/order/query</code> 发现。
 <strong>不要在收到 <code>FAILED</code> 时删除本地订单记录或让它变得不可更新</strong> —— 否则你会收到一条
 无处安放的事件，同时有一张已交付却无人认领的卡。</p>
 <p>⚠️ <strong><code>REFUNDED</code> 只出现在你自己提交过退款申请的订单上</strong>（§4.12），不使用退款接口的接入方
@@ -1507,11 +1550,13 @@ String qrPayload = ac.isTextual() ? ac.asText() : null;   // 为 null 时 asText
    b. 轮询 order/query 看 orderStatus 是否变 REFUNDED
       注意：拒绝不改变订单状态，所以这条路只能识别"已确认"，需配合超时
 4. refundStatus === "CONFIRMED" → 金额已退回预付费余额，这一单的套餐已作废
-   refundStatus === "REJECTED"  → 不退，卡仍有效，reason 是原因</code></pre></figure>
+   refundStatus === "REJECTED"  → 不退款；订单仍为 FULFILLED，这次拒绝不会改动卡的状态；
+                                  reason 是平台的拒绝原因（可能为 null）</code></pre></figure>
 <blockquote class="note warn"><p>⚠️ <strong>确认是异步的，不承诺时限。</strong> 平台要先确认这一单确实已退，才把钱退回你的余额；
-这个确认由平台的定期核实流程做出，不是你调接口的那一刻，端到端时延取决于上游何时
-把这一单标记为已退。所以 <code>/order/refund</code> 返回 <code>REQUESTED</code> 之后，
-<strong>不要立刻去查余额并断言已经涨回来</strong>，也不要按固定时限设置超时告警。</p>
+这个确认由平台的定期核实流程做出，不是你调接口的那一刻，端到端时延取决于平台处理这张申请、
+以及上游何时把这一单标记为已退。所以 <code>/order/refund</code> 返回 <code>REQUESTED</code> 之后，
+<strong>不要立刻去查余额并断言已经涨回来</strong>，也不要把固定时限当作失败判据（退款单不会因超时自动失败）——
+只设一个宽松的人工跟进时限，超过后联系平台。</p>
 <p>⚠️ <strong>回调路同样需要超时兜底</strong>：一张 <code>REQUESTED</code> 的退款单在拿到结论前不会有任何事件，
 而这两种结论都可能迟迟不发生。超过你设定的时限仍无结论请联系平台 ——
 <strong>没有撤销退款申请的接口</strong>。</p>
@@ -1522,7 +1567,8 @@ String qrPayload = ac.isTextual() ? ac.asText() : null;   // 为 null 时 asText
 <hr>
 <h2 id="6-回调通知">6. 回调通知<a class="anchor" href="#6-回调通知">#</a></h2>
 <p>平台在事件发生时主动 <code>POST</code> 到你的回调地址。<strong>这项能力需要先向平台方申请开通</strong>，
-申请时提供你的回调接收地址，并说明需要订阅哪些事件（不指定则默认订阅全部）。</p>
+申请时提供你的回调接收地址，并说明需要订阅哪些事件（不指定则默认订阅全部）。
+沙盒与生产分别开通、分别配置回调地址与订阅。</p>
 <blockquote class="note"><p><strong>判定发生在事件产生的那一刻</strong>：开通之前<strong>已经产生</strong>的事件不会补发；开通之后产生的
 事件都会发 —— 包括开通前下的单在开通后才履约的那些，以及开通前就存在的老卡在开通后
 发生的状态变更。</p></blockquote>
@@ -1533,20 +1579,20 @@ String qrPayload = ac.isTextual() ? ac.asText() : null;   // 为 null 时 asText
 上游的履约通知没带卡信息时，订单同样会落 <code>FULFILLED</code>，事件里对应字段为 <code>null</code>。
 直接 <code>qrcode(event.data.activationCode)</code> 会在这条真实路径上抛异常 ——
 <code>activationCode</code> 为 <code>null</code> 而 <code>iccid</code> 有值时，请改用 §4.10 的 <code>/iccid/profile</code> 取；<code>iccid</code> 也为空、或仍取不到时请联系平台，<strong>不要重新下单</strong>。</p></blockquote>
-<blockquote class="note warn"><p>⚠️ <strong><code>STATUS_CHANGED</code> 的 <code>orderNo</code> 是该 ICCID 当前最新的订单号，用来定位这张卡，
+<blockquote class="note warn"><p>⚠️ <strong><code>STATUS_CHANGED</code> 的 <code>orderNo</code> 是该 ICCID 最近一次履约的订单号，用来定位这张卡，
 不代表引发本次变更的订单。</strong> profile 变更是<strong>卡级</strong>事件，本来就不存在"引发它的那一单"；
-续订之后这张卡的状态变更会挂在续订单的 <code>orderNo</code> 上。<strong>请以 <code>iccid</code> 为关联主键。</strong></p>
+续订单落 <code>FULFILLED</code> 之后，这张卡的状态变更会挂在续订单的 <code>orderNo</code> 上。<strong>请以 <code>iccid</code> 为关联主键。</strong></p>
 <p><code>previousStatus</code> 是平台记录的上一个状态，未必等于你上次收到的 <code>currentStatus</code>（例如履约时随通知写入的状态不单独发事件）；<code>changedAt</code> 是平台处理这次变更的时刻。判断先后请用 <code>changeVersion</code>。</p></blockquote>
 <p>⚠️ <strong><code>ORDER_REFUND_RESULT</code> 对两种结论都会送达，请两种都处理。</strong> <code>refundStatus: "REJECTED"</code> 是退款流程一个<strong>成功完成的结论</strong>（平台判定不退），不是投递失败：收到它即可停止等待。<code>reason</code> 里是原因，但<strong>它可能为 <code>null</code></strong>（平台未附原因）—— 不要直接 <code>reason.trim()</code>，为空时提示用户联系客服即可。</p>
-<div class="tw"><table><thead><tr><th><code>refundStatus</code></th><th><code>orderStatus</code></th><th><code>reason</code></th><th>含义</th></tr></thead><tbody><tr><td><code>"CONFIRMED"</code></td><td><code>"REFUNDED"</code></td><td><code>null</code></td><td>退款已确认，金额已退回你的预付费余额</td></tr><tr><td><code>"REJECTED"</code></td><td><code>"FULFILLED"</code></td><td>拒绝原因（<code>string|null</code>）</td><td>平台判定不退，订单状态<strong>没有变化</strong>，卡仍然有效</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th><code>refundStatus</code></th><th><code>orderStatus</code></th><th><code>reason</code></th><th>含义</th></tr></thead><tbody><tr><td><code>"CONFIRMED"</code></td><td><code>"REFUNDED"</code></td><td><code>null</code></td><td>退款已确认，金额已退回你的预付费余额</td></tr><tr><td><code>"REJECTED"</code></td><td><code>"FULFILLED"</code></td><td>拒绝原因（<code>string|null</code>）</td><td>平台判定不退，订单状态<strong>没有变化</strong>，这次拒绝也不会改动这张卡（卡与套餐的实际状态以 <code>/iccid/profile</code> 为准）</td></tr></tbody></table></div>
 <p><code>ORDER_REFUND_RESULT</code> 的 <code>idempotencyKey</code> 是你调用 <code>/order/refund</code> 时传的幂等键（不是下单时的）；<code>amount</code> 是 6 位小数的字符串（如 <code>"3.200000"</code>）。</p>
 <p>⚠️ <strong>去重请按 <code>eventId</code>。</strong> 一张退款单只会收到一次 <code>ORDER_REFUND_RESULT</code>（<code>CONFIRMED</code> 与 <code>REJECTED</code> 都是终态），但同一张<strong>订单</strong>可以收到多次——第一次被拒之后可以再次申请，那是另一张退款单、另一个 <code>refundNo</code>，<code>eventId</code> 也不同。按 <code>orderNo</code> 去重会把后续退款的结论一并滤掉。</p>
 <h3 id="62-请求形状">6.2 请求形状<a class="anchor" href="#62-请求形状">#</a></h3>
-<p><code>POST</code> 到你的 <code>callback_url</code>，<code>Content-Type: application/json</code>，<strong>10 秒超时</strong>。</p>
+<p><code>POST</code> 到你的回调地址，<code>Content-Type: application/json</code>，<strong>10 秒超时</strong>。</p>
 <p>请求头：</p>
 <div class="tw"><table><thead><tr><th>头</th><th>值</th></tr></thead><tbody><tr><td><code>x-event-id</code></td><td>与 body 的 <code>eventId</code> <strong>完全相同</strong>。头不在签名覆盖范围内，幂等以验签通过的 body <code>eventId</code> 为准</td></tr><tr><td><code>x-sign</code></td><td>签名，HMAC-SHA256 十六进制小写。<strong>签名只在这个头里，body 里没有 <code>sign</code> 字段</strong></td></tr></tbody></table></div>
 <p>信封字段：</p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>code</code></td><td><strong>string</strong></td><td>恒为 <code>"0000"</code>（<strong>字符串</strong>，不是数字）</td></tr><tr><td><code>msg</code></td><td>string</td><td><code>success</code></td></tr><tr><td><code>eventId</code></td><td>string</td><td><code>sha256("&lt;orderNo&gt;:&lt;eventType&gt;:&lt;version&gt;")</code> 的前 48 位十六进制。<strong>确定性、重投不变</strong></td></tr><tr><td><code>eventType</code></td><td>string</td><td>见 §6.1</td></tr><tr><td><code>data</code></td><td>object</td><td>事件数据</td></tr><tr><td><code>timestamp</code></td><td>string</td><td>本次投递尝试的 ISO-8601 时刻，<strong>重投会变</strong></td></tr><tr><td><code>nonce</code></td><td>string</td><td>每次投递重新生成的 UUID，<strong>重投会变</strong></td></tr><tr><td><code>businessType</code></td><td>string</td><td>恒为 <code>ESIM</code></td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>code</code></td><td><strong>string</strong></td><td>恒为 <code>"0000"</code>（<strong>字符串</strong>，不是数字）</td></tr><tr><td><code>msg</code></td><td>string</td><td><code>success</code></td></tr><tr><td><code>eventId</code></td><td>string</td><td><code>sha256("&lt;orderNo&gt;:&lt;eventType&gt;:&lt;version&gt;")</code> 的前 48 位十六进制；<code>&lt;version&gt;</code>：开卡 / 续订结果恒为 <code>1</code>，<code>STATUS_CHANGED</code> 为 <code>data.changeVersion</code>，<code>ORDER_REFUND_RESULT</code> 为这张退款单是该订单的第几张（1、2、3…）。<strong>确定性、重投不变</strong>，按收到的值去重即可，不需要自己计算</td></tr><tr><td><code>eventType</code></td><td>string</td><td>见 §6.1</td></tr><tr><td><code>data</code></td><td>object</td><td>事件数据</td></tr><tr><td><code>timestamp</code></td><td>string</td><td>本次投递尝试的 ISO-8601 时刻，<strong>重投会变</strong></td></tr><tr><td><code>nonce</code></td><td>string</td><td>每次投递重新生成的 UUID，<strong>重投会变</strong></td></tr><tr><td><code>businessType</code></td><td>string</td><td>恒为 <code>ESIM</code></td></tr></tbody></table></div>
 <p><strong>示例报文</strong>（四类各一）</p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>// ORDER_OPEN_RESULT
 {"msg":"success","code":"0000","data":{"imsi":"460000000000433","iccid":"89000000000000000433","msisdn":"850000000000433","orderNo":"XE1788489809764F48C390102","orderStatus":"FULFILLED","productCode":"XP0909F3C1C8A9D7F97456F799","clientOrderNo":"m1whA-1788489808349","activationCode":"LPA:1$smdp-a.example.com$7ADBC7BBD32B47438D0BB3F4EXAMPLE","idempotencyKey":"m1whA-idem-1788489808349"},"eventId":"145b1ba79790575ae1fa22a5b172fb2fc6687a27de71d584","eventType":"ORDER_OPEN_RESULT","timestamp":"2026-09-04T02:43:37.180Z","nonce":"b2106d10-f164-4c89-84d9-4c7887dc7d03","businessType":"ESIM"}</code></pre></figure>
@@ -1555,21 +1601,29 @@ String qrPayload = ac.isTextual() ? ac.asText() : null;   // 为 null 时 asText
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>// STATUS_CHANGED
 {"msg":"success","code":"0000","data":{"iccid":"89000000000000000433","orderNo":"XE1788489809764F48C390102","changedAt":"2026-09-04T02:49:39.026Z","entityType":"PROFILE","changeVersion":1,"currentStatus":"ENABLED","previousStatus":"UNKNOWN"},"eventId":"56e045be3d6c736f968e19c690dd01fc6be016055fcc32bf","eventType":"STATUS_CHANGED","timestamp":"2026-09-04T02:49:43.548Z","nonce":"e154774a-636d-4ee3-b2a4-4b007db57a97","businessType":"ESIM"}</code></pre></figure>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>// ORDER_REFUND_RESULT —— 确认（reason 为 null）
-{"msg":"success","code":"0000","data":{"orderNo":"XE1788489809764F48C390102","clientOrderNo":"m1whA-1788489808349","refundNo":"XR1788692301447A31B7C0D28","idempotencyKey":"m1whA-refund-1788692300112","refundStatus":"CONFIRMED","orderStatus":"REFUNDED","amount":"3.200000","currency":"USD","reason":null},"eventId":"991536ed1ff784d8d2c026c24f0e1f2ebc20f1b5fd93ba74","eventType":"ORDER_REFUND_RESULT","timestamp":"2026-09-13T09:21:44.006Z","nonce":"5f2a1c93-70e8-4a1d-9b6e-2c81d4f0a7b3","businessType":"ESIM"}</code></pre></figure>
+{"msg":"success","code":"0000","data":{"amount":"3.200000","reason":null,"orderNo":"XE1788489809764F48C390102","currency":"USD","refundNo":"XR1788692301447A31B7C0D28","orderStatus":"REFUNDED","refundStatus":"CONFIRMED","clientOrderNo":"m1whA-1788489808349","idempotencyKey":"m1whA-refund-1788692300112"},"eventId":"991536ed1ff784d8d2c026c24f0e1f2ebc20f1b5fd93ba74","eventType":"ORDER_REFUND_RESULT","timestamp":"2026-09-13T09:21:44.006Z","nonce":"5f2a1c93-70e8-4a1d-9b6e-2c81d4f0a7b3","businessType":"ESIM"}</code></pre></figure>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>// ORDER_REFUND_RESULT —— 拒绝（orderStatus 不变，reason 是原因）
-{"msg":"success","code":"0000","data":{"orderNo":"XE1788505564505CF4DE8D310","clientOrderNo":"m1n-C4-DATA-rn-1788504527118","refundNo":"XR17886931125503F9E82A146","idempotencyKey":"m1n-refund-1788693111204","refundStatus":"REJECTED","orderStatus":"FULFILLED","amount":"5.000000","currency":"USD","reason":"upstream declined: package already consumed"},"eventId":"a665fa8d571364599d7e4f168e36d3fa268d7da998cfb946","eventType":"ORDER_REFUND_RESULT","timestamp":"2026-09-13T09:38:02.771Z","nonce":"c0913ba7-1d55-4e0a-8f37-6ab2e59d4c10","businessType":"ESIM"}</code></pre></figure>
+{"msg":"success","code":"0000","data":{"amount":"5.000000","reason":"upstream declined: package already consumed","orderNo":"XE1788505564505CF4DE8D310","currency":"USD","refundNo":"XR17886931125503F9E82A146","orderStatus":"FULFILLED","refundStatus":"REJECTED","clientOrderNo":"m1n-C4-DATA-rn-1788504527118","idempotencyKey":"m1n-refund-1788693111204"},"eventId":"a665fa8d571364599d7e4f168e36d3fa268d7da998cfb946","eventType":"ORDER_REFUND_RESULT","timestamp":"2026-09-13T09:38:02.771Z","nonce":"c0913ba7-1d55-4e0a-8f37-6ab2e59d4c10","businessType":"ESIM"}</code></pre></figure>
 <blockquote class="note warn"><p>🔴 <strong>不要假设键序。</strong> 当前键序为 <code>msg, code, data, eventId, eventType, timestamp, nonce, businessType</code>，
 但它<strong>不是契约的一部分</strong>，平台给信封或 <code>data</code> 增加字段，都可能改变对应层级的键序。</p>
 <p>键序与验签<strong>无关</strong>，随便它怎么排。</p></blockquote>
 <h3 id="63-验签">6.3 验签<a class="anchor" href="#63-验签">#</a></h3>
 <p>与入站<strong>同一套规则</strong>（2.1 的四条规则），所以你只需实现一次。
 两点要注意：</p>
-<ol><li><strong><code>sign</code> 不在 body 里</strong>，只在 <code>x-sign</code> 头；</li><li>被签的不是报文字节，而是从<strong>解析后的数据</strong>拼出的规范串。键序、空白、转义、用哪个 JSON 库，全都不影响结果。你<strong>不需要</strong>拿到原始字节。</li></ol>
+<ol><li><strong><code>sign</code> 不在 body 里</strong>，只在 <code>x-sign</code> 头；</li><li>被签的不是报文字节，而是从<strong>解析后的数据</strong>拼出的规范串。键序、空白、转义、用哪个 JSON 库，全都不影响结果。你<strong>不需要</strong>拿到原始字节。前提是数字按整数解析：出站报文里目前唯一的数字是 <code>STATUS_CHANGED</code> 的 <code>data.changeVersion</code>，必须编码成 <code>i:&lt;整数&gt;</code>；Go 的 <code>encoding/json</code> 解到 <code>map[string]any</code> 时会把它变成 <code>float64</code>，请用 <code>Decoder.UseNumber()</code>。</li></ol>
 <p>验签 = 解析 body → 加上 <code>"sigAlg": "xpin.esim.webhook.kv1"</code> → 按四条规则算基串 →
 HMAC-SHA256 → 与 <code>x-sign</code> 常数时间比对。</p>
 <figure class="code" data-lang="js"><button class="copy" type="button">复制</button><pre><code>// canonicalize() 与 2.5 里那份逐字相同 —— 入站出站共用，写一次
 function verifyKv1(parsedBody, signHeader, appSecret) {
-  const base = canonicalize({ ...parsedBody, sigAlg: 'xpin.esim.webhook.kv1' })
+  let base
+  try {
+    // ⚠️ body 同样完全由调用方控制：带小数、超范围整数、不合法键名或顶层不是对象的 body 都会让
+    // canonicalize() 抛异常。必须在这里接住、按验签失败处理 —— 否则在 async 处理函数里会变成
+    // 未处理的 Promise 拒绝，可能让你的进程直接退出。
+    base = canonicalize({ ...parsedBody, sigAlg: 'xpin.esim.webhook.kv1' })
+  } catch (e) {
+    return false
+  }
   const expected = crypto.createHmac('sha256', appSecret).update(base, 'utf8').digest('hex')
   // ⚠️ 必须先转成 Buffer 再比长度：字符串的 .length 是 UTF-16 码元数，而 Buffer 按
   // UTF-8 编码，含非 ASCII 字符时两者不等价，timingSafeEqual 会**抛异常**而不是返回
@@ -1582,7 +1636,10 @@ function verifyKv1(parsedBody, signHeader, appSecret) {
 <figure class="code" data-lang="python"><button class="copy" type="button">复制</button><pre><code>import hashlib, hmac
 # canonicalize() 与 2.5 那份逐字相同 —— 入站出站共用，写一次
 def verify_kv1(parsed_body, sign_header, app_secret):
-    base = canonicalize({**parsed_body, 'sigAlg': 'xpin.esim.webhook.kv1'})
+    try:
+        base = canonicalize({**parsed_body, 'sigAlg': 'xpin.esim.webhook.kv1'})
+    except (ValueError, TypeError):
+        return False   # body 由调用方控制：小数、不合法键名、顶层不是对象 —— 一律按验签失败处理，不要抛出去
     expected = hmac.new(app_secret.encode(), base.encode('utf-8'), hashlib.sha256).hexdigest()
     # 先转成 bytes 再比：两个 str 里任一含非 ASCII 字符时 compare_digest 会抛 TypeError
     return hmac.compare_digest(expected.encode('ascii'), (sign_header or '').encode('utf-8'))</code></pre></figure>
@@ -1615,15 +1672,18 @@ app.post('/xpin/webhook', async (req, res) =&gt; {
 <ol><li><strong>ACK 判据是响应体 <code>code === "0000"</code> 加 HTTP 2xx，两者都要</strong>。任何其它组合都按失败 处理并重投（间隔与上限见 <a href="#64-ack-与重投">6.4</a>）。所以处理失败时<strong>不要</strong>回 <code>0000</code>。</li><li><strong>幂等存储必须跨进程生效</strong>（唯一索引表或 Redis <code>SETNX</code>）。我们的重投可能落到你集群 里的另一个实例上，进程内的 <code>Set</code> 挡不住。<code>x-event-id</code> 头与 body 的 <code>eventId</code> 恒等， 用哪个都行 —— 但要注意<strong>头不在签名覆盖范围内</strong>，所以以 body 里的 <code>eventId</code> 为准更稳。</li></ol></blockquote>
 <hr>
 <h3 id="64-ack-与重投">6.4 ACK 与重投<a class="anchor" href="#64-ack-与重投">#</a></h3>
-<div class="tw"><table><thead><tr><th>项</th><th>值</th></tr></thead><tbody><tr><td>送达判定</td><td><strong>HTTP 2xx 且响应体 <code>code === "0000"</code>（字符串）</strong></td></tr><tr><td>失败情形</td><td>非 2xx、响应超时、<code>code</code> 不是 <code>"0000"</code>、响应体过大</td></tr><tr><td>重投节奏</td><td><strong>退避</strong>，见下表</td></tr><tr><td>总尝试次数</td><td><strong>7 次</strong>（首投 + 6 次重投），之后不再重投</td></tr><tr><td>重投时</td><td><code>eventId</code> 与 <code>data</code> <strong>不变</strong>；<code>timestamp</code> / <code>nonce</code> / <code>sign</code> <strong>每次重新生成</strong></td></tr><tr><td>ACK 之后</td><td><strong>立即停止重投</strong></td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>项</th><th>值</th></tr></thead><tbody><tr><td>送达判定</td><td><strong>HTTP 2xx 且响应体 <code>code === "0000"</code>（字符串）</strong></td></tr><tr><td>失败情形</td><td>非 2xx、连接失败或响应超时（10 秒）、<code>code</code> 不是 <code>"0000"</code>、响应体超过 1 MB</td></tr><tr><td>重投节奏</td><td><strong>退避</strong>，见下表</td></tr><tr><td>总尝试次数</td><td><strong>7 次</strong>（首投 + 6 次重投），之后不再重投</td></tr><tr><td>重投时</td><td><code>eventId</code> 与 <code>data</code> <strong>不变</strong>；<code>timestamp</code> / <code>nonce</code> / <code>sign</code> <strong>每次重新生成</strong></td></tr><tr><td>ACK 之后</td><td><strong>立即停止重投</strong></td></tr></tbody></table></div>
+<blockquote class="note warn"><p>⚠️ <strong>回调地址请直接填最终地址（例如直接写 <code>https://</code>），不要依赖重定向。</strong> 平台会跟随 3xx 跳转、以跳转后的
+最终响应判定送达，但 <code>301</code> / <code>302</code> / <code>303</code> 跳转会把 <code>POST</code> 变成不带 body 的 <code>GET</code> —— 事件到不了你的处理逻辑。</p></blockquote>
 <p><strong>退避阶梯</strong></p>
 <div class="tw"><table><thead><tr><th>第几次失败</th><th>下一次重投在</th><th>距首投约</th></tr></thead><tbody><tr><td>第 1 次</td><td>10 秒后</td><td>10 秒</td></tr><tr><td>第 2 次</td><td>30 秒后</td><td>40 秒</td></tr><tr><td>第 3 次</td><td>60 秒后</td><td>1 分 40 秒</td></tr><tr><td>第 4 次</td><td>600 秒后</td><td>11 分 40 秒</td></tr><tr><td>第 5 次</td><td>3600 秒后</td><td>1 小时 12 分</td></tr><tr><td>第 6 次</td><td>7200 秒后</td><td><strong>3 小时 12 分</strong></td></tr><tr><td>第 7 次</td><td>—</td><td>不再重投</td></tr></tbody></table></div>
-<blockquote class="note warn"><p>⚠️ <strong>上表是最短耗时，不是保证。</strong> 实际重投在到点之后由后台按批处理，积压时会比表上更晚
-—— 只会更晚，不会更早。请按"最终会到、但可能迟"来设计，不要用固定时限判定平台失败。</p></blockquote>
+<blockquote class="note warn"><p>⚠️ <strong>上表是最短耗时，不是保证。</strong> 实际重投在到点之后由后台按批处理，积压时会比表上更晚。
+请按"最终会到、但可能迟"来设计，不要用固定时限判定平台失败。（平台自身故障恢复时，被中断的那次投递
+会在几分钟后重新发出，可能早于上表；按 <code>eventId</code> 去重即可。）</p></blockquote>
 <blockquote class="note warn"><p>🔴 <strong>7 次全部失败之后事件不再重投，且没有补发入口。</strong> 端点长时间不可用时，请按下方 💡 的方法对账补齐
 —— 尤其是 <code>ORDER_OPEN_RESULT</code>，它是激活码唯一的推送通道。</p></blockquote>
 <blockquote class="note"><p>💡 <strong>长时间没收到预期事件时</strong>，按事件类型对账补齐：</p>
-<ul><li>履约结果：用 <code>/order/query</code>（按 <code>clientOrderNo</code>）或 <code>/order/list</code>（按 <code>externalUserId</code> / <code>iccid</code> / <code>productCode</code>， <a href="#46-订单列表-orderlist">§4.6</a>）找到订单，再用 <code>/iccid/profile</code> 取激活码；</li><li>Profile 状态：看 <code>/iccid/profile</code> 的 <code>profile.status</code> 与 <code>profile.changeVersion</code>；</li><li>退款确认：订单的 <code>orderStatus</code> 变为 <code>REFUNDED</code>。⚠️ 退款<strong>被拒</strong>（<code>REJECTED</code>）在任何查询接口上都看不到， 这条事件丢失时只能联系平台。</li></ul></blockquote>
+<ul><li>履约结果：用 <code>/order/query</code>（按 <code>clientOrderNo</code>）或 <code>/order/list</code>（按 <code>externalUserId</code> / <code>iccid</code> / <code>productCode</code>， <a href="#46-订单列表-orderlist">§4.6</a>）找到订单，再用 <code>/iccid/profile</code> 取激活码；</li><li>Profile 状态：看 <code>/iccid/profile</code> 的 <code>profile.status</code> 与 <code>profile.changeVersion</code>；</li><li>退款结论：确认后订单的 <code>orderStatus</code> 变为 <code>REFUNDED</code>。⚠️ 退款<strong>被拒</strong>（<code>REJECTED</code>）不会体现在 <code>/order/query</code> 上； 这条事件丢失时，用<strong>同一个</strong> <code>idempotencyKey</code>、相同内容重发一次那笔 <code>/order/refund</code>，会以 <code>replayed: true</code> 返回这张退款单此刻的 <code>refundStatus</code>（不会新建退款单，见 §4.12；用于一次性对账，不要拿它轮询）； 原请求内容已无法复现时联系平台。</li></ul></blockquote>
 <blockquote class="note warn"><p>🔴 <strong>幂等键只能是 <code>eventId</code>（或头里的 <code>x-event-id</code>）</strong>，不能用 <code>sign</code>、<code>nonce</code> 或 <code>timestamp</code>——它们每次投递都会变。</p>
 <p>🔴 <strong><code>"0000"</code> 是字符串，同步接口的 <code>200</code> 是数字，两套码本。</strong> 回 <code>{"code":200}</code> 或 <code>{"code":0}</code>
 都会被判为失败，导致同一事件在约 3 小时内被重投 6 次，之后不再重投。请务必按字符串 <code>"0000"</code> 应答。</p></blockquote>
@@ -1633,7 +1693,8 @@ app.post('/xpin/webhook', async (req, res) =&gt; {
 <code>ORDER_OPEN_RESULT</code> / <code>ORDER_RENEW_RESULT</code> 与 <code>STATUS_CHANGED</code> 之间同样不保证先后。</p></blockquote>
 <blockquote class="note warn"><p>🔴 <strong>密钥轮换会中断在途事件的投递。</strong> 平台用你凭证<strong>当前</strong>的 <code>app_secret</code> 签名，
 不回落旧密钥；轮换之后，<strong>已在投递队列里的事件不会再发出</strong>（你不会收到一条验不过的
-通知，而是<strong>什么都收不到</strong>），并且<strong>不会自行恢复</strong>，未送达的事件在有限时间后被放弃。</p>
+通知，而是<strong>什么都收不到</strong>），并且<strong>不会自行恢复</strong>：这些事件仍按上方阶梯计次，7 次尝试用尽（首投后约
+3 小时）即被放弃，之后无法补发。</p>
 <p><strong>请与平台方约定轮换时间窗</strong>，选在没有事件在途的时段。轮换后请核对这段时间内是否有
 订单只在 <code>/order/query</code> 里变成了 <code>FULFILLED</code> 却没有收到对应事件 —— 按上文 💡 的方法对账补齐。</p>
 <p>⚠️ <strong>回调地址在事件入队时就已确定。</strong> 修改回调地址之后，已在队列里（含重投中）的事件仍发往旧地址；
@@ -1669,9 +1730,10 @@ app.post('/xpin/webhook', async (req, res) =&gt; {
 <div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td>是</td><td>10–32 字符。目标卡，必须在你名下</td></tr><tr><td><code>packageStatus</code></td><td>string</td><td>否</td><td>目标套餐状态，取值见 <a href="#71-可以设成哪些状态">§7.1</a></td></tr><tr><td><code>profileStatus</code></td><td>string</td><td>否</td><td>目标 eSIM Profile 状态，取值见 <a href="#71-可以设成哪些状态">§7.1</a></td></tr><tr><td><code>clientOrderNo</code></td><td>string</td><td>否</td><td>1–100 字符。指定改哪一笔订单的套餐状态。不传就取这张卡<strong>最近一次履约</strong>的那笔订单</td></tr></tbody></table></div>
 <p><code>packageStatus</code> 与 <code>profileStatus</code> <strong>至少要给一个</strong>，都不给返回 <code>400</code>。</p>
 <blockquote class="note warn"><p>⚠️ <strong>续订过的卡请传 <code>clientOrderNo</code>。</strong> 一张卡上有多笔订单时，"这张卡的套餐状态"
-本身是有歧义的；不传就落在最近一次履约的那一笔上，那未必是你想改的那一笔。</p>
+本身是有歧义的；不传就落在最近一次履约的那一笔上，那未必是你想改的那一笔。下单时没传 <code>clientOrderNo</code>
+的订单无法用这个参数指定。</p>
 <p>另外：<strong>用量只会为状态生效后将成为这张卡主导订单（§4.10）的那一笔填充</strong>（见下）；
-不会成为主导订单时 <code>usage</code> 返回 <code>null</code>，<code>usageSkippedReason</code> 是 <code>ORDER_NOT_GOVERNING</code>。</p></blockquote>
+设成 <code>ACTIVATED</code> / <code>IN_USE</code>、本该填充却不会成为主导订单时，<code>usage</code> 返回 <code>null</code>，<code>usageSkippedReason</code> 是 <code>ORDER_NOT_GOVERNING</code>。</p></blockquote>
 <p><strong>响应</strong></p>
 <div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>iccid</code></td><td>string</td><td>回显目标卡</td></tr><tr><td><code>orderNo</code></td><td>string | null</td><td>实际命中的平台订单号；只改 Profile 状态且这张卡尚无订单时为 <code>null</code></td></tr><tr><td><code>clientOrderNo</code></td><td>string | null</td><td>命中订单的业务单号</td></tr><tr><td><code>simulationId</code></td><td>string</td><td>32 位十六进制。本次模拟的标识，排查时提供给平台</td></tr><tr><td><code>accepted</code></td><td>array</td><td>本次受理的状态变更，每项 <code>{ kind, eventType }</code>。<code>kind</code> 为 <code>ORDER_CHANGE</code>（套餐状态）或 <code>PROFILE_CHANGE</code>（Profile 状态）；<code>eventType</code> 是平台内部的编号，仅供排查，与 §6.1 的 <code>eventType</code> 无关，请勿依赖</td></tr><tr><td><code>usage</code></td><td>object | null</td><td>本次<strong>已经写入</strong>的模拟用量，见下。不填时为 <code>null</code></td></tr><tr><td><code>usageSkippedReason</code></td><td>string | null</td><td>没填用量的原因；填了则为 <code>null</code></td></tr></tbody></table></div>
 <p><strong>示例响应</strong></p>
@@ -1701,7 +1763,7 @@ app.post('/xpin/webhook', async (req, res) =&gt; {
 <ul><li><code>accepted</code> 是<strong>已受理</strong>。状态变更走的是回调链路，落库是异步的（通常几秒）。</li><li><code>usage</code> 是<strong>已生效</strong>。流量数字在上游的回调协议里没有任何载体，所以平台直接写投影， 返回时它已经能从 <code>/order/usage</code> 读到了。</li></ul>
 <p><strong>只有把套餐设成 <code>ACTIVATED</code> 或 <code>IN_USE</code> 时才填</strong>，因为只有这两个状态下平台原本会去向
 上游实查。其余状态一律不填，<code>usageSkippedReason</code> 会说明原因：</p>
-<div class="tw"><table><thead><tr><th>情形</th><th><code>usageSkippedReason</code></th><th>说明</th></tr></thead><tbody><tr><td>设成 <code>NOT_ACTIVATED</code> / <code>EXHAUSTED</code></td><td><code>PLATFORM_DERIVE</code></td><td>平台按套餐总量自己算（用了 0 / 用满），不需要模拟。商品没有总量时 <code>EXHAUSTED</code> 为 <code>PLATFORM_KEEP</code></td></tr><tr><td>设成 <code>EXPIRED</code> 等终态</td><td><code>PLATFORM_KEEP</code></td><td>平台保留最后一次读数，覆盖它会毁掉那条语义</td></tr><tr><td>只设了 <code>profileStatus</code></td><td><code>NO_PACKAGE_STATUS_REQUESTED</code></td><td>用量跟着套餐状态走</td></tr><tr><td>目标订单在状态生效后不会成为主导订单</td><td><code>ORDER_NOT_GOVERNING</code></td><td>用量一卡一份，只记在主导订单名下（例如卡上另有 <code>IN_USE</code> 套餐时把另一笔设成 <code>ACTIVATED</code>）</td></tr><tr><td>设成 <code>ACTIVATED</code> / <code>IN_USE</code>，但套餐不限量或商品没有配总量</td><td><code>PACKAGE_TOTAL_UNKNOWN</code></td><td>没有总量就没有合理区间，平台不编一个数字出来</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>情形</th><th><code>usageSkippedReason</code></th><th>说明</th></tr></thead><tbody><tr><td>设成 <code>NOT_ACTIVATED</code> / <code>EXHAUSTED</code></td><td><code>PLATFORM_DERIVE</code></td><td>平台按套餐总量自己算（用了 0 / 用满），不需要模拟。商品没有总量时 <code>EXHAUSTED</code> 为 <code>PLATFORM_KEEP</code></td></tr><tr><td>设成 <code>EXPIRED</code> 等终态</td><td><code>PLATFORM_KEEP</code></td><td>平台保留最后一次读数，覆盖它会毁掉那条语义</td></tr><tr><td>只设了 <code>profileStatus</code></td><td><code>NO_PACKAGE_STATUS_REQUESTED</code></td><td>用量跟着套餐状态走</td></tr><tr><td>设成 <code>ACTIVATED</code> / <code>IN_USE</code>，但目标订单在状态生效后不会成为主导订单</td><td><code>ORDER_NOT_GOVERNING</code></td><td>用量一卡一份，只记在主导订单名下（例如卡上另有 <code>IN_USE</code> 套餐时把另一笔设成 <code>ACTIVATED</code>）</td></tr><tr><td>设成 <code>ACTIVATED</code> / <code>IN_USE</code>，但套餐不限量或商品没有配总量</td><td><code>PACKAGE_TOTAL_UNKNOWN</code></td><td>没有总量就没有合理区间，平台不编一个数字出来</td></tr></tbody></table></div>
 <p>填充规则：总量取自该订单<strong>商品配置的套餐总量</strong>（不是随机的）；已用量在区间内随机 ——
 <code>ACTIVATED</code> 取 0–5%，<code>IN_USE</code> 取 5–85%；剩余量 = 总量 − 已用量。</p>
 <blockquote class="note warn"><p>⚠️ <strong>模拟的用量是一次快照，不会随时间增长，也可能被覆盖。</strong> 平台仍会按自己的节奏
@@ -1715,9 +1777,10 @@ app.post('/xpin/webhook', async (req, res) =&gt; {
 （<code>usage</code> 是例外，它在返回时已经生效。）</p></blockquote>
 <blockquote class="note warn"><p>⚠️ <strong>每次调用都会重新推送一次，本接口没有 <code>idempotencyKey</code>。</strong> 但只有状态<strong>真的变化</strong>时才会落库并发
 <code>STATUS_CHANGED</code>：同样的参数连续调两次，第二次通常不产生事件（见 §7.4 第 4 步）。可以重复推送是刻意的
-—— 状态被别的流程改回去之后，你需要能再推一次。</p></blockquote>
-<blockquote class="note warn"><p>⚠️ <strong>模拟出来的状态不是永久的。</strong> 平台仍会按自己的节奏与上游核对这张卡；
-一段时间之后，上游的真实状态可能把你设的值覆盖掉。请在设定之后<strong>尽快</strong>完成验证，
+—— 状态被别的流程改回去之后，你需要能再推一次。（例外是用量：设成 <code>ACTIVATED</code> / <code>IN_USE</code> 时每次调用
+都会重新写一次模拟用量，数值会变。）</p></blockquote>
+<blockquote class="note warn"><p>⚠️ <strong>模拟出来的状态不是永久的。</strong> 上游之后推来的真实状态（或平台与上游的核对）
+可能把你设的值覆盖掉。请在设定之后<strong>尽快</strong>完成验证，
 不要把一张模拟状态的卡当成长期夹具。</p></blockquote>
 <hr>
 <h3 id="73-拒绝">7.3 拒绝<a class="anchor" href="#73-拒绝">#</a></h3>
@@ -1731,9 +1794,9 @@ app.post('/xpin/webhook', async (req, res) =&gt; {
 <blockquote class="note warn"><p>⚠️ 只在 Profile 状态<strong>真的发生了变化</strong>时才会发。卡本来就是 <code>ENABLED</code>，再设一次
 <code>IN_USE</code> 不会产生新事件（<code>changeVersion</code> 也不会前进）—— 那是正确行为，不是丢事件。</p></blockquote>
 <p>一条建议的联调顺序：</p>
-<ol><li><code>/order/create</code> 开一张卡，等 <code>ORDER_OPEN_RESULT</code>。</li><li><code>POST /sandbox/card/status</code>，<code>{"iccid": "...", "packageStatus": "IN_USE"}</code> —— 一次调用同时验证：套餐状态推进、连带的 <code>STATUS_CHANGED</code>、<code>changeVersion</code> 去重逻辑， 以及 <code>/order/usage</code> 上出现的模拟流量。</li><li><code>{"iccid": "...", "profileStatus": "DISABLED"}</code> —— 验证你对 Profile 单独变更的处理。</li><li>再调一次第 3 步同样的参数 —— 此时 Profile 没有变化，<strong>不该</strong>再收到事件；验证你没有 把"没有事件"误判成链路故障。</li><li><code>{"iccid": "...", "packageStatus": "EXHAUSTED"}</code> —— 验证你对"套餐用尽"的处理。连带规则会把 Profile 设回 <code>ENABLED</code>，所以接在第 3 步之后会再收到一条 <code>STATUS_CHANGED</code>（<code>DISABLED</code> → <code>ENABLED</code>）；<code>/order/usage</code> 的剩余量 会在平台下一轮用量刷新后变成 0。</li></ol>
+<ol><li><code>/order/create</code> 开一张卡，等 <code>ORDER_OPEN_RESULT</code>。</li><li><code>POST /sandbox/card/status</code>，<code>{"iccid": "...", "packageStatus": "IN_USE"}</code> —— 一次调用同时验证：套餐状态推进、连带的 <code>STATUS_CHANGED</code>、<code>changeVersion</code> 去重逻辑， 以及 <code>/order/usage</code> 上出现的模拟流量。</li><li><code>{"iccid": "...", "profileStatus": "DISABLED"}</code> —— 验证你对 Profile 单独变更的处理。</li><li>再调一次第 3 步同样的参数 —— 此时 Profile 没有变化，<strong>不该</strong>再收到事件；验证你没有 把"没有事件"误判成链路故障。</li><li><code>{"iccid": "...", "packageStatus": "EXHAUSTED"}</code> —— 验证你对"套餐用尽"的处理。连带规则会把 Profile 设回 <code>ENABLED</code>，所以接在第 3 步之后会再收到一条 <code>STATUS_CHANGED</code>（<code>DISABLED</code> → <code>ENABLED</code>）；<code>/order/usage</code> 的剩余量 会在平台下一轮用量刷新后变成 0（商品配有套餐总量时；刷新是周期性的，可能要等一段时间）。</li></ol>
 <h4 id="这个接口不能帮你验证的">这个接口<strong>不能</strong>帮你验证的<a class="anchor" href="#这个接口不能帮你验证的">#</a></h4>
-<div class="tw"><table><thead><tr><th></th><th>为什么</th></tr></thead><tbody><tr><td><strong>开卡 / 激活码</strong></td><td>履约事件在上游协议里要求签名，本接口不构造签名。开卡只能走 <code>/order/create</code></td></tr><tr><td><strong>续订资格</strong></td><td>本接口改不了可续订截止时间。但套餐状态参与平台的续订规则（槽位占用、日包在用），设成 <code>EXHAUSTED</code> / <code>EXPIRED</code> / <code>ABANDONED</code> 等可能让 <code>/iccid/renew</code> 变为可续 —— 上游并不知道模拟状态，真实的 <code>/order/renew</code> 仍可能被拒。续订联调请用真实下单</td></tr><tr><td><strong>用量随时间增长</strong></td><td>模拟的用量是一次快照，见 <a href="#72-调用与返回">§7.2</a></td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th></th><th>为什么</th></tr></thead><tbody><tr><td><strong>开卡 / 续订结果、激活码</strong></td><td>本接口只模拟套餐状态与 Profile 状态，从不产生履约结果（不会触发 <code>ORDER_OPEN_RESULT</code> / <code>ORDER_RENEW_RESULT</code>，也不会生成激活码）。开卡只能走 <code>/order/create</code></td></tr><tr><td><strong>续订资格</strong></td><td>本接口改不了可续订截止时间。但套餐状态参与平台的续订规则（槽位占用、日包在用），设成 <code>EXHAUSTED</code> / <code>EXPIRED</code> / <code>ABANDONED</code> 等可能让 <code>/iccid/renew</code> 变为可续 —— 上游并不知道模拟状态，真实的 <code>/order/renew</code> 仍可能被拒。续订联调请用真实下单</td></tr><tr><td><strong>用量随时间增长</strong></td><td>模拟的用量是一次快照，见 <a href="#72-调用与返回">§7.2</a></td></tr></tbody></table></div>
 <hr></main>
 </div>
 

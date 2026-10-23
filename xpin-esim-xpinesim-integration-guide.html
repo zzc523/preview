@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>XPIN eSIM OpenAPI 接入说明（eSIMDB 渠道）</title>
+    <title>XPIN eSIM OpenAPI 接入说明（比价平台）</title>
     <style>
       :root {
         --bg: #f5f7fa;
@@ -367,8 +367,8 @@
   <body>
     <header>
       <div class="in">
-        <span class="tag">eSIMDB 渠道接入文档</span>
-        <h1>XPIN eSIM OpenAPI 接入说明（eSIMDB 渠道）</h1>
+        <span class="tag">比价平台接入文档</span>
+        <h1>XPIN eSIM OpenAPI 接入说明（比价平台）</h1>
         <p>本文档为单文件版本，不引用任何外部资源，可离线阅读与打印。</p>
       </div>
     </header>
@@ -391,7 +391,7 @@
         <blockquote class="note">
           <p><strong>文档版本：v1</strong>（2026-09-24）</p>
           <p>
-            面向 <strong>eSIMDB</strong> 渠道的 OpenAPI 接入文档，包括认证与签名、商品接口两部分。套餐对象按 eSIMDB
+            面向<strong>比价平台</strong>的 OpenAPI 接入文档，包括认证与签名、商品接口两部分。套餐对象按比价平台
             Provider API <strong>v1.0.2</strong> 的
             <code>DataPlan</code> 结构输出。文中的响应样本取自联调环境的真实返回。
           </p>
@@ -468,7 +468,7 @@
               <tr>
                 <td>数据结构</td>
                 <td>
-                  eSIMDB Provider API v1.0.2 的 <code>DataPlan</code>，字段说明见 <a href="#5-套餐对象-dataplan">§5</a>
+                  比价平台 Provider API v1.0.2 的 <code>DataPlan</code>，字段说明见 <a href="#5-套餐对象-dataplan">§5</a>
                 </td>
               </tr>
             </tbody>
@@ -820,7 +820,7 @@ def sign_inbound(secret, api_key, method, path, timestamp, nonce, body):
     return hmac.new(secret.encode(), base.encode('utf-8'), hashlib.sha256).hexdigest()
 
 APP_KEY, APP_SECRET = 'ak_xxx', 'sk_xxx'
-BASE = 'https://tbetaopenapi.xpin.network'
+BASE = 'https://sandboxapi.xpin.network'
 
 def call(path, body):
     ts, nonce = str(int(time.time() * 1000)), 'n_' + secrets.token_hex(8)
@@ -1041,18 +1041,30 @@ function signInbound(secret, { apiKey, method, path, timestamp, nonce, body }) {
                 <td>number</td>
                 <td>否</td>
                 <td><code>[1, 100000]</code>，默认 <code>1</code></td>
-                <td>页码。越界返回 <code>400 pageNo Range error</code></td>
+                <td>
+                  页码，从 <code>1</code> 开始。小于 1 或大于 100000 返回 <code>400 pageNo Range error</code>，但数字
+                  <code>0</code> 例外：按 <code>1</code> 处理、不报错，所以从 0 起翻会把第一页取两次
+                </td>
               </tr>
               <tr>
                 <td><code>pageSize</code></td>
                 <td>number</td>
                 <td>否</td>
                 <td><code>[1, 100]</code>，默认 <code>20</code></td>
-                <td>每页条数。全量同步建议用 <code>100</code></td>
+                <td>
+                  每页条数，全量同步建议用 <code>100</code>。小于 1 或大于 100 返回 <code>400 pageSize Range error</code>，但数字
+                  <code>0</code> 例外：按默认值 <code>20</code> 处理、不报错
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
+        <blockquote class="note">
+          <p>
+            两个字段都请传 JSON 整数。落在范围内的 JSON 小数（如 <code>1.5</code>）<strong>不会被取整</strong>，而是在验签环节被拒，返回
+            <code>400 CANONICAL_NUMBER_UNSUPPORTED</code>（见 <a href="#31-签名算法-xpin-kv1">§3.1</a> 的 R2）。
+          </p>
+        </blockquote>
         <p>
           <strong>响应 <code>data</code></strong>
         </p>
@@ -1070,7 +1082,8 @@ function signInbound(secret, { apiKey, method, path, timestamp, nonce, body }) {
                 <td><code>pageNo</code> / <code>pageSize</code></td>
                 <td>number</td>
                 <td>
-                  <strong>实际生效的</strong>页码 / 每页条数。平台会对越界或小数入参做归一，它们可能与你发出的值不同
+                  <strong>实际生效的</strong>页码 / 每页条数，可能与你发出的值不同：传数字 <code>0</code> 时按默认值处理，以字符串传入的小数（如
+                  <code>"2.5"</code>）向下取整
                 </td>
               </tr>
               <tr>
@@ -1129,7 +1142,7 @@ function signInbound(secret, { apiKey, method, path, timestamp, nonce, body }) {
           <button class="copy" type="button">复制</button>
           <pre><code>const crypto = require('crypto')
 
-const BASE = 'https://tbetaopenapi.xpin.network'
+const BASE = 'https://sandboxapi.xpin.network'
 const APP_KEY = process.env.XPIN_APP_KEY
 const APP_SECRET = process.env.XPIN_APP_SECRET
 
@@ -1221,7 +1234,7 @@ async function listAllPlans() {
 
         <h2 id="5-套餐对象-dataplan">5. 套餐对象 DataPlan<a class="anchor" href="#5-套餐对象-dataplan">#</a></h2>
         <p>
-          字段名、类型、枚举均与 eSIMDB Provider API v1.0.2 的 <code>DataPlan</code> 一致，五个必填字段
+          字段名、类型、枚举均与比价平台 Provider API v1.0.2 的 <code>DataPlan</code> 一致，五个必填字段
           （<code>validity</code>、<code>dataCap</code>、<code>dataUnit</code>、<code>prices</code>、<code>coverages</code>）在每个套餐对象上都有。
         </p>
 
@@ -1350,7 +1363,7 @@ async function listAllPlans() {
               <tr>
                 <td>总量包</td>
                 <td>整个有效期内的高速流量</td>
-                <td>恒为 <code>MB</code></td>
+                <td><code>MB</code> 或 <code>GB</code></td>
                 <td>不输出</td>
                 <td>50GB 套餐 → <code>51200</code> / <code>MB</code></td>
               </tr>
@@ -1366,8 +1379,8 @@ async function listAllPlans() {
         </div>
         <ul>
           <li>
-            <strong>总量包按 MB 给出、不换算成 GB</strong>：<code>dataCap</code> 只能是整数，1536MB 换成 GB 是
-            1.5，取整就会凭空多报或少报半个 G。
+            <strong><code>dataCap</code> 恒为整数，平台不做取整换算</strong>：例如 1536MB 按 <code>1536</code> /
+            <code>MB</code> 给出，不会换成 1.5GB 再取整成 1 或 2，凭空多报或少报半个 G。
           </li>
           <li>
             <strong><code>dataCap</code> 不会是 <code>0</code></strong
@@ -1379,9 +1392,9 @@ async function listAllPlans() {
         <h4 id="降速">降速：<code>reducedSpeed</code><a class="anchor" href="#降速">#</a></h4>
         <ul>
           <li>日包：用完当天的高速额度后降到这个速率，单位 kbps（例如 <code>512</code>），第二天恢复高速。</li>
+          <li>总量包：用完整个有效期的高速额度后降到这个速率。</li>
           <li>
-            总量包：用完即断网，<strong>不输出</strong>这个字段。DataPlan 中它的缺省值
-            <code>null</code> 即"用完即断网"。
+            用完即断网的套餐<strong>不输出</strong>这个字段。DataPlan 中它的缺省值 <code>null</code> 即"用完即断网"。
           </li>
         </ul>
         <h4 id="覆盖国家">覆盖国家：<code>coverages</code><a class="anchor" href="#覆盖国家">#</a></h4>

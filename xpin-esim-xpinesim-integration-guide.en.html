@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>XPIN eSIM OpenAPI Integration Guide (eSIMDB Channel)</title>
+    <title>XPIN eSIM OpenAPI Integration Guide (Price Comparison Platform)</title>
     <style>
       :root {
         --bg: #f5f7fa;
@@ -369,8 +369,8 @@
   <body>
     <header>
       <div class="in">
-        <span class="tag">eSIMDB Channel Integration Guide</span>
-        <h1>XPIN eSIM OpenAPI Integration Guide (eSIMDB Channel)</h1>
+        <span class="tag">Price Comparison Platform Integration Guide</span>
+        <h1>XPIN eSIM OpenAPI Integration Guide (Price Comparison Platform)</h1>
         <p>This guide is a single self-contained file with no external resources. It can be read offline and printed.</p>
       </div>
     </header>
@@ -398,9 +398,9 @@
         <blockquote class="note">
           <p><strong>Document version: v1</strong> (2026-09-24)</p>
           <p>
-            OpenAPI integration guide for the <strong>eSIMDB</strong> channel, covering authentication and signing, and
-            the product endpoints. Plan objects follow the <code>DataPlan</code> structure of eSIMDB Provider API
-            <strong>v1.0.2</strong>. All response samples are real responses from the sandbox environment.
+            OpenAPI integration guide for the <strong>price comparison platform</strong>, covering authentication and
+            signing, and the product endpoints. Plan objects follow the <code>DataPlan</code> structure of the price
+            comparison platform's Provider API <strong>v1.0.2</strong>. All response samples are real responses from the sandbox environment.
           </p>
           <p>If this guide and the running service disagree, <strong>the service is authoritative</strong>.</p>
         </blockquote>
@@ -472,8 +472,8 @@
               <tr>
                 <td>Data structure</td>
                 <td>
-                  <code>DataPlan</code> of eSIMDB Provider API v1.0.2; the fields are described in
-                  <a href="#5-plan-object-dataplan">§5</a>
+                  <code>DataPlan</code> of the price comparison platform's Provider API v1.0.2; the fields are
+                  described in <a href="#5-plan-object-dataplan">§5</a>
                 </td>
               </tr>
             </tbody>
@@ -1078,18 +1078,33 @@ function signInbound(secret, { apiKey, method, path, timestamp, nonce, body }) {
                 <td>number</td>
                 <td>No</td>
                 <td><code>[1, 100000]</code>, default <code>1</code></td>
-                <td>Page number. Out-of-range values return <code>400 pageNo Range error</code></td>
+                <td>
+                  Page number, starting at <code>1</code>. Values below 1 or above 100000 return
+                  <code>400 pageNo Range error</code>, except the number <code>0</code>: it is treated as <code>1</code>
+                  without an error, so paging from 0 fetches the first page twice
+                </td>
               </tr>
               <tr>
                 <td><code>pageSize</code></td>
                 <td>number</td>
                 <td>No</td>
                 <td><code>[1, 100]</code>, default <code>20</code></td>
-                <td>Items per page. <code>100</code> is recommended for full syncs</td>
+                <td>
+                  Items per page; <code>100</code> is recommended for full syncs. Values below 1 or above 100 return
+                  <code>400 pageSize Range error</code>, except the number <code>0</code>: it is treated as the default
+                  <code>20</code> without an error
+                </td>
               </tr>
             </tbody>
           </table>
         </div>
+        <blockquote class="note">
+          <p>
+            Send both fields as JSON integers. An in-range JSON decimal such as <code>1.5</code> is
+            <strong>not rounded</strong>: it is rejected during signature verification with
+            <code>400 CANONICAL_NUMBER_UNSUPPORTED</code> (see R2 in <a href="#31-signature-algorithm-xpin-kv1">§3.1</a>).
+          </p>
+        </blockquote>
         <p><strong>Response <code>data</code></strong></p>
         <div class="tw">
           <table>
@@ -1105,8 +1120,9 @@ function signInbound(secret, { apiKey, method, path, timestamp, nonce, body }) {
                 <td><code>pageNo</code> / <code>pageSize</code></td>
                 <td>number</td>
                 <td>
-                  The page number / page size <strong>actually applied</strong>. The platform normalizes out-of-range
-                  or fractional inputs, so these may differ from what you sent
+                  The page number / page size <strong>actually applied</strong>, which can differ from what you sent:
+                  the number <code>0</code> is replaced by the default, and a decimal sent as a string (such as
+                  <code>"2.5"</code>) is rounded down
                 </td>
               </tr>
               <tr>
@@ -1258,8 +1274,8 @@ async function listAllPlans() {
 
         <h2 id="5-plan-object-dataplan">5. Plan Object DataPlan<a class="anchor" href="#5-plan-object-dataplan">#</a></h2>
         <p>
-          Field names, types and enums all match the <code>DataPlan</code> of eSIMDB Provider API v1.0.2, and the five
-          required fields (<code>validity</code>, <code>dataCap</code>, <code>dataUnit</code>, <code>prices</code>,
+          Field names, types and enums all match the <code>DataPlan</code> of the price comparison platform's Provider
+          API v1.0.2, and the five required fields (<code>validity</code>, <code>dataCap</code>, <code>dataUnit</code>, <code>prices</code>,
           <code>coverages</code>) are present on every plan object.
         </p>
 
@@ -1402,7 +1418,7 @@ async function listAllPlans() {
               <tr>
                 <td>Total-allowance plan</td>
                 <td>High-speed data for the whole validity period</td>
-                <td>Always <code>MB</code></td>
+                <td><code>MB</code> or <code>GB</code></td>
                 <td>Not returned</td>
                 <td>50GB plan → <code>51200</code> / <code>MB</code></td>
               </tr>
@@ -1418,8 +1434,9 @@ async function listAllPlans() {
         </div>
         <ul>
           <li>
-            <strong>Total-allowance plans are given in MB, not converted to GB</strong>: <code>dataCap</code> must be an
-            integer, and 1536MB is 1.5GB, so rounding would overstate or understate the allowance by half a gigabyte.
+            <strong><code>dataCap</code> is always an integer and is never rounded</strong>: an allowance of 1536MB is
+            returned as <code>1536</code> / <code>MB</code>, not converted to 1.5GB and rounded to 1 or 2, which would
+            overstate or understate it by half a gigabyte.
           </li>
           <li>
             <strong><code>dataCap</code> is never <code>0</code></strong>: in DataPlan, <code>0</code> means truly
@@ -1434,10 +1451,10 @@ async function listAllPlans() {
             Daily plans: once the day's high-speed allowance is used up, the speed drops to this rate in kbps (for
             example <code>512</code>); high speed resumes the next day.
           </li>
+          <li>Total-allowance plans: once the allowance for the whole validity is used up, the speed drops to this rate.</li>
           <li>
-            Total-allowance plans: the connection is cut off when the allowance is used up, and this field is
-            <strong>not returned</strong>. In DataPlan, its default <code>null</code> means exactly that: cut off when
-            used up.
+            Plans that cut off the connection when the allowance is used up do <strong>not return</strong> this field.
+            In DataPlan, its default <code>null</code> means exactly that: cut off when used up.
           </li>
         </ul>
         <h4 id="coverage">Coverage: <code>coverages</code><a class="anchor" href="#coverage">#</a></h4>

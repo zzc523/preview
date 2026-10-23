@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>XPIN eSIM OpenAPI 接入说明（比价平台）</title>
+    <title>XPIN eSIM OpenAPI 接入说明（eSIM 平台）</title>
     <style>
       :root {
         --bg: #f5f7fa;
@@ -367,8 +367,8 @@
   <body>
     <header>
       <div class="in">
-        <span class="tag">比价平台接入文档</span>
-        <h1>XPIN eSIM OpenAPI 接入说明（比价平台）</h1>
+        <span class="tag">eSIM 平台接入文档</span>
+        <h1>XPIN eSIM OpenAPI 接入说明（eSIM 平台）</h1>
         <p>本文档为单文件版本，不引用任何外部资源，可离线阅读与打印。</p>
       </div>
     </header>
@@ -391,7 +391,7 @@
         <blockquote class="note">
           <p><strong>文档版本：v1</strong>（2026-09-24）</p>
           <p>
-            面向<strong>比价平台</strong>的 OpenAPI 接入文档，包括认证与签名、商品接口两部分。套餐对象按比价平台
+            面向 <strong>eSIM 平台</strong>的 OpenAPI 接入文档，包括认证与签名、商品接口两部分。套餐对象按 eSIM 平台
             Provider API <strong>v1.0.2</strong> 的
             <code>DataPlan</code> 结构输出。文中的响应样本取自联调环境的真实返回。
           </p>
@@ -468,7 +468,7 @@
               <tr>
                 <td>数据结构</td>
                 <td>
-                  比价平台 Provider API v1.0.2 的 <code>DataPlan</code>，字段说明见 <a href="#5-套餐对象-dataplan">§5</a>
+                  eSIM 平台 Provider API v1.0.2 的 <code>DataPlan</code>，字段说明见 <a href="#5-套餐对象-dataplan">§5</a>
                 </td>
               </tr>
             </tbody>
@@ -1234,7 +1234,7 @@ async function listAllPlans() {
 
         <h2 id="5-套餐对象-dataplan">5. 套餐对象 DataPlan<a class="anchor" href="#5-套餐对象-dataplan">#</a></h2>
         <p>
-          字段名、类型、枚举均与比价平台 Provider API v1.0.2 的 <code>DataPlan</code> 一致，五个必填字段
+          字段名、类型、枚举均与 eSIM 平台 Provider API v1.0.2 的 <code>DataPlan</code> 一致，五个必填字段
           （<code>validity</code>、<code>dataCap</code>、<code>dataUnit</code>、<code>prices</code>、<code>coverages</code>）在每个套餐对象上都有。
         </p>
 

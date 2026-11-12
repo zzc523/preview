@@ -523,7 +523,7 @@ Python 的 `bool` 是 `int` 的子类型，必须先判布尔，否则会把 `tr
 | `409` | `RENEW_NOT_ALLOWED` | 这张卡此刻不可续订 | 先调 `iccid/renew` 看 `reasons` |
 | `409` | `ORDER_NOT_REFUNDABLE` | 这一单现在不能退：未履约、已退款、或不具备可退款的计价信息 | 查 `/order/query` 看当前状态。**改参数改不出来**，见 §4.12 |
 | `409` | `REFUND_ALREADY_IN_PROGRESS` | 这一单已有一张在途退款单 | 等 `ORDER_REFUND_RESULT` 出结论后再发起，见 §4.12 |
-| `402` | `BALANCE_LIMIT_REACHED` | **预付费余额不足**：下单时余额已到达你的透支额度，整单被拒、一分钱不扣 | 充值。**不要重试**，见下方 ⚠️ |
+| `402` | `BALANCE_LIMIT_REACHED` | **预付费余额不足**：本单扣完会跌破你的透支额度，整单被拒、一分钱不扣 | 充值。**不要重试**，见下方 ⚠️ |
 | `503` | `BALANCE_ACCOUNT_NOT_FOUND` | 余额账户尚未就绪 | 联系平台开通后重试 |
 | `503` | `CURRENCY_MISMATCH` | 账户币种与商品币种不一致 | 联系平台核对，**改请求改不出来** |
 | `503` | `ORDER_NO_COLLISION` | 平台生成订单号时连续冲突，本次请求什么都没写、没扣 | 用**同一个** `idempotencyKey` 重新签名后重试 |
@@ -538,7 +538,7 @@ Python 的 `bool` 是 `int` 的子类型，必须先判布尔，否则会把 `tr
 > ⚠️ **`402` 请不要重试。**
 >
 > 你的账户在平台上是**预付费**的：`/order/create` 与 `/order/renew` 在受理时就按结算价扣款，
-> 下单时余额已到达额度，整单被拒、一分钱不扣。在余额回升（充值，或在途订单落 `FAILED` / `REFUNDED`
+> 余额扣完会跌破额度时整单被拒、一分钱不扣。在余额回升（充值，或在途订单落 `FAILED` / `REFUNDED`
 > 自动退回）之前，重试都是同一个结果。
 >
 > 请把 `402` 当成**需要人工介入**的信号（告警 + 暂停该
@@ -660,7 +660,6 @@ return body.data
 | `retailPrice` | string | 平台不披露零售价，恒为 `"0"` |
 | `currency` | string\|null | 币种，如 `USD` |
 | `configVersion` | number | 商品配置的**发布代次**：平台每次发布该商品都会递增，**即使内容未变**。可用于判断"需要重新拉取"，不能用于判断"内容确实变了" |
-| `countryCodeList` | string[]\|null | 覆盖国家/地区，ISO 3166-1 alpha-2 代码（大写，如 `JP`），主覆盖国在前，不重复。取不到时为 `null` —— 那是"未知"，不是"不覆盖任何国家"；**早期受理订单**的 `product` 块里恒为 `null` |
 
 > ⚠️ **类型里带 `null` 的字段都可能是 `null`**，`attributes` 尤其常见（见下节）。
 > 平台**不为可空字段的未知值编造默认值**（取不到就是 `null`）—— 请按上表的类型解析，不要假设可空字段一定有值。
@@ -671,9 +670,6 @@ return body.data
 >
 > `dataLimited: "N"` 的不限量套餐没有总量概念，`volume` 当前为 `"0.000000"` ——
 > 那是"没有额度上限"，不是"额度为零"。
-
-> ℹ️ **覆盖国家请以 `countryCodeList` 为准。** `mccList` 是网络维度的列表：一个国家可以有多个
-> MCC，也有不属于任何国家的 MCC（如国际/卫星网络），它不能一一换算成国家。
 
 > ℹ️ **需要不同的商品字段结构？** 上表是默认结构。若贵方的系统需要其它字段组织方式
 > （不同的字段名、额外的派生字段、或把覆盖范围/价格按贵方口径重排），
@@ -756,20 +752,7 @@ return body.data
         "settlementPrice": "0",
         "retailPrice": "0",
         "currency": "USD",
-        "configVersion": 9,
-        "countryCodeList": [
-          "GE",
-          "KZ",
-          "UA",
-          "AM",
-          "KG",
-          "UZ",
-          "BY",
-          "TJ",
-          "MD",
-          "RU",
-          "AZ"
-        ]
+        "configVersion": 9
       },
       {
         "productCode": "XP0909F3C1C8A9D7F97456F799",
@@ -810,20 +793,7 @@ return body.data
         "settlementPrice": "0",
         "retailPrice": "0",
         "currency": "USD",
-        "configVersion": 9,
-        "countryCodeList": [
-          "GE",
-          "KZ",
-          "UA",
-          "AM",
-          "KG",
-          "UZ",
-          "BY",
-          "TJ",
-          "MD",
-          "RU",
-          "AZ"
-        ]
+        "configVersion": 9
       }
     ],
     "hasMore": true,
@@ -946,20 +916,7 @@ public List<JsonNode> listAllProducts(XpinEsimClient client) throws Exception {
     "settlementPrice": "0",
     "retailPrice": "0",
     "currency": "USD",
-    "configVersion": 9,
-    "countryCodeList": [
-      "GE",
-      "KZ",
-      "UA",
-      "AM",
-      "KG",
-      "UZ",
-      "BY",
-      "TJ",
-      "MD",
-      "RU",
-      "AZ"
-    ]
+    "configVersion": 9
   },
   "code": 200,
   "msg": "ok",
@@ -1081,7 +1038,7 @@ JsonNode detail = client.invoke("/openapi/v1/products/detail",
 
 > ⚠️ **受理即扣款。** 平台在返回 `ACCEPTED` 的同一个事务里就按该商品的结算价从你的预付费余额扣了钱，不是等履约才扣。后续订单落 `FAILED`（不会出卡）或 `REFUNDED`（退款确认）时自动退回，中间态不动钱。极少数情况下订单状态会被事后更正（见 §5.1），余额随之重新扣回或退回。
 >
-> 下单时余额已到达额度，**整单被拒、一分钱不扣**，返回 `402 BALANCE_LIMIT_REACHED`。
+> 余额不足以致本单会跌破额度时，**整单被拒、一分钱不扣**，返回 `402 BALANCE_LIMIT_REACHED`。
 > **收到这个码请不要重试**，先完成充值，见 [§3](#3-错误码)。
 
 **示例响应**
@@ -1259,20 +1216,7 @@ public String createOrder(XpinEsimClient client, String productCode,
       "settlementPrice": "0",
       "retailPrice": "0",
       "currency": "USD",
-      "configVersion": 4,
-      "countryCodeList": [
-        "GE",
-        "KZ",
-        "UA",
-        "AM",
-        "KG",
-        "UZ",
-        "BY",
-        "TJ",
-        "MD",
-        "RU",
-        "AZ"
-      ]
+      "configVersion": 4
     }
   },
   "code": 200,
@@ -1432,20 +1376,7 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
           "settlementPrice": "0",
           "retailPrice": "0",
           "currency": "USD",
-          "configVersion": 4,
-          "countryCodeList": [
-            "GE",
-            "KZ",
-            "UA",
-            "AM",
-            "KG",
-            "UZ",
-            "BY",
-            "TJ",
-            "MD",
-            "RU",
-            "AZ"
-          ]
+          "configVersion": 4
         }
       },
       {
@@ -1487,8 +1418,7 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
           "settlementPrice": "0",
           "retailPrice": "0",
           "currency": "USD",
-          "configVersion": 2,
-          "countryCodeList": null
+          "configVersion": 2
         }
       }
     ],
@@ -1732,8 +1662,7 @@ public RenewCheck checkRenewable(XpinEsimClient client, String iccid, String pro
 {"data":{"list":[{"productCode":"XP2D6285459B2CB858B2E52390","productName":"Europe 365D 5GB","tagName":"Europe",
   "volume":"5120.000000","dataLimited":"Y","validity":365,"expireDay":365,"cardType":"ep3","productType":"DATA_PACKAGE",
   "mccList":["276","232","206","218","248","219","244","280","230","238","284","262","216","295","247","222","202","208","272","278","270","268","259","226","294","242","204","246","214","231","293","220","228","240","255","234","235","274"],
-  "attributes":null,"settlementPrice":"0","retailPrice":"0","currency":"USD","configVersion":1,
-  "countryCodeList":["AL","AT","BE","BA","EE","HR","FI","CY","CZ","DK","BG","DE","HU","LI","LV","IT","GR","FR","IE","MT","LU","PT","MD","RO","MK","NO","NL","LT","ES","SK","SI","RS","CH","SE","UA","GB","IS"]}],
+  "attributes":null,"settlementPrice":"0","retailPrice":"0","currency":"USD","configVersion":1}],
   "hasMore":false,"pageNo":1,"pageSize":1,"language":"en"},"code":200,"msg":"ok","t":1791543582196}
 
 // 一个都不能续（例：卡型规则为"日包独占"、卡上的日包还在用）
@@ -2605,25 +2534,12 @@ app.post('/xpin/webhook', async (req, res) => {
 
 | 项 | 值 |
 |---|---|
-| 送达判定 | **HTTP 2xx 且响应体是 JSON 对象，其 `code === "0000"`（字符串）** |
-| 失败情形 | 非 2xx、连接失败或响应超时（10 秒）、`code` 不是 `"0000"`、响应体不是 JSON 对象（见下方应答示例）、响应体超过 1 MB |
+| 送达判定 | **HTTP 2xx 且响应体 `code === "0000"`（字符串）** |
+| 失败情形 | 非 2xx、连接失败或响应超时（10 秒）、`code` 不是 `"0000"`、响应体超过 1 MB |
 | 重投节奏 | **退避**，见下表 |
 | 总尝试次数 | **7 次**（首投 + 6 次重投），之后不再重投 |
 | 重投时 | `eventId` 与 `data` **不变**；`timestamp` / `nonce` / `sign` **每次重新生成** |
 | ACK 之后 | **立即停止重投** |
-
-**应答示例**：只需要 `code` 一个字段，其余字段（如 `msg`）可有可无，平台不读。
-
-```
-HTTP/1.1 200 OK
-Content-Type: application/json
-
-{"code":"0000"}
-```
-
-> ⚠️ **响应体直接写 JSON 对象，不要再把它序列化成 JSON 字符串。** 常见于框架把已经序列化好的字符串
-> 又交给 JSON 序列化器输出，线上得到的是 `"{\"code\":\"0000\"}"`（带外层引号与转义，21 字节）。
-> 这种写法平台目前**也按送达处理**，但它不是约定写法，请改为直接返回对象；再多包一层则判为失败。
 
 > ⚠️ **回调地址请直接填最终地址（例如直接写 `https://`），不要依赖重定向。** 平台会跟随 3xx 跳转、以跳转后的
 > 最终响应判定送达，但 `301` / `302` / `303` 跳转会把 `POST` 变成不带 body 的 `GET` —— 事件到不了你的处理逻辑。

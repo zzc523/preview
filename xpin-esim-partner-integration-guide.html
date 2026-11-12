@@ -404,10 +404,10 @@ Python 的 <code>bool</code> 是 <code>int</code> 的子类型，必须先判布
 否则在鉴权之前就会得到 <code>code: 404</code>。</p></blockquote>
 <hr>
 <h2 id="3-错误码">3. 错误码<a class="anchor" href="#3-错误码">#</a></h2>
-<div class="tw"><table><thead><tr><th><code>code</code></th><th><code>msg</code></th><th>含义</th><th>你该做什么</th></tr></thead><tbody><tr><td><code>200</code></td><td><code>ok</code></td><td>成功</td><td>—</td></tr><tr><td><code>400</code></td><td><code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code> / <code>&lt;字段&gt; Range error</code> / <code>&lt;字段&gt; Type error, ...</code></td><td>参数校验失败（<strong>自由文本，不是稳定错误码</strong>）。必填字段传空串得到 <code>required</code>，传纯空白得到 <code>length error</code>（先去首尾空白再计长度）</td><td>修参数。判定用 <code>code===400</code> + 字段名子串，不要精确匹配 <code>msg</code></td></tr><tr><td><code>400</code></td><td><code>ORDER_RANGE_SELECTOR_REQUIRED</code> / <code>ORDER_RANGE_SELECTOR_CONFLICT</code> / <code>ORDER_PAGE_TOKEN_INVALID</code></td><td>列表选择器/游标非法</td><td>见 §4.6</td></tr><tr><td><code>400</code></td><td><code>ACCOUNT_PAGE_TOKEN_INVALID</code></td><td>余额接口的 <code>pageToken</code> 被改动、已过期，或不是签发给你、签发给本接口的</td><td>去掉 <code>pageToken</code> 从第一页重新开始，见 §4.13</td></tr><tr><td><code>400</code></td><td><code>ACCOUNT_PAGE_SIZE_INVALID</code></td><td>余额接口的 <code>pageSize</code> 过了参数校验、但不是合法整数（如数字 <code>0</code>、字符串 <code>"10.5"</code>）</td><td>传 1–100 的整数，见 §4.13</td></tr><tr><td><code>400</code></td><td><code>REQUEST_BODY_NOT_JSON</code> / <code>REQUEST_BODY_MUST_BE_OBJECT</code></td><td>请求体不是 JSON，或是 JSON 但不是对象</td><td>检查序列化</td></tr><tr><td><code>401</code></td><td><code>AUTH_HEADERS_MISSING</code></td><td>四个签名头缺任意一个</td><td>补头</td></tr><tr><td><code>401</code></td><td><code>NONCE_INVALID</code></td><td>nonce 格式不符</td><td>用 <code>^[A-Za-z0-9._:-]{8,128}$</code></td></tr><tr><td><code>401</code></td><td><code>TIMESTAMP_INVALID</code></td><td>时间戳非数字或偏差 &gt; 5 分钟</td><td><strong>对时</strong>；确认用的是毫秒</td></tr><tr><td><code>401</code></td><td><code>APP_KEY_INVALID</code></td><td>app_key 不存在/已停用/环境不匹配</td><td>找平台核对凭证</td></tr><tr><td><code>401</code></td><td><code>CREDENTIAL_EXPIRED</code></td><td>凭证已过期</td><td>找平台轮换</td></tr><tr><td><code>401</code></td><td><code>SIGNATURE_INVALID</code></td><td>签名不匹配</td><td>先跑 <a href="#26-自检向量">2.6</a> 的自检向量，全过再查联调</td></tr><tr><td><code>400</code></td><td><code>CANONICAL_*</code>：<code>CANONICAL_KEY_INVALID</code> / <code>CANONICAL_NUMBER_UNSUPPORTED</code> / <code>CANONICAL_TOO_DEEP</code> / <code>CANONICAL_TOO_LARGE</code></td><td>载荷里有签不了的值：依次是不合法的键名、小数或超范围整数、嵌套过深、节点过多</td><td><strong>查载荷，不要查密钥</strong>。<code>msg</code> 只有错误码、不指出字段，请用本地的规范化实现定位</td></tr><tr><td><code>401</code></td><td><code>NONCE_REPLAYED</code></td><td>nonce 已被用过</td><td>每次请求换新 nonce</td></tr><tr><td><code>403</code></td><td><code>SCOPE_FORBIDDEN</code></td><td>凭证 scope 不足</td><td>找平台加 scope</td></tr><tr><td><code>403</code></td><td><code>IP_NOT_ALLOWED</code></td><td>源 IP 不在白名单</td><td>找平台加 IP</td></tr><tr><td><code>400</code></td><td><code>ORDER_INPUT_INVALID</code> / <code>EXTERNAL_USER_ID_INVALID</code></td><td>受理类接口的兜底校验，<strong>正常不会出现</strong>：字符串参数先去首尾空白再校验长度，空白串、超长的 <code>externalUserId</code> 在通用参数校验那一步就会被拒（<code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code>）</td><td>同通用参数校验</td></tr><tr><td><code>403</code></td><td><code>SOURCE_PARTNER_NOT_ALLOWED</code></td><td><code>sourcePartnerCode</code> 不是你名下的子分销商</td><td>检查该字段</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_FOUND</code></td><td>商品不存在或不属于你</td><td>从 <code>products/list</code> 动态取码</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_AVAILABLE</code></td><td>下单时商品不可售/不存在</td><td>同上</td></tr><tr><td><code>404</code></td><td><code>ORDER_NOT_FOUND</code></td><td>订单不存在或不属于你</td><td>检查 <code>clientOrderNo</code></td></tr><tr><td><code>404</code></td><td><code>CARD_NOT_FOUND</code></td><td>卡不存在或不属于你</td><td>检查 <code>iccid</code></td></tr><tr><td><code>404</code> / <code>405</code></td><td>—</td><td>路径名拼错（前缀正确），或 HTTP 方法不是 <code>POST</code>（<code>GET</code> 得到 <code>405</code>，其它方法得到 <code>404</code>）。<code>msg</code> 不是稳定错误码，不要对它做断言。⚠️ <strong>前缀本身写错是另一回事</strong>，见 <a href="#31-非-200-的响应怎么处理">§3.1</a></td><td>核对路径名与方法。确实发的是 <code>POST</code> 却收到 <code>405</code>，先检查 Base URL 是不是 <code>https://</code>（见 §1）</td></tr><tr><td><code>409</code></td><td><code>IDEMPOTENCY_KEY_REUSED</code></td><td>同 <code>idempotencyKey</code> 但请求内容不同</td><td>换新的幂等键</td></tr><tr><td><code>409</code></td><td><code>CLIENT_ORDER_NO_REUSED</code></td><td><code>clientOrderNo</code> 已被别的订单占用</td><td>换新的业务单号</td></tr><tr><td><code>409</code></td><td><code>RENEW_NOT_ALLOWED</code></td><td>这张卡此刻不可续订</td><td>先调 <code>iccid/renew</code> 看 <code>reasons</code></td></tr><tr><td><code>409</code></td><td><code>ORDER_NOT_REFUNDABLE</code></td><td>这一单现在不能退：未履约、已退款、或不具备可退款的计价信息</td><td>查 <code>/order/query</code> 看当前状态。<strong>改参数改不出来</strong>，见 §4.12</td></tr><tr><td><code>409</code></td><td><code>REFUND_ALREADY_IN_PROGRESS</code></td><td>这一单已有一张在途退款单</td><td>等 <code>ORDER_REFUND_RESULT</code> 出结论后再发起，见 §4.12</td></tr><tr><td><code>402</code></td><td><code>BALANCE_LIMIT_REACHED</code></td><td><strong>预付费余额不足</strong>：下单时余额已到达你的透支额度，整单被拒、一分钱不扣</td><td>充值。<strong>不要重试</strong>，见下方 ⚠️</td></tr><tr><td><code>503</code></td><td><code>BALANCE_ACCOUNT_NOT_FOUND</code></td><td>余额账户尚未就绪</td><td>联系平台开通后重试</td></tr><tr><td><code>503</code></td><td><code>CURRENCY_MISMATCH</code></td><td>账户币种与商品币种不一致</td><td>联系平台核对，<strong>改请求改不出来</strong></td></tr><tr><td><code>503</code></td><td><code>ORDER_NO_COLLISION</code></td><td>平台生成订单号时连续冲突，本次请求什么都没写、没扣</td><td>用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后重试</td></tr><tr><td><code>503</code></td><td>其它未列出的 <code>msg</code></td><td>开卡 / 续订 / 退款受理时的平台侧临时故障。<code>msg</code> 是平台内部的错误标识，不是稳定错误码</td><td>用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后退避重试（已受理的会以 <code>replayed: true</code> 返回）；持续出现请联系平台</td></tr><tr><td><code>413</code></td><td><code>REQUEST_ENTITY_TOO_LARGE</code></td><td>请求体超过 256KB（体积再大时会在到达平台之前被拒，得到传输层的 <code>HTTP 413</code>，见 §3.1）</td><td>拆小</td></tr><tr><td><code>415</code></td><td><code>CONTENT_TYPE_MUST_BE_JSON</code></td><td><code>Content-Type</code> 不是 <code>application/json</code></td><td>改头</td></tr><tr><td><code>429</code></td><td><code>QPS_LIMITED</code></td><td>超过该商户每秒请求上限。<strong>开卡、续订、退款三个写接口不受此限</strong>，配额口径见 <a href="#23-认证检查顺序">§2.3</a></td><td>退避重试</td></tr><tr><td><code>406</code></td><td><code>[controller error]</code></td><td>服务端异常。<code>msg</code> 为固定字符串 <code>[controller error]</code>，不携带原因</td><td>见下方 ⚠️</td></tr><tr><td><code>501</code></td><td><code>FEATURE_NOT_IMPLEMENTED</code></td><td>该路径是平台预留、尚未开放的接口（鉴权通过后才会给出这个码）</td><td>只调用 §4 列出的接口</td></tr><tr><td><code>503</code></td><td><code>OPENAPI_AUTH_UNAVAILABLE</code> / <code>PLATFORM_NOT_ENABLED</code> / <code>PRODUCT_ADAPTER_UNKNOWN</code></td><td>平台侧依赖或配置问题，与你的请求无关</td><td>退避重试并联系平台</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th><code>code</code></th><th><code>msg</code></th><th>含义</th><th>你该做什么</th></tr></thead><tbody><tr><td><code>200</code></td><td><code>ok</code></td><td>成功</td><td>—</td></tr><tr><td><code>400</code></td><td><code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code> / <code>&lt;字段&gt; Range error</code> / <code>&lt;字段&gt; Type error, ...</code></td><td>参数校验失败（<strong>自由文本，不是稳定错误码</strong>）。必填字段传空串得到 <code>required</code>，传纯空白得到 <code>length error</code>（先去首尾空白再计长度）</td><td>修参数。判定用 <code>code===400</code> + 字段名子串，不要精确匹配 <code>msg</code></td></tr><tr><td><code>400</code></td><td><code>ORDER_RANGE_SELECTOR_REQUIRED</code> / <code>ORDER_RANGE_SELECTOR_CONFLICT</code> / <code>ORDER_PAGE_TOKEN_INVALID</code></td><td>列表选择器/游标非法</td><td>见 §4.6</td></tr><tr><td><code>400</code></td><td><code>ACCOUNT_PAGE_TOKEN_INVALID</code></td><td>余额接口的 <code>pageToken</code> 被改动、已过期，或不是签发给你、签发给本接口的</td><td>去掉 <code>pageToken</code> 从第一页重新开始，见 §4.13</td></tr><tr><td><code>400</code></td><td><code>ACCOUNT_PAGE_SIZE_INVALID</code></td><td>余额接口的 <code>pageSize</code> 过了参数校验、但不是合法整数（如数字 <code>0</code>、字符串 <code>"10.5"</code>）</td><td>传 1–100 的整数，见 §4.13</td></tr><tr><td><code>400</code></td><td><code>REQUEST_BODY_NOT_JSON</code> / <code>REQUEST_BODY_MUST_BE_OBJECT</code></td><td>请求体不是 JSON，或是 JSON 但不是对象</td><td>检查序列化</td></tr><tr><td><code>401</code></td><td><code>AUTH_HEADERS_MISSING</code></td><td>四个签名头缺任意一个</td><td>补头</td></tr><tr><td><code>401</code></td><td><code>NONCE_INVALID</code></td><td>nonce 格式不符</td><td>用 <code>^[A-Za-z0-9._:-]{8,128}$</code></td></tr><tr><td><code>401</code></td><td><code>TIMESTAMP_INVALID</code></td><td>时间戳非数字或偏差 &gt; 5 分钟</td><td><strong>对时</strong>；确认用的是毫秒</td></tr><tr><td><code>401</code></td><td><code>APP_KEY_INVALID</code></td><td>app_key 不存在/已停用/环境不匹配</td><td>找平台核对凭证</td></tr><tr><td><code>401</code></td><td><code>CREDENTIAL_EXPIRED</code></td><td>凭证已过期</td><td>找平台轮换</td></tr><tr><td><code>401</code></td><td><code>SIGNATURE_INVALID</code></td><td>签名不匹配</td><td>先跑 <a href="#26-自检向量">2.6</a> 的自检向量，全过再查联调</td></tr><tr><td><code>400</code></td><td><code>CANONICAL_*</code>：<code>CANONICAL_KEY_INVALID</code> / <code>CANONICAL_NUMBER_UNSUPPORTED</code> / <code>CANONICAL_TOO_DEEP</code> / <code>CANONICAL_TOO_LARGE</code></td><td>载荷里有签不了的值：依次是不合法的键名、小数或超范围整数、嵌套过深、节点过多</td><td><strong>查载荷，不要查密钥</strong>。<code>msg</code> 只有错误码、不指出字段，请用本地的规范化实现定位</td></tr><tr><td><code>401</code></td><td><code>NONCE_REPLAYED</code></td><td>nonce 已被用过</td><td>每次请求换新 nonce</td></tr><tr><td><code>403</code></td><td><code>SCOPE_FORBIDDEN</code></td><td>凭证 scope 不足</td><td>找平台加 scope</td></tr><tr><td><code>403</code></td><td><code>IP_NOT_ALLOWED</code></td><td>源 IP 不在白名单</td><td>找平台加 IP</td></tr><tr><td><code>400</code></td><td><code>ORDER_INPUT_INVALID</code> / <code>EXTERNAL_USER_ID_INVALID</code></td><td>受理类接口的兜底校验，<strong>正常不会出现</strong>：字符串参数先去首尾空白再校验长度，空白串、超长的 <code>externalUserId</code> 在通用参数校验那一步就会被拒（<code>&lt;字段&gt; required</code> / <code>&lt;字段&gt; length error [a-b]</code>）</td><td>同通用参数校验</td></tr><tr><td><code>403</code></td><td><code>SOURCE_PARTNER_NOT_ALLOWED</code></td><td><code>sourcePartnerCode</code> 不是你名下的子分销商</td><td>检查该字段</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_FOUND</code></td><td>商品不存在或不属于你</td><td>从 <code>products/list</code> 动态取码</td></tr><tr><td><code>404</code></td><td><code>PRODUCT_NOT_AVAILABLE</code></td><td>下单时商品不可售/不存在</td><td>同上</td></tr><tr><td><code>404</code></td><td><code>ORDER_NOT_FOUND</code></td><td>订单不存在或不属于你</td><td>检查 <code>clientOrderNo</code></td></tr><tr><td><code>404</code></td><td><code>CARD_NOT_FOUND</code></td><td>卡不存在或不属于你</td><td>检查 <code>iccid</code></td></tr><tr><td><code>404</code> / <code>405</code></td><td>—</td><td>路径名拼错（前缀正确），或 HTTP 方法不是 <code>POST</code>（<code>GET</code> 得到 <code>405</code>，其它方法得到 <code>404</code>）。<code>msg</code> 不是稳定错误码，不要对它做断言。⚠️ <strong>前缀本身写错是另一回事</strong>，见 <a href="#31-非-200-的响应怎么处理">§3.1</a></td><td>核对路径名与方法。确实发的是 <code>POST</code> 却收到 <code>405</code>，先检查 Base URL 是不是 <code>https://</code>（见 §1）</td></tr><tr><td><code>409</code></td><td><code>IDEMPOTENCY_KEY_REUSED</code></td><td>同 <code>idempotencyKey</code> 但请求内容不同</td><td>换新的幂等键</td></tr><tr><td><code>409</code></td><td><code>CLIENT_ORDER_NO_REUSED</code></td><td><code>clientOrderNo</code> 已被别的订单占用</td><td>换新的业务单号</td></tr><tr><td><code>409</code></td><td><code>RENEW_NOT_ALLOWED</code></td><td>这张卡此刻不可续订</td><td>先调 <code>iccid/renew</code> 看 <code>reasons</code></td></tr><tr><td><code>409</code></td><td><code>ORDER_NOT_REFUNDABLE</code></td><td>这一单现在不能退：未履约、已退款、或不具备可退款的计价信息</td><td>查 <code>/order/query</code> 看当前状态。<strong>改参数改不出来</strong>，见 §4.12</td></tr><tr><td><code>409</code></td><td><code>REFUND_ALREADY_IN_PROGRESS</code></td><td>这一单已有一张在途退款单</td><td>等 <code>ORDER_REFUND_RESULT</code> 出结论后再发起，见 §4.12</td></tr><tr><td><code>402</code></td><td><code>BALANCE_LIMIT_REACHED</code></td><td><strong>预付费余额不足</strong>：本单扣完会跌破你的透支额度，整单被拒、一分钱不扣</td><td>充值。<strong>不要重试</strong>，见下方 ⚠️</td></tr><tr><td><code>503</code></td><td><code>BALANCE_ACCOUNT_NOT_FOUND</code></td><td>余额账户尚未就绪</td><td>联系平台开通后重试</td></tr><tr><td><code>503</code></td><td><code>CURRENCY_MISMATCH</code></td><td>账户币种与商品币种不一致</td><td>联系平台核对，<strong>改请求改不出来</strong></td></tr><tr><td><code>503</code></td><td><code>ORDER_NO_COLLISION</code></td><td>平台生成订单号时连续冲突，本次请求什么都没写、没扣</td><td>用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后重试</td></tr><tr><td><code>503</code></td><td>其它未列出的 <code>msg</code></td><td>开卡 / 续订 / 退款受理时的平台侧临时故障。<code>msg</code> 是平台内部的错误标识，不是稳定错误码</td><td>用<strong>同一个</strong> <code>idempotencyKey</code> 重新签名后退避重试（已受理的会以 <code>replayed: true</code> 返回）；持续出现请联系平台</td></tr><tr><td><code>413</code></td><td><code>REQUEST_ENTITY_TOO_LARGE</code></td><td>请求体超过 256KB（体积再大时会在到达平台之前被拒，得到传输层的 <code>HTTP 413</code>，见 §3.1）</td><td>拆小</td></tr><tr><td><code>415</code></td><td><code>CONTENT_TYPE_MUST_BE_JSON</code></td><td><code>Content-Type</code> 不是 <code>application/json</code></td><td>改头</td></tr><tr><td><code>429</code></td><td><code>QPS_LIMITED</code></td><td>超过该商户每秒请求上限。<strong>开卡、续订、退款三个写接口不受此限</strong>，配额口径见 <a href="#23-认证检查顺序">§2.3</a></td><td>退避重试</td></tr><tr><td><code>406</code></td><td><code>[controller error]</code></td><td>服务端异常。<code>msg</code> 为固定字符串 <code>[controller error]</code>，不携带原因</td><td>见下方 ⚠️</td></tr><tr><td><code>501</code></td><td><code>FEATURE_NOT_IMPLEMENTED</code></td><td>该路径是平台预留、尚未开放的接口（鉴权通过后才会给出这个码）</td><td>只调用 §4 列出的接口</td></tr><tr><td><code>503</code></td><td><code>OPENAPI_AUTH_UNAVAILABLE</code> / <code>PLATFORM_NOT_ENABLED</code> / <code>PRODUCT_ADAPTER_UNKNOWN</code></td><td>平台侧依赖或配置问题，与你的请求无关</td><td>退避重试并联系平台</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>⚠️ <strong><code>402</code> 请不要重试。</strong></p>
 <p>你的账户在平台上是<strong>预付费</strong>的：<code>/order/create</code> 与 <code>/order/renew</code> 在受理时就按结算价扣款，
-下单时余额已到达额度，整单被拒、一分钱不扣。在余额回升（充值，或在途订单落 <code>FAILED</code> / <code>REFUNDED</code>
+余额扣完会跌破额度时整单被拒、一分钱不扣。在余额回升（充值，或在途订单落 <code>FAILED</code> / <code>REFUNDED</code>
 自动退回）之前，重试都是同一个结果。</p>
 <p>请把 <code>402</code> 当成<strong>需要人工介入</strong>的信号（告警 + 暂停该
 商户的下单队列），不要交给自动重试 —— 对它做无限重试除了浪费两边的资源，不会得到
@@ -466,7 +466,7 @@ return body.data</code></pre></figure>
 <p><strong>商品对象</strong></p>
 <p>同一个商品在 <code>/products/list</code>、<code>/products/detail</code>、<code>/order/query</code>、<code>/order/list</code> 上是
 <strong>同一份结构</strong>，字段名、字段集、键序一致。</p>
-<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td>对外商品码，下单用它</td></tr><tr><td><code>productName</code></td><td>string|null</td><td>商品名</td></tr><tr><td><code>tagName</code></td><td>string|null</td><td>分组标签，如 <code>Europe</code></td></tr><tr><td><code>volume</code></td><td>string|null</td><td>流量额度（字符串形式的十进制数），<strong>单位 MB</strong>。不限量套餐（<code>dataLimited: "N"</code>）上它没有意义，当前为 <code>"0.000000"</code> —— 是否限量请以 <code>dataLimited</code> 为准</td></tr><tr><td><code>dataLimited</code></td><td>string</td><td><code>Y</code> 限量 / <code>N</code> 不限量</td></tr><tr><td><code>validity</code></td><td>number|null</td><td>套餐天数：激活之后可以使用的天数</td></tr><tr><td><code>expireDay</code></td><td>number|null</td><td>未激活状态下的有效期（天）：开卡之后须在这段时间内完成激活</td></tr><tr><td><code>cardType</code></td><td>string</td><td>卡型标识，如 <code>eo1</code> / <code>ep1</code> / <code>ep3</code> / <code>C4</code>。取值由平台目录决定，<strong>请勿枚举或硬编码</strong></td></tr><tr><td><code>productType</code></td><td>string|null</td><td>形态：<code>DATA_PACKAGE</code> 流量包 / <code>DAYPASS</code> 日包；无法归类时为 <code>null</code></td></tr><tr><td><code>mccList</code></td><td>string[]|null</td><td>覆盖网络的 MCC 列表</td></tr><tr><td><code>attributes</code></td><td>object|null</td><td>展示用扩展属性，<strong>见下方专节</strong></td></tr><tr><td><code>settlementPrice</code></td><td>string|null</td><td>结算单价。<strong>默认结构不披露金额，恒为 <code>"0"</code></strong>；仅当平台方为贵方账号开通了结算价披露时才是真实单价（十进制字符串，6 位小数），此时个别尚未定价的商品、以及早期受理订单的快照里可能为 <code>null</code></td></tr><tr><td><code>retailPrice</code></td><td>string</td><td>平台不披露零售价，恒为 <code>"0"</code></td></tr><tr><td><code>currency</code></td><td>string|null</td><td>币种，如 <code>USD</code></td></tr><tr><td><code>configVersion</code></td><td>number</td><td>商品配置的<strong>发布代次</strong>：平台每次发布该商品都会递增，<strong>即使内容未变</strong>。可用于判断"需要重新拉取"，不能用于判断"内容确实变了"</td></tr><tr><td><code>countryCodeList</code></td><td>string[]|null</td><td>覆盖国家/地区，ISO 3166-1 alpha-2 代码（大写，如 <code>JP</code>），主覆盖国在前，不重复。取不到时为 <code>null</code> —— 那是"未知"，不是"不覆盖任何国家"；<strong>早期受理订单</strong>的 <code>product</code> 块里恒为 <code>null</code></td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>字段</th><th>类型</th><th>说明</th></tr></thead><tbody><tr><td><code>productCode</code></td><td>string</td><td>对外商品码，下单用它</td></tr><tr><td><code>productName</code></td><td>string|null</td><td>商品名</td></tr><tr><td><code>tagName</code></td><td>string|null</td><td>分组标签，如 <code>Europe</code></td></tr><tr><td><code>volume</code></td><td>string|null</td><td>流量额度（字符串形式的十进制数），<strong>单位 MB</strong>。不限量套餐（<code>dataLimited: "N"</code>）上它没有意义，当前为 <code>"0.000000"</code> —— 是否限量请以 <code>dataLimited</code> 为准</td></tr><tr><td><code>dataLimited</code></td><td>string</td><td><code>Y</code> 限量 / <code>N</code> 不限量</td></tr><tr><td><code>validity</code></td><td>number|null</td><td>套餐天数：激活之后可以使用的天数</td></tr><tr><td><code>expireDay</code></td><td>number|null</td><td>未激活状态下的有效期（天）：开卡之后须在这段时间内完成激活</td></tr><tr><td><code>cardType</code></td><td>string</td><td>卡型标识，如 <code>eo1</code> / <code>ep1</code> / <code>ep3</code> / <code>C4</code>。取值由平台目录决定，<strong>请勿枚举或硬编码</strong></td></tr><tr><td><code>productType</code></td><td>string|null</td><td>形态：<code>DATA_PACKAGE</code> 流量包 / <code>DAYPASS</code> 日包；无法归类时为 <code>null</code></td></tr><tr><td><code>mccList</code></td><td>string[]|null</td><td>覆盖网络的 MCC 列表</td></tr><tr><td><code>attributes</code></td><td>object|null</td><td>展示用扩展属性，<strong>见下方专节</strong></td></tr><tr><td><code>settlementPrice</code></td><td>string|null</td><td>结算单价。<strong>默认结构不披露金额，恒为 <code>"0"</code></strong>；仅当平台方为贵方账号开通了结算价披露时才是真实单价（十进制字符串，6 位小数），此时个别尚未定价的商品、以及早期受理订单的快照里可能为 <code>null</code></td></tr><tr><td><code>retailPrice</code></td><td>string</td><td>平台不披露零售价，恒为 <code>"0"</code></td></tr><tr><td><code>currency</code></td><td>string|null</td><td>币种，如 <code>USD</code></td></tr><tr><td><code>configVersion</code></td><td>number</td><td>商品配置的<strong>发布代次</strong>：平台每次发布该商品都会递增，<strong>即使内容未变</strong>。可用于判断"需要重新拉取"，不能用于判断"内容确实变了"</td></tr></tbody></table></div>
 <blockquote class="note warn"><p>⚠️ <strong>类型里带 <code>null</code> 的字段都可能是 <code>null</code></strong>，<code>attributes</code> 尤其常见（见下节）。
 平台<strong>不为可空字段的未知值编造默认值</strong>（取不到就是 <code>null</code>）—— 请按上表的类型解析，不要假设可空字段一定有值。</p></blockquote>
 <blockquote class="note"><p>ℹ️ <strong><code>volume</code> 的单位是 MB</strong>，与 <code>/order/usage</code> 的字节口径换算关系为
@@ -474,8 +474,6 @@ return body.data</code></pre></figure>
 <code>"1024.000000"</code>，对应 <code>dataTotalBytes</code> 为 <code>1073741824</code>）。</p>
 <p><code>dataLimited: "N"</code> 的不限量套餐没有总量概念，<code>volume</code> 当前为 <code>"0.000000"</code> ——
 那是"没有额度上限"，不是"额度为零"。</p></blockquote>
-<blockquote class="note"><p>ℹ️ <strong>覆盖国家请以 <code>countryCodeList</code> 为准。</strong> <code>mccList</code> 是网络维度的列表：一个国家可以有多个
-MCC，也有不属于任何国家的 MCC（如国际/卫星网络），它不能一一换算成国家。</p></blockquote>
 <blockquote class="note"><p>ℹ️ <strong>需要不同的商品字段结构？</strong> 上表是默认结构。若贵方的系统需要其它字段组织方式
 （不同的字段名、额外的派生字段、或把覆盖范围/价格按贵方口径重排），
 <strong>可联系平台方定制</strong> —— 平台以适配器的方式为渠道单独提供，不影响本文档描述的默认结构。</p></blockquote>
@@ -537,20 +535,7 @@ MCC，也有不属于任何国家的 MCC（如国际/卫星网络），它不能
         "settlementPrice": "0",
         "retailPrice": "0",
         "currency": "USD",
-        "configVersion": 9,
-        "countryCodeList": [
-          "GE",
-          "KZ",
-          "UA",
-          "AM",
-          "KG",
-          "UZ",
-          "BY",
-          "TJ",
-          "MD",
-          "RU",
-          "AZ"
-        ]
+        "configVersion": 9
       },
       {
         "productCode": "XP0909F3C1C8A9D7F97456F799",
@@ -591,20 +576,7 @@ MCC，也有不属于任何国家的 MCC（如国际/卫星网络），它不能
         "settlementPrice": "0",
         "retailPrice": "0",
         "currency": "USD",
-        "configVersion": 9,
-        "countryCodeList": [
-          "GE",
-          "KZ",
-          "UA",
-          "AM",
-          "KG",
-          "UZ",
-          "BY",
-          "TJ",
-          "MD",
-          "RU",
-          "AZ"
-        ]
+        "configVersion": 9
       }
     ],
     "hasMore": true,
@@ -696,20 +668,7 @@ MCC，也有不属于任何国家的 MCC（如国际/卫星网络），它不能
     "settlementPrice": "0",
     "retailPrice": "0",
     "currency": "USD",
-    "configVersion": 9,
-    "countryCodeList": [
-      "GE",
-      "KZ",
-      "UA",
-      "AM",
-      "KG",
-      "UZ",
-      "BY",
-      "TJ",
-      "MD",
-      "RU",
-      "AZ"
-    ]
+    "configVersion": 9
   },
   "code": 200,
   "msg": "ok",
@@ -771,7 +730,7 @@ MCC，也有不属于任何国家的 MCC（如国际/卫星网络），它不能
 <code>orderStatus</code> 本身的取值（§5.1）。把 <code>ACCEPTED</code> 当成"受理成功"的判据，会让你在每一次
 超时重试上误判为失败并再次重试。</p></blockquote>
 <blockquote class="note warn"><p>⚠️ <strong>受理即扣款。</strong> 平台在返回 <code>ACCEPTED</code> 的同一个事务里就按该商品的结算价从你的预付费余额扣了钱，不是等履约才扣。后续订单落 <code>FAILED</code>（不会出卡）或 <code>REFUNDED</code>（退款确认）时自动退回，中间态不动钱。极少数情况下订单状态会被事后更正（见 §5.1），余额随之重新扣回或退回。</p>
-<p>下单时余额已到达额度，<strong>整单被拒、一分钱不扣</strong>，返回 <code>402 BALANCE_LIMIT_REACHED</code>。
+<p>余额不足以致本单会跌破额度时，<strong>整单被拒、一分钱不扣</strong>，返回 <code>402 BALANCE_LIMIT_REACHED</code>。
 <strong>收到这个码请不要重试</strong>，先完成充值，见 <a href="#3-错误码">§3</a>。</p></blockquote>
 <p><strong>示例响应</strong></p>
 <figure class="code" data-lang="json"><button class="copy" type="button">复制</button><pre><code>{
@@ -886,20 +845,7 @@ MCC，也有不属于任何国家的 MCC（如国际/卫星网络），它不能
       "settlementPrice": "0",
       "retailPrice": "0",
       "currency": "USD",
-      "configVersion": 4,
-      "countryCodeList": [
-        "GE",
-        "KZ",
-        "UA",
-        "AM",
-        "KG",
-        "UZ",
-        "BY",
-        "TJ",
-        "MD",
-        "RU",
-        "AZ"
-      ]
+      "configVersion": 4
     }
   },
   "code": 200,
@@ -1018,20 +964,7 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
           "settlementPrice": "0",
           "retailPrice": "0",
           "currency": "USD",
-          "configVersion": 4,
-          "countryCodeList": [
-            "GE",
-            "KZ",
-            "UA",
-            "AM",
-            "KG",
-            "UZ",
-            "BY",
-            "TJ",
-            "MD",
-            "RU",
-            "AZ"
-          ]
+          "configVersion": 4
         }
       },
       {
@@ -1073,8 +1006,7 @@ public JsonNode waitForFulfilled(XpinEsimClient client, String clientOrderNo,
           "settlementPrice": "0",
           "retailPrice": "0",
           "currency": "USD",
-          "configVersion": 2,
-          "countryCodeList": null
+          "configVersion": 2
         }
       }
     ],
@@ -1222,8 +1154,7 @@ public RenewCheck checkRenewable(XpinEsimClient client, String iccid, String pro
 {"data":{"list":[{"productCode":"XP2D6285459B2CB858B2E52390","productName":"Europe 365D 5GB","tagName":"Europe",
   "volume":"5120.000000","dataLimited":"Y","validity":365,"expireDay":365,"cardType":"ep3","productType":"DATA_PACKAGE",
   "mccList":["276","232","206","218","248","219","244","280","230","238","284","262","216","295","247","222","202","208","272","278","270","268","259","226","294","242","204","246","214","231","293","220","228","240","255","234","235","274"],
-  "attributes":null,"settlementPrice":"0","retailPrice":"0","currency":"USD","configVersion":1,
-  "countryCodeList":["AL","AT","BE","BA","EE","HR","FI","CY","CZ","DK","BG","DE","HU","LI","LV","IT","GR","FR","IE","MT","LU","PT","MD","RO","MK","NO","NL","LT","ES","SK","SI","RS","CH","SE","UA","GB","IS"]}],
+  "attributes":null,"settlementPrice":"0","retailPrice":"0","currency":"USD","configVersion":1}],
   "hasMore":false,"pageNo":1,"pageSize":1,"language":"en"},"code":200,"msg":"ok","t":1791543582196}
 
 // 一个都不能续（例：卡型规则为"日包独占"、卡上的日包还在用）
@@ -1741,15 +1672,7 @@ app.post('/xpin/webhook', async (req, res) =&gt; {
 <ol><li><strong>ACK 判据是响应体 <code>code === "0000"</code> 加 HTTP 2xx，两者都要</strong>。任何其它组合都按失败 处理并重投（间隔与上限见 <a href="#64-ack-与重投">6.4</a>）。所以处理失败时<strong>不要</strong>回 <code>0000</code>。</li><li><strong>幂等存储必须跨进程生效</strong>（唯一索引表或 Redis <code>SETNX</code>）。我们的重投可能落到你集群 里的另一个实例上，进程内的 <code>Set</code> 挡不住。<code>x-event-id</code> 头与 body 的 <code>eventId</code> 恒等， 用哪个都行 —— 但要注意<strong>头不在签名覆盖范围内</strong>，所以以 body 里的 <code>eventId</code> 为准更稳。</li></ol></blockquote>
 <hr>
 <h3 id="64-ack-与重投">6.4 ACK 与重投<a class="anchor" href="#64-ack-与重投">#</a></h3>
-<div class="tw"><table><thead><tr><th>项</th><th>值</th></tr></thead><tbody><tr><td>送达判定</td><td><strong>HTTP 2xx 且响应体是 JSON 对象，其 <code>code === "0000"</code>（字符串）</strong></td></tr><tr><td>失败情形</td><td>非 2xx、连接失败或响应超时（10 秒）、<code>code</code> 不是 <code>"0000"</code>、响应体不是 JSON 对象（见下方应答示例）、响应体超过 1 MB</td></tr><tr><td>重投节奏</td><td><strong>退避</strong>，见下表</td></tr><tr><td>总尝试次数</td><td><strong>7 次</strong>（首投 + 6 次重投），之后不再重投</td></tr><tr><td>重投时</td><td><code>eventId</code> 与 <code>data</code> <strong>不变</strong>；<code>timestamp</code> / <code>nonce</code> / <code>sign</code> <strong>每次重新生成</strong></td></tr><tr><td>ACK 之后</td><td><strong>立即停止重投</strong></td></tr></tbody></table></div>
-<p><strong>应答示例</strong>：只需要 <code>code</code> 一个字段，其余字段（如 <code>msg</code>）可有可无，平台不读。</p>
-<figure class="code"><button class="copy" type="button">复制</button><pre><code>HTTP/1.1 200 OK
-Content-Type: application/json
-
-{"code":"0000"}</code></pre></figure>
-<blockquote class="note warn"><p>⚠️ <strong>响应体直接写 JSON 对象，不要再把它序列化成 JSON 字符串。</strong> 常见于框架把已经序列化好的字符串
-又交给 JSON 序列化器输出，线上得到的是 <code>"{\"code\":\"0000\"}"</code>（带外层引号与转义，21 字节）。
-这种写法平台目前<strong>也按送达处理</strong>，但它不是约定写法，请改为直接返回对象；再多包一层则判为失败。</p></blockquote>
+<div class="tw"><table><thead><tr><th>项</th><th>值</th></tr></thead><tbody><tr><td>送达判定</td><td><strong>HTTP 2xx 且响应体 <code>code === "0000"</code>（字符串）</strong></td></tr><tr><td>失败情形</td><td>非 2xx、连接失败或响应超时（10 秒）、<code>code</code> 不是 <code>"0000"</code>、响应体超过 1 MB</td></tr><tr><td>重投节奏</td><td><strong>退避</strong>，见下表</td></tr><tr><td>总尝试次数</td><td><strong>7 次</strong>（首投 + 6 次重投），之后不再重投</td></tr><tr><td>重投时</td><td><code>eventId</code> 与 <code>data</code> <strong>不变</strong>；<code>timestamp</code> / <code>nonce</code> / <code>sign</code> <strong>每次重新生成</strong></td></tr><tr><td>ACK 之后</td><td><strong>立即停止重投</strong></td></tr></tbody></table></div>
 <blockquote class="note warn"><p>⚠️ <strong>回调地址请直接填最终地址（例如直接写 <code>https://</code>），不要依赖重定向。</strong> 平台会跟随 3xx 跳转、以跳转后的
 最终响应判定送达，但 <code>301</code> / <code>302</code> / <code>303</code> 跳转会把 <code>POST</code> 变成不带 body 的 <code>GET</code> —— 事件到不了你的处理逻辑。</p></blockquote>
 <p><strong>退避阶梯</strong></p>
